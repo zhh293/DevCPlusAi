@@ -1,0 +1,168 @@
+# ============================================================================
+#  DevCPlusAi - 自动构建并发布 Windows 可执行包
+# ----------------------------------------------------------------------------
+#  触发方式：
+#    1. 推送形如 v1.0.0 / v2.3.1-beta 的 tag 时，自动构建并发布正式 Release。
+#    2. 也可在 Actions 页面手动点击运行（workflow_dispatch），便于调试流程。
+#
+#  构建前提：
+#    本项目是 Delphi 7/VCL 工程，必须在具备合法 Delphi 编译器和依赖包的
+#    Windows runner 上构建。工作流不会再生成占位 exe；缺少 dcc32 时直接失败。
+# ============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'            # 例如 v1.0.0、v1.2.3-beta
+  workflow_dispatch:    # 允许在 Actions 页面手动触发，方便调试
+    inputs:
+      version:
+        description: '手动构建时使用的版本号（如 v0.0.0-dev）'
+        required: false
+        default: 'v0.0.0-dev'
+
+permissions:
+  contents: write       # 创建 Release / 上传产物需要写权限
+
+jobs:
+  build:
+    name: Build Windows EXE
+    # Set repository variable DEVCPP_RUNNER to a self-hosted runner label
+    # containing Delphi 7; otherwise this fails clearly on windows-latest.
+    runs-on: ${{ vars.DEVCPP_RUNNER || 'windows-latest' }}
+
+    steps:
+      # ----------------------------------------------------------------------
+      # 1. 拉取源码
+      # ----------------------------------------------------------------------
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # 2. 计算版本号（tag 触发用 tag 名，手动触发用输入值）
+      # ----------------------------------------------------------------------
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ----------------------------------------------------------------------
+      # 3. 使用真实 Delphi 编译器生成 devcpp.exe。
+      #    推荐将此 job 放到已安装 Delphi 7 和项目依赖包的 self-hosted runner。
+      # ----------------------------------------------------------------------
+      - name: Check Delphi compiler
+        shell: pwsh
+        run: |
+          if (-not (Get-Command dcc32.exe -ErrorAction SilentlyContinue)) {
+            throw "未找到 dcc32.exe。请将此 workflow 运行在已安装 Delphi 7 和项目依赖包的 Windows runner。"
+          }
+
+      - name: Prepare bundled Agent runtime
+        shell: pwsh
+        run: |
+          ./tools/prepare-agent-runtime.ps1 `
+            -NodeArchive "runtime-packages\node-v24.18.0-win-x64.zip" `
+            -ClaudeCliArchive "runtime-packages\claude-code-2.1.211-win-x64.zip" `
+            -NodeVersion "24.18.0" `
+            -ClaudeCliVersion "2.1.211"
+
+      - name: Build with Delphi
+        shell: cmd
+        working-directory: Source
+        run: |
+          dcc32.exe -B devcpp.dpr -E. -NU.\dcu
+          if not exist devcpp.exe exit /b 1
+
+      # ----------------------------------------------------------------------
+      # 4. 收集运行时所需文件，组装成一个可分发的目录
+      #    把 exe 与运行时资源（语言包、模板、图标、帮助、清单等）放到一起。
+      # ----------------------------------------------------------------------
+      - name: Assemble package
+        shell: pwsh
+        run: |
+          $pkg = "dist/DevCPlusAi"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+
+          # 主程序
+          Copy-Item "Source\devcpp.exe" -Destination $pkg -Force
+
+          # 运行时资源。Agent runtime 是发布包的必需内容，缺少时直接失败。
+          $assets = @("Lang", "Templates", "Icons", "Help", "RedPanda.ico", "devcpp.exe.manifest", "LICENSE", "NEWS.txt", "README.md", "AGENT-RUNTIME-VERSIONS.txt", "nodejs", "claude-cli")
+          foreach ($a in $assets) {
+            if (Test-Path $a) {
+              Copy-Item $a -Destination $pkg -Recurse -Force
+              Write-Host "已打包: $a"
+            } else {
+              throw "缺少发布资源: $a"
+            }
+          }
+
+      # ----------------------------------------------------------------------
+      # 5. 压缩为 zip（产物名带版本号）
+      # ----------------------------------------------------------------------
+      - name: Create zip archive
+        id: zip
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          $zip = "DevCPlusAi-$ver-win.zip"
+          Compress-Archive -Path "dist/DevCPlusAi/*" -DestinationPath $zip -Force
+          echo "zipname=$zip" >> $env:GITHUB_OUTPUT
+          Write-Host "已生成压缩包: $zip"
+
+      # ----------------------------------------------------------------------
+      # 6. 上传到本次构建的 Artifacts（即使不是 tag 触发也能下载到产物）
+      # ----------------------------------------------------------------------
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevCPlusAi-${{ steps.ver.outputs.version }}-win
+          path: ${{ steps.zip.outputs.zipname }}
+          retention-days: 14
+
+      # ----------------------------------------------------------------------
+      # 7. 仅在 tag 触发时：创建 GitHub Release 并附上 zip
+      #    发布后，别人就能在仓库 “Releases” 页面直接点击下载。
+      # ----------------------------------------------------------------------
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DevCPlusAi ${{ steps.ver.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}   # 形如 v1.0.0-beta 视为预发布
+          generate_release_notes: true                         # 自动根据提交生成发布说明
+          files: ${{ steps.zip.outputs.zipname }}
+          body: |
+            ## DevCPlusAi ${{ steps.ver.outputs.version }}
+
+            集成 AI 编程助手的 C/C++ IDE，下方附件为 Windows 可执行包。
+
+            ### 下载使用
+            下载 `${{ steps.zip.outputs.zipname }}`，解压后运行其中的 `devcpp.exe` 即可。
+
+            > 该包由 Delphi 真实编译产出。AI CLI 运行时目录只有在仓库中提供
+            > `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt` 已通过构建前检查。
+
+# ============================================================================
+#  该工作流不自动安装 Delphi，也不伪造编译产物。若使用 GitHub-hosted
+#  runner，需要先迁移到 Lazarus/FPC；当前仓库仍是 Delphi/VCL 工程。
+#
+#      - name: Install Lazarus
+#        uses: gcarreno/setup-lazarus@v3
+#        with:
+#          lazarus-version: stable
+#
+#      - name: Build with Lazarus
+#        shell: pwsh
+#        run: |
+#          lazbuild --build-mode=Release Source/devcpp.lpi
+# ============================================================================

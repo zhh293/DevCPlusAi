@@ -1,0 +1,1969 @@
+Version 6.7.5 AUGUST 2021
+
+    - add: blend mode for debug cpu window
+    - change: use msys2 x86_64 gcc compiler instead of TDM-GCC-64, becuause the gdb distributed with TDM can't correctly handle path with non-ascii characters.
+    - fix: clear local panel when debugger stops.
+    - fix: parse error when double quotes not correctly closed
+    - fix: parse error when single quotes not correctly closed
+    - fix: show inherited members button of the class browser doesn't work
+    - enhancement: open system header files in readonly mode
+    - enhancement: Can run/compile/debug while there is program running. 
+    - fix: not correctly handle multiple inheritance in parser
+    - fix: newly created projects can't be debugged
+    - fix: typo error of turtle template
+    - fix: crash when try to start debugger while the debugger executable dosen't exist
+    - fix: non-cpp project file will make generated makefile error
+    - fix: project created by GLUT(freeglut) template won't compile
+    - add: GLFW/GLEW project template 
+ 
+Version 6.7.4 AUGUST 2021
+ 
+    - change: use TDM-GCC gcc compiler in distribution
+    - fix: use relative path for projects folder setting
+
+Version 6.7.3 JULY 2021
+
+    - change: use del instead of rm.exe in the project's makefile
+    - fix: Generated makefiles have error for dll projects
+    - fix: gdb annotation infos are not correctly displayed
+    - fix: the symbol completion option for ']' doesn't work
+    - experiment support for clang (msys2 64bit build) 
+    issues for clang:
+    - gdb used by clang dosen't support path name without non-ascii characters
+    - clang doesn't support encoding arguments
+    - Parser can't correctly parse libc++ header files (support will be done in the QT version of devcpp)
+
+
+Version 6.7.2 JUNE 2021
+
+    - fix: show value of the variable under cursor when debugging
+    - add: open .asm file with assembly language highlighter
+
+Version 6.7.1 MAY 2021
+    
+    - fix: gdb.exe included in the gcc 10.2 distribution may fail to debug
+    - fix: the title for the include and lib tabs in project option dialog are wrong.
+    - fix: add LANG=en environment variable  when run gcc -v to get compiler infos, to prevent it use locale translations
+
+Version 6.7 MAY 2021
+    
+    highlights:
+
+    - statically link execuatables by default
+    - syntax highlighter for Lua files
+    - Support editing utf-8 BOM encoded files
+    - and a dozen of other enhancements and fixes
+
+Version 6.7-beta5 MAY 2021
+
+    - fix: if screen width is less than width of the completion box, the position of completion box is not right
+    - fix: compiler sets added by folder are not correctly saved
+
+Version 6.7-beta4 APR 2021
+
+    - fix: show friendly error message, instead of crash error when set the icon file for project
+    - fix: can't compile the project, when it contains files that having spaces in their names.
+    - enhancement: When user set the project's icon, show them the information "Dev-C++ can only handle icon no bigger than 48x48";
+    - enhancement: code snippets can use snippet macros like "<DATETIME>" or "<DATE>"
+    - fix: random crash when tabnine is enabled
+    - change: dont show tabnine suggestion at the #include line
+
+Version 6.7-beta3 APR 2021
+
+    - change: the option "static link all libs" is turned on by default
+    - fix: .exe compiled using dynamic link fail to run, when devcpp starts and try to run it.
+    - fix: devcpp may crash when watch complex structured object
+    - enhancement: click in non-content area in the file browser will clear the selection
+    - enhancement: add popup menu to the file browser
+    - fix: can't load a compiler set, if the compiler (gcc)'s folder is not under Dev-Cpp folder, and it's path contains space or non-ascii chars
+    - change: remove "Find Text" option in the editor options dialog
+    - change: add "Show fold outline" option in the editor options dialog
+    - enhancement: add "show indent guides" and "indent guide color" options in the editor options dialog
+    - fix: don't show error msg "gcc/g++ not exists", when the current compiler set is invalid and devcpp tries to run syntax checker.
+    
+Version 6.7-beta2 MAR 2021
+
+    - enhancement: syntax highlighter for Lua files
+    - enhancement: add " pause console after the program ends" option in the tool config dialog
+    - fix: close environment option dialog needs administration privileges (it shouldn't be)
+    - fix: wrong item height of UI Font & UI Font size lists in the environment options dialog
+    - fix: some text in the statusbar are blocked, when UI font size is big
+    - enhancement: beautify the new project dialog with big ui font.
+    - fix: Dev-Cpp can't correctly check if '.cc' '.cxx' and '.hxx' is associated with Dev-Cpp by the installer 
+    - fix: octal & hex escape sequences is not correctly highlighted
+    - enhancement: add "static link all libs" option to the project option dialog's options tab
+    - fix: new file is saved with utf8 encoding when "Use Utf-8 option" is not on.
+    - fix: row height of the compiler options in the compiler option dialog
+    - fix: font size of the table in the editor option dialog's snippet tab
+    - enhancement: add "add charset options to the compiler" option in the compiler option's dialog
+    - enhancement: add "add charset options to the compiler" option in the project option's dialog
+
+Version 6.7-beta1.1 MAR 2021
+
+    - fix: files not compiled because of compiler setting error
+
+Version 6.7-beta1 MAR 2021
+
+    - enhancement: Support editing utf-8 BOM encoded files
+    - enhancement: option statically link stdlibs in the compiler options dialog
+    - fix: option "highlight current line" in the editor options dialog can't be turned off
+    - fix: auto completion suggestion shouldn't show symbols defined after the current line
+    - enhancement: better support of "show all special chars" option
+    - enhancement: projects created using dev-cpp 5.11 compatible
+    - fix: parse error if a function is declared and defined in the same file
+    - fix: function parameters parse error is seperated by ', '
+    - enhancement: auto save all project files after it was created
+    - enhancement: double click on the file editor's title bar will trigger full screen
+    - fix: can't correctly compile Tools/CheckLang project
+    - enhancement: hide special chars in selected contents
+    - enhancement: correctly color special characters in comments/preprocessors/strings
+    - enhancement: add clear breakpoints menuitem in editor's context menu
+    - enhancement: add clear all breakpoints menuitem in breakpoints view's context menu
+    - enhancement: use standalone checker instead of compiler to check syntax 
+    - fix: when using IME to append contents to the end of a line, a space char will be wrongly added
+    - fix: border around current placeholder not correctly cleared when switch to the next placeholder which is not in the same line
+
+Version 6.6 MAR 2021
+
+    - fix: click on left panel tab can't correctly hide it when project view is not visible
+    - change: use 24x24 icons for menus and toolbars by default
+    - fix: wrong position of left panel tabs' icons
+    - enhancement: add icons tab in the environment dialog
+    - enhancement: add file assoc setting for '.cc' files
+    - change: remove the theme option in the environment dialog 
+    - enhancement: correctly handle extern variable declarations.
+    - fix: errors in the included XEGE library
+    - fix: highlighted selected words not correctly cleared
+    - fix: devcpp crash when watch view has contents and exit devcpp. 
+    - change: the "ignore case when complete" option in the editor options dialog's completion tab was turned on by default.
+    - change: Localized the dev-cpp's applicaton name
+
+Version 6.5 FEB 2021
+
+    - fix: classbrowser not work when class browser is opened by default when devcpp starts
+    - fix: finish reparse before rename a symbol
+    - change: don't auto save after rename a symbol
+    - fix: crash when remembered editor posistions >= 500
+    - fix: devcpp crash when open many editors and close the last one
+    - fix: devcpp may crash when reparse project files
+    - fix: row height in the project option dialog's version info tab not correct
+    - fix: show code completion list after 'unsigned' and 'signed'
+    - enhancement: add compiler by folder will add release/debug/profile sets
+    - enhancement: optimize "locate the editing file in the files view"
+
+Version 6.4-beta4.1 FEB 2021
+
+    - fix: the display of title bar is not correct when file is edited
+    - fix: infinite loop when includes "iostream" and input "v"
+
+Version 6.4-beta4 FEB 2021
+
+    - fix: the contents not get parsed when create a new file and paste into it.  
+    - enhancement: don't mark identifiers contains chinese character as error
+    - fix: error when reparsing a project file
+    - enhancement: Add file browser panel
+    - enhancement: Add scrollbar in the compiler options dialog's autolinks tab
+    - enhancement: add close button to editors
+
+Version 6.4-beta3 FEB 2021
+
+    - fix: random crash when close project
+    - change: if devcpp is started by open file in the explorer, don't auto open last closed files.
+    - change: if an instance of devcpp is already started and running, don't auto open last closed files.
+    - enhancement: show filenames instead of full path in the File menu's open history
+    - fix: enclosing '>' or '"' may dispear when auto complete #include header name
+    - fix: chinese characters in the  compiled exe file error, when the file's encoding is gbk
+
+Version 6.4-beta2.1 FEB 2021
+
+    - fix: can't close project files which are opened before the project. ( and can't close auto opened project files when start, because they are opened before the project)
+    - fix: random crash when close an editor
+
+Version 6.4-beta2 FEB 2021
+
+    - fix: local variables not show up when editing in the definition of a function which declaration is not in the same file
+    - fix: delete a linebreak and undo, the result is not correct
+    - enhancement: better hightlight support in the demo of the editor options dialog's color tab
+    - enhancement: add support to things like 'using std::vector;'
+    - upgrade integrated EGE to version 21.01
+    - upgrade libturtle: add setBackgroundColor() setBackgroundImage() and fill() functions
+    - fix: chinese wchar string literals like L"×Ö·û´® 2" is wrongly marked as error by gcc syntax check.
+    - fix: autolinks sometimes not work when the file is not saved before compiling. 
+    - fix: The executable file is deleted after syntax check.
+    - enhancement: check if the file needs to be recompiled before execute the Run command
+    - enhancement: use different color to display escape sequences in the string
+    - fix: diplay error when string is not correctly ends
+    - enhancement: add "sort by scope" option in the editor options dialog's code completion tab
+    - fix: Delete symbols pairs shouldn't be invoked when editing the comments or strings.
+    - change: disable the "Use UTF-8 by default" option by default (because gcc will use system's ansi encoding to encode __FILE__ )
+    - enhancement: add "auto load last closed files when start" option in the editor option dialog's misc tab, turned on by default
+    - enhancement: auto load last closed files when start
+
+Version 6.4-beta1 JAN 2021
+
+    - fix: wrong text color of the evaluation input and result controls
+    - fix: prevent copy/paste/cut/indent/toggle comment when input focus is not in the editor
+    - fix: can't copy/paste in the evaluation input control
+    - enhancement: refresh editor when parsing finished
+    - enhancement: better organize infos in the classbrowser for class members definitions in the cpp files
+    - fix: expand a node in the class browser will jump to its declaration
+    - fix: don't auto scroll the expanded node to the top
+    - enhancement: All same name namespaces only display once in the classbrowser
+    - enhancement: auto open files opened when devcpp exited last time
+
+
+Version 6.4-alpha2 JAN 2021
+
+    - enhancement: Add "enable auto links" option in the compiler option dialog
+    - fix: can't correctly parse symbols like 'blocks[four_blocks[j].i][four_blocks[j].j].color_id';
+    - fix: leftpanel tab display not correct, when the project panel is hidden.
+    - enhancement: greatly improved the speed of class browser loading. (For large files such as GL/glew.h, the loading time changed from >20s to <0.2s);
+    - enhancement: Add options to switch between show all members in the project and in the current file
+
+Version 6.4-alpha1 JAN 2021
+
+    - enhancement: The Parser works in a background thread.
+    - fix: Won't show code suggestion when include a header using path including '.' or '..';
+    - fix: chinese translations 
+    - enhancement: auto expand nodes in the left project panel when a new project is created;
+    - enhancement: hide the left project panel when no project is opened
+    - fix: debugger don't stop at the first statement of main(), if the current debugging file doesn't has breakpoints but other files have breakpoints; 
+    - fix: can't make projects including source files in subfolders
+    - enhancement: don't reload the classbrowser each time click on it
+    - fix: filenames in the breakpoint view is not the same with the editors
+    - enhancement: change the way to load predefined color themes.
+
+Version 6.3 JAN 2021
+
+    - enhancement: Use the same color for global var in completion suggestion windows as in the editor
+    - fix: The compiler sets found are not saved , when devcpp starts up and the old compiler set is not valid.
+    - fix: todo item display error
+    - fix: stop execution don't really stop the execution in windows 10
+    - change: display the active non-project file's name in the titlebar even when there's project opened.
+    - fix: stop debug when the code needs to be compiled and the user choose 'No' in the info dialog.
+    - enhancement: Code Template in code suggestion window. (thanks @totomusic)
+    - fix: array display error in the local panel
+    - enhancement: show code snippets option in the editor options dialog's code completion tabpage
+    - enhancement: show code completion window even if the word is inputed by IME
+    - enhancement: popup menu for the Local Panel
+    - fix: some character in utf8 encoding files will cause gcc compile error
+    - enhancement: dragging mouse on the editor's gutter won't toggle breakpoint and fold codes.
+
+Version 6.3-beta4 JAN 2021
+   
+    - fix: devcpp crash when tring to turn off the windows sytem while devcpp is running
+    - enhancement: the parser support complex template parameters in type definitions;
+    - enhancement: the parser support C++ 11 attr in struct/class/union defininitions;
+    - enhancement: the parser support {} object initializer , like A x {new A};    
+    - enhancement: correctly parse and show code suggestion for std::future
+    - enhancement: left click the message panel's active tab will hide it
+    - enhancement: add local variables tab to the debug panel
+    - fix: Click test for the folder icon on the gutter is wrong if the option "use custom font" for gutter is turned on. 
+    - enhancement: left click the left panel's active tab will hide it
+    - enhancement: GDB console won't lose focus after executing commands.
+    - fix: Special toolbar display error under dark themes.
+    - enhancement: Placeholder in user code template.
+    - fix: ctrl+F11 maximization works properly
+    - fix: check syntax for new files
+    - enhancement: don't check syntax if new file is saved to a non c/cpp file
+    - fix: installer : delete 'PackMaker.exe' when uninstall
+    - fix: correctly intercept and process  windows turned off message
+    - fix: auto-save modified files when windows turned off
+    - fix: parser error when 'typedef' is the last symbol
+    - fix: parser error when 'typedef struct' is the last symbol
+    - fix: parser error when 'typedef enum' is the last symbol
+    - fix: parser error for things like 'typedef enum {} E;'
+    - enhancement: open windows terminal in the current file's folder
+    - enhancement: custom option for astyle (code reformater)
+    - fix: undo failed when selected text is overrided with text inputed by IME
+    - fix: half chinese character when type and delete chinese characters in the find dialog's input combobox
+    - enhancement: upgrade xege to git master
+    - fix: toggle comment doesn't work
+    - enhancement: don't display things like '12s' as error (C++ 11 User-defined literals support)
+    - fix: error when quit
+    - fix: when devcpp is minimized and bring to front by open c/cpp file in file browser, the minimize button doesn't work
+    - fix: makefile don't use cpp highlighter, and don't check syntax as a c/cpp file
+    - enhancement: show modification sign in the app title.
+    - enhancement: add ';' to auto completed '}' if necessary
+    - fix: chinese characters display not correct when scroll horizontally 
+    - fix: encoding info in the statusbar not updated when switch editors
+    - change: auto check syntax don't keep show error dialog if the compiler set is not setting correctly
+    - fix: label heights in the environment / editor dialogs
+    - fix: parse mingw-w64 gcc 10.2's stdio.h file error, and can't show completion for scanf() 
+
+Version 6.3-beta3 DEC 2020
+
+    - fix: code suggestion for #include headers in the sub directories which appears in more than two system or project include dirs
+    - enhancement: don't show user code template when the value of section is less than 0
+    - fix: cursor position wrong when insert a user code tempalte (codeIns ) 
+    - fix: devcpp exception when write a for loop out of a function
+    - fix: Turn on the option "Trim trailing spaces" in the editor option dialog will cause error when editing
+    - fix: Correctly remove invalid compiler sets and auto detect compiler sets when startup
+    - enhancement: better color for fold sign in editor gutter
+    - fix: set class browser's current editor to nil when close editor ( to prevent possible pointer access error).
+    - fix: correctly load/save code completion usage  data
+    - fix: show code suggestion infos for enum defined in a class
+    - fix: correct type abbreviation in code suggestion window for enum types
+    - fix: show header file suggestion for #include<> / #include""
+    - fix: can't show code suggestion for symbols like (char*)malloc(...)
+    - fix: highlight selected keywords
+    - change: redesign encoding ui and logic
+    - enhancement: convert UTF-8 encoding file to ansi (system default encoding) encoding
+    - fix: Turn on the option "Trim trailing spaces" in the editor option dialog will cause error when editing multiline comment
+ '*'
+    - fix: Position of the folder icon on the gutter is wrong if the option "use custom font" for gutter is turned on.
+    - fix: Using the running devcpp instance when double click c/cpp/h/hpp file in the explorer. 
+    - fix: view menu -> toolbar -> debug item doesn't work
+    - fix: open a project or file will cause compile/run buttons in the toolbar keep repainting themselves
+    - fix: A save-ased file is not correctly monitered for its change outside devcpp.
+    - enhancement: open with multiple source files
+    - change: remove class toolbar (which is buggy and seldom used)
+
+Version 6.3-beta2 DEC 2020
+
+    - enhancement: correct reparse header file in project (don't lose function definition in other files)
+    - fix: reparse changed files after rename symbols
+    - fix: rename symbol will add a new line to the last of the file
+    - fix: random devcpp crash when rename symbol in the project
+    - fix: flicker when rename symbol/reformat file
+    - enhancement: set the mouse cursor to wait when rename symbol / reformat code
+    - fix: use critical section to avoid resource confliction in cpp parser
+    - enhancement: reparse the file after reformat code
+    - fix: code completion flag not clear when set new position of the caret using mouse
+    - fix: user code template not loaded when devcpp start up
+    - enhancement: javadoc style docstring input support
+    - enhancement: code completion for c/cpp preprocessors
+    - enhancement: code completion for javadoc tags
+    - enhancement: adjust code suggestion window width/height in the editor option dialog
+    - enhancement: global variable and local variable can use different color
+    - enhancement: correctly process function parameters with default value
+    - enhancement: differentiate enum name and enum values in the parser
+    - fixes: Goto Function dialog
+    - enhancement: Rename symbols only save the files using the symbols. And rename local symbols only parse the current file.
+    - change: allow more than one instances of  devcpp to run at the same time
+    - change: add freeglut 3.2.1 and glew 2.1 and glfw 3.3.2 to the included gcc 9.2, for learning CG and opengl
+    - enhancement: packmaker: show destination infos in the file list
+    - enhancement: packmaker: edit the selected item in the file list with double click
+    - enhancement: slightly increase menu item height
+    - fix: text messed when click in the auto-link list in the compiler options dialog
+    - enhancement: use topology sort to decide the order of the auto-links for the file to be compiled
+    - enhancement: autolink settings for freeglut/glew/glfw
+    - fix: copy all in the context menu for the compile log panel
+    - enhancement: include packmaker.exe to the binary distribution
+    - enhancement: add hdpi fix for packman.exe/packmaker.exe
+    - fix: packman.exe will remove folders which contains installed package files when remove a package.
+    - fix?: compiler hangs when start compiling file and (auto) check syntax run at the same time
+
+Version 6.3-beta1 DEC 2020
+    
+    - enhancement: add ignore case option in the code completion tab of the editor options dialog
+    - enhancement: add append () to func option in the code completion tab of the editor options dialog
+    - fix: inserted lines calculated error when auto indent {}
+    - enhancement: add ... to the last of folded lines
+    - change: disable close buttons when parser is running. 
+    - enhancement: auto check syntax when line break;
+    - enhancement: run checker in the background thread;
+    - fix: auto completion flag not cleared when auto insert a function with ();
+    - fix: color error when some code is folded
+    - fix: don't color var/func when code completion window is shown
+    - fix: wrong macro define hint info 
+    - enhancement: each project/source file use its own parser
+    - fix: toggle comment wont work if the cursor is at the begin of the line
+    - fix: correctly show code suggestion if at the end of the file and the current block is not closed with '}'
+    - enhancement: auto completion for include header
+    - enhancement: Limit recent projects to use just half of the history.
+    - enhancement: correctly match func definition & declaration in the same namespace but not in the same file
+    - enhancement: beautify icons 
+    - enhancement: can show code completion for std containers elements
+    - enhancement: only c/cpp/new file/project can compile or syntax check
+    - enhancement: only c/cpp/h/new file/ non static library project can run or debug
+    - enhancement: only c/cpp/h/new file show code completion 
+    - enhancement: when add file to Project , the dialog will open in the project's folder by default
+    - enhancement: when select custom makefile/precompile header for the project, the dialog will open in the project's folder by default
+    - enhancement: precompiled header in the project
+    - enhancement: support object call chain breaked by whitespace or linebreak;
+    - enhancement: show code completion for typedef/class nested in other classes.
+    - enhancement: show code completion for var of typedef of smart pointers / stl container
+    - enhancement: support C++ 14 long integer literal (such as 100'000'000)
+    - fix: can't find stl chrono header (because it's name starts with 'c')
+    - fix: #if __cplusplus evaluates error
+    - fix: #define parse error if contains '/' in value
+    - enhancement: support C++ 11 inline namespace; (inline namespace is treated as part of the outer namespace, it's ok for the most usages)
+    - enhancement: update some icons
+    - enhancement: auto link
+    - fix: color setting is messed up when click in the editor option dialog's color tab page.
+    - enhancement: reduce flicker when select a paragraph
+    - fix: crash when close an opened file
+    - enhancement: correctly detect and set mingw-w64 gcc compiler set
+    - enhancement: don't auto add () when complete std::endl
+    - enhancement: correctly show function tip of overloaded functions
+
+Version 6.2.1
+
+    - enhancement: Export as RTF/Copy as RTF use the same colors as the editor
+    - fix: debug logout is not turned off
+
+Version 6.2-beta6
+
+    - fix: toolbar position error after restart
+    - enhancement: redesign the search in files result panel;
+    - enhancement: can differentiate most case of class typed variables initialization from function declaration,like int a(10); 
+    - enhancement: greatly improved the speed of parser
+    - enhancement: greatly improved the code suggestion window preparation speed
+    - fix: tokenizer can't correctly skip double quoted strings.
+    - fix: preprocessor don't replace comments in the macro defines with space
+    - change: clean compile result when user change the compiler set.
+    - change: disable all close buttons when closing project/file.
+    - change: only show code suggestion when current word has more than 2 characters
+    - change: don't auto using namespace std.
+    - enhancement: unify compiler set option settings for 32/64-bit gcc
+    - fix: -O2 is not set for release compiler set
+    - fix: devcpp crash when search in a not opened project file
+    - fix: can't correctly parse for-each loop
+    - fix: can't correctly show class info ( the constructor info is showed);
+    - fix: add check to prevent include loop (but gcc will hang too)
+    - fix: can't correctly parse string paramters like test("//"); (has // in the string parameter)
+    - fix: files not including any header still show code suggestion of global functions
+    - change: don't close message panel after auto syntax check
+    - enhancement: reformat code now can remove empty lines/redundant empty lines
+    - fix: update status bar info after convert a gbk file to utf8
+    - fix: disable run/debug/compile buttons when editing a non-project non-c/cpp file
+    - enhancement: correctly color symbols chain like  m_myDialog.DoModal()
+    - enhancement: correctly parse symbols like ::PostMessage();
+    - fix: correctly parse inheritance
+    - enhancement: correctly show hints/code completion info for nested class/struct members;
+    - fix: don't try to convert encoding when check syntax
+    - enhancement: show definition info in class browser if a symbol is defined outside of the current file
+    - change: mouse left click in the class browser will navigate in the editing file by default.
+    - fix: sometimes crash when switch editors
+    - enhancement: optimize the process of project open;
+    - enhancement: optimize don't refresh class browser in the process of parsing
+    - enhancement: code completion for C/C++ keyword and the option in the editor dialog
+    - enhancement: color enum/namespace/class/typedef
+    - enhancement: correctly parse variable define like struct Student *p;
+    - enhancement: code suggesion correctly show gcc compiler macro defines like __FILE__ __LINE__
+    - enhancement: register highlighter for sql/html/css/js/html/xml/makefile/shell/bat/asm and other files
+    - fix: if the project's compiled exe is not in the same folder with the src, gdb will not find the source files
+    - fix: not add project's lib and include folder to gdb's source dir
+    - fix: correctly show custom color when setting colors in the editor dialog's color tab
+    - fix: devcpp crash if there's '%' in the macro define 
+    - fix: some gui program can't run 
+
+Version 6.2-beta5 Dec 2020
+
+    - enhancement: Can parse statements like 'struct Node { int data; } s;'
+    - change/enhancement: Save/Save As a project file will save project settings too.
+    - enhancement: Use different color for warning message in the compiler output dialog
+    - add: VS Code color scheme (thanks to ÉXÉmjyy)
+    - enhancement: highlight identifiers which are the same as the selected words
+    - fix: can't correctly read panel color settings
+    - fix: undo error when copy multiline text
+    - fix: crash when use Class wizard to add a new class to the project
+    - fix: variables of string can't show type hints
+    - optimize: use typedef instead of define multiple structs 
+    - fix: can handle var define using unamed struct 
+    - optimize: all symbols are scanned. Don't later scan
+    - fix£ºparse error of keywords try/catch/do
+    - fix: parse error for std::types
+    - fix: brace color error of new typed contents to the last of the source file 
+    - fix: we only parse file if code completion is enabled
+    - fix: use project include path when check syntax;
+    - fix: crash when try to compile a project but no file is opend
+    - enhancement: adjust editor context menu; only show close/close all when right click the editor title bar; show compile&Run / debug  when right click other area of the editor 
+    - enhancement: add undo/redo toolbar (don't show by default; can be enabled in view -> toolbar)
+    - enhancement: check for keyword/identifier before rename symbol
+    - fix: change the way to handel the request to close all editors. Don't active any editor at all. This will speed up the process, and hope this will remove the bug that devcpp crashes when closing all editors.
+    - fix: Redo the logic to parse local symbols. Now we only reparse the file when open/save a file, or text lines count is changed. This will remove the bugs that hangs devcpp when try to show mouse hint.
+    - enhancement: correctly parse variables defined in for() and catch()
+    - fix: devcpp error when no compiler set
+    - fix: the tabnine option will be auto turned off if we can't find the tabnine.exe
+    - enhancement: add an "open tabnine donwload site" button to the editor option dialog's tabnine tab
+
+Version 6.2-beta4 Dec 2020
+    
+    - enhancement: Show confirm dialog before "delete user configurations & exit" in the environment dialog.
+    - enhancement: add an option in the editor options dialog, let user choose the default file type(extension) 
+    - fix: color error after a brace matching
+    - enhancement: use diffenrent color for syntax warning 
+    - enhancement: warning color and panel color settings
+    - change: dont use -Werror for the Debug compiler set by default
+    - fix: a project file opend before the project is opened will correctly be set to be belong the project
+    - change: do the first source parse after an #include line is finished and press ENTER
+    - enhancement: optimization for Class Browser Refresh
+    - fix: crash when try to show mouse hint for a preprocessor
+
+Version 6.2-beta3 Nov 2020
+    
+    - fix: Export to RTF, correct background
+    - fix: Export to RTF, chinese character support
+    - enhancement: Edit Menu -> Copy As  RTF
+    - enhancement: Show Error Hint when point mouse on the editor gutter (the line number column on the left)
+    - enhancement: Auto set highdpi registry fix when first run (choose language wizard)
+    - fix: when check syntax for a project file, we shouldn't make the whole project
+    - fix: mouse cursor is not set to normal when Code Suggestion window show up
+    - fix: old error infos are not cleared, when build a project
+    - fix: error when compiler return error without line/column infos
+    - enhancement: navigate back/forward
+    - enhancement: add "Close Report panel" menu item in the view menu; use Alt+V as it's short cut.
+    - change: remove "float report view" and "float project manager" menu item in the view menu. They are buggy and seldom used.
+    - fix: devcpp error when typing struct and it's name in a struct define on the last line and } is the last symbol
+    - fix: can't parse correctly when typedef struct xxx{} yyy,zzz; xxx and yyy is the same.
+    - fix: CPU window can only open once.
+    - fix: Choose unassemble type buttons disappeared in the CPU Window
+    - fix: code suggestion failed when chained like x->y->z;
+    - enhancement: navigate to previous/next error line
+    - fix: set timeout for a hint to 30 seconds;
+    - enhancement: show hint info for overload functions
+    - enhancement: more controls support editor color theme
+    - change: remove "Full Screenmode", add "Maximum editor area" instead.
+    - enhancement: can code suggestion for things like (x)-> or (*x)->
+    - enhancement: change width of the gutter for better display of breakpoint/error icons
+    - enhancement: Full color support? (except main menu and statusbar) in MainForm
+    - fix: devcpp dead lock when try to show mouse hint and there are unsaved modifications
+
+Version 6.2-beta2
+
+  - fix: Shortcut TAB and Shift+TAB for Indent and Unindent doesn't work
+  - enhancement: use different colors for embedded ()/{}/[]
+  - enhancement: use hex format to save color settings in the config file
+  - enhancement: tabnine integration (experiment)
+  - enhancement: save debug toolbar position; streamline default toolbar
+  - fix: devcpp deadlock when define a function
+  - fix: Debug Console don't show the commands entered when "Display Debug Commands" option is disabled.
+  - enhancement: better display of syntax errors;
+  - enhancement: auto check syntax errors after save;
+  - enhancement: now we don't parse project files when open a project 
+  - change: remove show all/show projects/show includes option in class browser ( these options is not very useful or need to parse all project files, which is slow)
+
+Version 6.2-beta1
+
+ - enhancement: correctly process C++ 11 R""/L""/u""/U"" string literals
+ - enhancement: Add "Clear Symbol Usage Data"  button in Editor option Dialog
+ - enhancement: Add "Default Project's Directory" Setting options in Environment options dialog    
+ - enhancement: Add "Open Project Folder" and "Open Console here" in Left Project Panel's Context Menu
+ - enhancement: Differentiate forward struct declaration from struct varaible definitions
+ - enhancement: Parse and save no name args for non-system header function declarations  
+ - enhancement: AStyle(Code Formatter) add space padding support
+ - enhancement: Use TEMP dir to save temp astyle files
+ - enhancement: Refactor: Extract Macro
+ - change: Delete .exe file before compile (so that if compile failed, user can't run the executable and wonder why the changes dont work)
+ - fix: can't rename symbol to a name which is not in the same scope
+ - fix: If a file is already opened in the editor, open a project containing it will still open another editor
+ - enhancement: Refactor: Rename Symbol in project files
+
+Version 6.1 November 2020
+
+ - fix: insert user code template from code menu
+
+Version 6.1-beta3 November 2020
+
+ - enhancement: remember the times user choosed a symbol, and use it to sort symbols user usages frequently to front
+ - enhancement: Code Suggestion Window and most Content View use Editor's color theme
+ - enhancement: don't show code suggesition when define var/parameter's name
+ - enhancement: if a project's unit file is not in the same folder with the project.dev file, show it's relative path
+ - enhancement: Improved Parser runtime performance
+ - fix: devcpp dead lock when debuging and move mouse cursor over a variable name
+ - fix: devcpp don't show function hint when debuging
+ - fix: trim left spaces when add watch var
+ - fix: #if parse error if there are spaces between ! and defined
+ - fix: #if parse error for defined xxx 
+ - fix: Installer get wrong install directory when uninstall old version
+
+Version 6.1-beta2.2 November 2020
+
+ - fix: upgrade ege to master
+ - fix: devcpp dead lock when debuging and move mouse cursor over a variable name
+
+Version 6.1-beta2.1 November 2020
+
+ - fix: shortcuts don't work
+
+Version 6.1-beta2 November 2020
+
+ - enhancement: ClassBrowser updates faster when refresh/change sort types
+ - enhancement: Code Suggestion for function return value's member
+ - enhancement: caret between {} and press enter will behave like in IDEA and CLion
+ - enhancement: user code template / call it in Code Sugestion
+ - enhancement: Symbol Completion of #include <>
+ - enhancement: code completion support smart pointers
+ - enhancement: Copy/insert user template will keep the origin indent 
+ - Fix: Code Suggestion can't find real type of usings (such as Image in using namespace Gdiplus::Image; Image img;)
+ - Fix: Memory Leak when processing '#undef'
+ - Fix: Error when project compiler set index is set to -1
+ - Fix: crash when remove/add #include to files
+ - Fix: out of classes/functions, std namespace is not used by default
+ - Fix: Forward declaration and definition can't be matched by the parser, when declaration parameters don't have name. (still don't work if parameters name in declaration and definition is not the same);
+ - fix: Parser can get template parameters of variables now(but we don't use it now..)
+ - fix: Crash when classbrowser is showing and resize main window
+ - fix: ClassBrowser don't refresh when select/jump to definitions
+ - fix: /* display error
+ - fix: Parser error cause infinite-loop when parsing local blocks
+ - change: compiler set droplist now use Mainform's font setting
+ - fix: Left Class browser updates correctly for project header file ( now we compare file name without casesensitive)
+ - fix: parse error when scan a block which delacration is not in the parsing file
+
+Version 6.1-beta1.1 November 2020
+
+ - Disable Debug Logs
+
+Version 6.1-beta1  November 2020
+
+  Highlights:
+  - C++ Namespace support
+  - Portable version is really portable: configs is stored in Dev-Cpp/config instead of %AppData%/Dev-Cpp, and new projects is created in Dev-Cpp/Projects
+  - Performance improve for Watch View update , now we only update once ach command the debugger runs.
+  
+  Updates
+  - enhancement: Watch View only update once each command the debugger runs.
+  - enhancement: Save/Load vars in Watch View
+  - change: only devcpp.exe installed by the installer will save configs to User's AppData dir; devcpp.exe not installed will save configs to Dev-CPP's config dir. This will make Dev-C++ really portable.
+  - fix: correctly draw current line in Editor option dialog's demo code windows
+  - fix: left panel's has a min width when use the splitter to adjust its size
+  - fix: when gdb is not finished a command executing( such as executing a scanf) , don't left user add watches. (Because gdb can't fetch watch info now)
+  - enhancement: use TStringHash to test if an identifier is a keyword in SynEdit's cpp highlighter, mush easier to maintain; Add new cpp keywords to cpp highlighter
+  - fix: if there're spaces in source file name, ConsolePauser will not find the compiled .exe file
+  - fix: RemoveProjectUnit dialog layout error
+  - fix: Project Makefile generate error, if #include<> headers in project  include folders
+  - change: lib and include dir tab order in project options dialog
+  - change: devcpp.exe installed by the installer will create new project folders under user's document dir; devcpp.exe not installed will create them under Dev-CPP/projects dir.
+  - fix: no caption action will crash when save/load custom shortcut settings
+  - enhancement: expand non-parameter macros in Parser's preprocessor
+  - fix: Crash when parsing and typedef is on the last line of file
+  - fix: memory leak in CppParser when processing namespace
+  - fix: nest structs processing error
+  - fix: expand macros error
+  - fix: expand macro with multiline value will cause wrong line info in statements 
+  - enhancement: C++ namespace support
+  - enhancement: ignore '__attribute__' in Parser
+  - enhancement: create project dir recursively
+  - fix: process #include <dir> 
+  - fix: project include dir not added to parser (and parse error) when open a project
+  - fix: crash when close project
+
+Version 6.0    November 2020
+  
+  - fix: change icons for run/complie&run/replace
+  - fix: make class members dropdown list in toolbar work
+  - add: open console from current file's folder
+  - fix: makefile generation error if #included header file is not in system include dirs
+  - fix: use Parsed #include info to generate dependent list in Makefile, instead of "gcc -MM"
+  - fix: class browser updated correctly when project is closed
+  - fix: typedef functions parsing error
+  - fix: when clear Parser's statementlist, delete a parent before it's children will cause Dev-C++ to crash
+  - fix: use fastindexof to search in stringlists, improve search speed
+  - fix: search using regular expression
+  - fix: Dev-C++ hangs when make project and ld.exe have errors 
+  - fix: member Suggestion failed when a var is defined using (Type * var) instead of (Type* var);
+  - fix: update watch when switch functions in Call Stack Panel
+  - fix: when dialogs is open, press Alt will cause buttons on it to disappear
+  - fix: update some chinese translations
+  - change: Press LEFT/RIGHT/HOME/END will close Code Suggestion and move the cursor in the current line
+  - fix: ignore namespace qualify info in identifiers. This makes auto suggestion work (but not perfect) for qualified names.
+  - fix: user can type while code suggestion is preparing
+  - fix: can set current line fg/bg color in Editor's Color tab
+  - fix: editor color theme with correct current line color
+  - fix: use TThemeColor instead of TPoint to save theme colors
+  - fix: wordwrap in project's compiler set options setting
+  - add installer scripts
+  - fix: if another dev-c++ is already running, just exit (dont loop to wait it finish starting)
+  - fix: -> . :: started code completion will not auto complete if there is only one suggestion candidator
+  - Simplified chinese translation for installer  
+  - enhancement: double click in watch view to rename a watch var
+  - change: remove 'show gdb annotation' option from gdb console's context menu
+  - enhancement: relayout link parameter input in project option dialog
+  - fix: if open a file when active left panel is not class browser, class browser is actived but show nothing
+  - fix: use uncompressed gcc & gdb & consolePauser to increase speed
+
+Version 6-beta6.1     November 2020
+
+  - fix: When closed, Dev-C++ doesn't really exist
+  - fix: Debug Console support editing in command line
+
+Version 6-beta6     November 2020
+
+  - fix: while debugging, switch functions in call stack windows will also update watch expressions(variables).
+  - fix: Correct update watch var infos while debugging enters/exits functions
+  - fix: don't show auto-code-completion suggestion when input a word and deleted it using backspace
+  - fix: macro defined in included headers not correctly processed when change #includes in source file. 
+  - fix: CppParser error if first completion input too fast to finish parsing
+  - fix: classbrowser not update if open a file in project
+  - fix: some chinese translations
+  - fix: correctly update classbrowser when close a project
+  - fix: redirect stdin to file doesn't work in windows xp
+  - fix: write to log file when some error happens
+  - fix: check if compiler(gcc or g++) exists before compile
+  - fix: add debug toolbar
+  - fix: dev-c++ will not find windows infinitely if there is already an instance runnning (this only happens when debugging dev-c++ in delphi)
+  - fix: add icons for static functions/vars and global functions
+  - fix: change icon of add watch
+  - fix: now debug output console is really like a console
+  - fix: Show Debug Command and Show Debug Annotations are disabled by default
+  - fix: buttons display error in First Run Wizard under windows XP
+  - fix: can't clear dev-c++ settings under windows xp
+
+Version 6-beta5.1   October  2020
+
+  - fix: crash when exit if Class B inheritanced Class A, and Class C inherited Class B
+  - fix: crash when typedef is the last symbol in file
+  - fix: only update class browser when file is open/save, in case it refreshes frequently.
+  - fix: #define in header files lost when reparsing files
+
+Version 6-beta5     October  2020
+
+  - fix: Select row in Class Browser
+  - fix: icons in Class Browser
+  - fix: Class Browser show nothing when view system headers
+  - fix: Show typedef / #define / enum in ClassBrowser
+  - fix: Class Browser won't scroll with mouse wheel
+  - fix: remove unused intlist  to reduce memory usage;
+  - fix: correctly parsing function type define
+  - fix: stop reparsing file when code completion finished but word not finish
+  - fix: rename symbol will only preprocess/tokenize file once
+  - fix: correctly show #define info
+
+Version 6-beta4     October  2020
+
+  - fix: Left Panel tab names display error in windows xp sp3
+  - fix: Tool Configuration Dialog size error
+  - fix: can't correctly show project file encoding in status bar
+  - fix: When loading Project configuration, if there's no UTF-8 setting in it, set it to False by default
+  - fix:  Before open a file, set UseUTF8 to True means auto-detect encoding, not enforcing it. 
+  - fix: auto show watch and debug panel when start debug
+  - fix: when debug and need re-compile file, when compile finishes, debugger not auto start
+  - fix: delete [] was thought as a type
+  - fix: check if newname is a C/C++ keyword when Rename Symbol 
+  - fix: correctly parse const keyword
+  - fix: correctly parse / code suggestion static class member methods/vars
+  - fix: correctly parse / code suggestion class member according to access privileges (including friend access).
+  - enhancement: Open resourcefile with ResEd.exe
+  - enhancement:  namespace support, can use, but far from perfection ( C++ namespace's using rule is too complicated, fully support will be hard and slow, so we won't do it for now)
+  - enhancement: auto code suggestion differentiate '::' from '.' and '->';
+  - enhancement: hide type name begin with '__' in variable defines.
+  - enhancement: friend function support in code suggestion. (may not work when friend function are overloaded)
+  - enhancement: change the way cpp parser to handle inheritance, faster and less errors.
+  - enhancement: Add _children to TStatement, to speedup symbol lookup
+  - enhancement: use TStringHash to check if token text is a key word, speed parsing.
+
+Version 6-beta3     October  2020
+
+  - fix: Text blur in Window High DPI (Environment Option -> Fix High DPI then Exit)
+  - fix: gcc error output parsing error
+  - fix: shouldn't jump to .o file when click in Compiler Output 
+  - fix: copy in compiler window will only copy error messages, not copy line no and file name.
+  - fix: auto code completion will replace whole word if input just before a word, that's not right
+  - fix: increase item height in code suggestion window
+  - fix: utf-8 encoding file open error in windows xp/ windows 7
+  - fix: show wrong encoding in status bar when first open a file
+  - fix: only auto detect utf-8 file encoding when first open it
+  - fix: lost open file menuitem
+  - fix: font too small in toolbar
+  - enhancement: In new project wizard,  project folder path will change with project name
+  - enhancement: change some chinese translations
+  - enhancement: context menu for breakpoints list in Debug panel
+  - enhancement: empty macro defines don't show in variable/function type infos
+  
+Version 6-beta2     October  2020
+
+  - fix: Debug menuitem captions
+  - fix: gray debug\run buttons while a program is running or debugging. 
+  - enhancement: redesign debug views
+  - enhancement: add icons for debug buttons
+  - enhancement: add icons for indent/unindent buttons
+  - enhancement: when parsing definitions, add a MACRO define '_EGE_FOR_AUTO_CODE_COMPLETETION_ONLY_'. EGE use to stop include windows.h (so can show less non-using code suggestions from windows.h).
+
+Version 6-beta1     October  2020
+
+  - version: upgrade to version 6, since we have made so many changes & enhancements.
+  - fix: font size in auto completion box
+  - fix: export HTML correctly setting the charset name
+  - enhancement: breakpoint condition in effect while debugging
+  - enhancement: set a default project folder when create a new project, and create it for the user
+  - enhancement: if the source code is utf-8 encoded, use utf-8 as the charset to export HTML
+  - enhancement: auto switch to structure pane when open/create a new file (not in project)
+  - use self implementation of rename instead of clang-rename
+  - add more about information
+  
+Version 5.13-beta5  October  2020
+
+  - fix: crash when encounter } and have blank lines before it
+  - fix: Code completion while typing, if variable name have only one suggestion it will auto use it, that's not right.
+  - fix: can't correctly skip ')' when there is a string before it.
+  - fix: crash when open/close CPU window and stop debugging.
+  - enhancement: When first running, will check the user's language and set as the preference (Only Chinese now)
+  - enhancement: breakpoint condition
+  - enhancement: save current file using utf8;
+  - change: regroup menuitems ( to highlight debug)
+  - redesign debug pane
+
+Version 5.13-beta4      October  2020
+
+  - fix: auto code completion error when input ( as the end of
+  - fix: crash when encounter } start in line
+  - enhancement: code completion suggestion while inputing;
+  - enhancement: in auto code completion, only display one suggestion for all overload function/methods
+  - add: if the user first run Dev-CPP and is using simplified-chinese windows, the option "use Alt+/  to activate Auto Code Completion" is set to on by default"
+  - add: auto detect if a file is UTF-8 encoded. If so, open it use UTF8.
+
+Version 5.13-beta3
+
+  - fix: English label error for step out button.
+  - fix: not release handles used by gdb subprocess.
+  - fix: Disallow user to input 'quit' command in the output windows to quit gdb.
+  - fix: incorrect font size in the class window
+  - fix: auto completion don't work on variables of type std::string 
+  - fix: correctly parsing windows.h header
+  - add 'show gdb commands' and 'show gdb annotations' option btn to debug output window's context menu
+  - upgrade graphics.h to the 
+  - change: hide debug output of btns
+
+Version 5.13-beta2
+
+  - fix: graphics.h & libturtle project templates
+  - fix: multi language support for rename symbol
+  - fix: parameters are in effect when run the compiled project program
+  - fix: When the compiler set setting in an old project is not valid any more, we use the editor's current set instead. But we cant save it (modify flag of the project is not set).
+  - fix: font size of debug output window is incorrect.
+  - add: Redirect  STDIO to a file when run (not working in windows XP)& debug the compiled program (need a patched gdb)
+  - add: redesign debug pane ( add more commands)
+  - add: In the CPU window, click on the functions in the left-bottom list will show the function's disassebly and cpu info
+  
+
+Version 5.13-beta1
+
+  - add: project UTF-8 support ( save/load utf8 option for project files, compile utf8 files)
+
+Version 5.13-alpha3
+
+  - fix: disable/enable custom link/compiler options text with the checkbox in the compiler options dialog
+  - fix: redo auto complete symboles: {} () [] "" '' , auto overwrite right matching symbols. (like jetbrains IDE). User Experience is much better.
+  - fix: input a '}' will remove all indent whitespaces;
+  - fix: code suggestion tip window can't process TAB key correctly
+  - change: shorten auto complete suggestion text (MinGW gcc's function type is too long to display)
+  - change: choose alt+/ or ctrl+space as the shortcut for code completion suggestion  
+
+Version 5.13-alpha2
+
+  - fix: status bar message too long to display
+  - fix: crash when try to debug using release compiler set
+  - fix: register info parsing error in cpu window(debug)
+  - fix: (debug)  gdb log window can display utf-8 content correctly.
+  - fix: better format of gdb output
+  - change: display current file's encoding  in statusbar
+  - change: back to mingw.org gcc 9.2 to save disk space (if you want utf8 identifiers support, use gcc 10 instead)
+  - change: upgrade gdb to version 9.2 
+  - change: (debug) remove next instruction/into instruction; add Run to cursor; rename some buttons (according to other IDEs)
+  - add: notify user while profiling when sourcefile is newer than profiling date
+  - add: if no breakpoints is set, gdb will stop at the beginning of the main function.
+ 
+Version 5.13-alpha1
+
+ - fix: Start Debug button is still enable while debuging; 
+ - change: notify user before start the Debugger if execution file is old than the source file
+ - change: better gdb output format
+ - change: upgrade gcc to MinGW-W64-i686 version 10.2 (for utf-8 support)
+ - add: support utf-8 encoding file (project support not done)
+ - add: two new options for debug in environment option dialog; 
+
+Version 5.12.4
+
+ - fix: project won't rebuild when only header file is changed. Use gcc -MM to generate Makefile targets (and get header dependencies)
+ - fix: crash at close when debugging
+- change: show gdb command in debug log window
+- add two options for debug( option dialog is yet to do) : ShowComandLog (show gdb command in debug window)/ ShowAnnotation (show gdb annotations in debug log window)
+
+Version 5.12.3 19 September 2020
+
+ - fix rename errors
+
+Version 5.12 - 9 September 2020
+
+- Upgraded the default compiler to GCC 9.2.0
+- Add Rename Symbol function (In Refactor menu, using clang-rename)
+- Use the Debug profile as the default compiler profile
+-  ¡°-Wall¡± and ¡°-Wextra" options are set by default in the Debug profile
+
+Version 5.11 - 27 April 2015
+
+- Fixed crash related to double clicking on a compiler error when a selection was made.
+- Upgraded the default compiler to TDM-GCC 4.9.2.
+- Improved startup speed.
+- Fixed Abort Compilation button not working anymore.
+- Fixed crash in TCppParser.CheckForTypedefStruct.
+- Fixed crash in TCppParser.HandleEnum.
+- Fixed some typos in the English translation (thanks to Hiro5).
+- Updated the Catalan translation (thanks to Hiro5).
+- Updated the Czech translation (thanks to tringi).
+- Fixed some hickups in the build process of Dev-C++ itself.
+
+Version 5.10 - 11 March 2015
+
+- Improved startup speed.
+- Removed splash window.
+- Temporarily removed the web update window.
+- Rewrote the LangCheck tool that can be used to validate translation files.
+- Improved indent guides painting and positioning.
+- Removed full screen information bar.
+- Added GUI option for maximum line length option to AStyle > Formatter Options.
+- Fixed parameter mismatch in Chinese translation.
+- Fixed memory leak in Edit > Unindent.
+- Improved behaviour of Edit > Toggle Comment.
+- Improved opening speed of Tools > Compiler Options.
+
+Version 5.9.2 - 1 Februari 2015
+
+- Changed Format Current File shortcut from Shift+F to Shift+Ctrl+A.
+- Removed/Changed all default Alt+(Key) shortcuts because they interfere with Alt menu navigation.
+- Assigned some new default shortcuts like Ctrl+B (Open Containing Folder) and F2 (Rename File).
+- Fixed Show Makefile being executable when no compiler set is configured.
+
+Version 5.9.1 - 31 Januari 2015
+
+- Updated Tools >> Edit Shortcuts.
+- Removed Ctrl+Alt combination in default shortcuts to ensure that the AltGr button keeps functioning:
+http://blogs.msdn.com/b/oldnewthing/archive/2004/03/29/101121.aspx
+
+- Fixed formatter options command line not showing up after first launch.
+- Added source LaTeX of testing document DevTest.pdf.
+- Widened the Menu >> Search >> Find window in order to accomodate longer translations.
+- Fixed a crash when launching for the first time with no compilers available.
+- Added last selection arrow to Find Results.
+- Fixed out of bounds error in TCppParser.HandleMethod.
+
+Version 5.9.0 - 5 Januari 2015
+
+- Added AStyle integration.
+- Remodeled Help >> About window.
+- When looking up a piece of code by Ctrl+Clicking the destination line is centered.
+- Removed caching from Tools >> Editor Options.
+- Widened the exception window.
+- Removed caching from the first-time configuration window.
+- Improved parsing progress messages in the status bar.
+- Improved performance of the classes list toolbar.
+- Improved function declaration/definition switching.
+- Significantly improved performance when selecting text.
+- Fixed parser error when parsing C-style cast of string constant.
+- Huge rewrite of code folding implementation.
+- Major improvements in typing responsiveness.
+- Major reduction in flickering during typing.
+- Around 40-50% reduction in memory usage per open file.
+- Fixed devcppPortable not passing files with spaces in names to devcpp correctly.
+- Improved performance when opening multiple files from explorer using Dev-C++.
+- Code completion does not show up anymore for periods typed as part of numbers.
+
+Version 5.8.3 - 10 November 2014
+
+- Slightly decreased flicker during editor opening.
+- Makefiles are now edited as if they are source files. It's better than nothing.
+- Opening braces after default are now completed correctly.
+- Fixed a bug in NewFunctionFrm and NewVarFrm that caused crashes (thank you for reporting).
+- Rewritten ancient source code of devcppPortable.exe. It is now immune to overflows due to arguments of length more than 400.
+- Fixed a bug in TCppParser that caused it to ignore project include paths.
+- Fixed a crash in TCppTokenizer due to spaces before #include in combination with comments after the <file> or "file" part (like " #include <foo> // bar").
+
+Version 5.8.2 - 1 November 2014
+
+- Fixed bug in procedure TMainForm.EditorSaveTimer that corrupted the editor views.
+- Updated provided commit command.
+
+Version 5.8.1 - 28 Oktober 2014
+
+- Fixed an overflow error in TCppParser.CheckForStructs that caused errors when opening/saving files.
+- Fixed a crash in TEditorList.GetFocusedPageControl that fixes random crashes.
+- Refactored symbol completion code.
+- The code completion window does not show anymore when the cursor changes during the timer rundown after typing . or :: or ->.
+- Improved multiple file opening performance.
+- Improved project closing performance.
+- Updated compilation readme.
+
+Version 5.8.0 - 21 Oktober 2014
+
+- Added support for two file views next to each other.
+- All windows are now opened at the centre of the main window instead of at random places across random monitors.
+- Slightly improved performance of the function tooltip.
+- Fixed a bug in makefile creation of C DLL's that prevented compilation.
+- When compiling, header files are now treated separately from other files.
+- Removed CVS support. CVS is considered deprecated, we recommend using explorer based code managers for alternatives like Git or SVN.
+- Fixed a crash in the file change monitor code.
+
+Version 5.7.1 - 29 Juli 2014
+
+- Resolved errors in compile log when using Syntax Check on non-project compilations.
+- One can now create precompiled headers when compiling non-project header files.
+- Compile log now mentions the output filename under Compilation Results.
+- Dev-C++ will now issue an error when compiling using a compiler set that does not have a valid binary directory.
+- When a currently open file is renamed or deleted, one can now choose to close the editor of the file in question.
+- Fixed a bug in "Shorten Compiler Paths" that mixed up library and binary paths.
+- Attempt to fix a common crash related to TdevMonitorThread.TellToQuit.
+- Reduced overdraw in the class browser when switching between or saving files.
+- Added the ability to syntax check the currently visible file only, even if it belongs to a project.
+- Added icons for Syntax Check, Syntax Check Current File and Clean
+- Fixed an out of bounds problem in the parser.
+- Dev-C++ now restores windows to their Aero Snap position.
+
+Version 5.7.0 - 19 Juli 2014
+
+- Redesigned Compiler Log.
+- Added an option to shorten compiler paths in Compiler Log.
+- Removed the Perfect Dependency Checking option in Tools >> Compiler Options >> Makefile.
+- Updated DLL Makefile creation to call gcc/g++ instead of dllwrap.exe.
+- Dev-C++ does not require the presence of dllwrap.exe anymore.
+- Fixed a few bugs that caused usage mixups between project compiler sets and global compiler sets.
+- The compiler set validator now does not complain if executables are not set.
+- Removed the Compile Delay option in Tools >> Compiler Options >> Makefile.
+- Fixed a bug that prevented editor tab filenames from being updated when using Save As.
+- Added an option to directly add a file to a folder in the project tree.
+- Fixed a crash in the class browser that happened when it had to redraw during parsing.
+- Fixed a crash in the project saving code that happened due to opening a file twice at the same time.
+- Fixed a crash in the file change monitor code.
+
+Version 5.6.3 - 4 Mei 2014
+
+- Fixed a bug in external program execution related to spaces in paths.
+- Updated Japanese language files.
+- Reduced flicker when opening Tools >> Environment Options.
+- Simplified the splash screen text.
+- Reduced class browser flicker. This significantly speeds up editor switching and project opening.
+- Greatly improved code completion performance.
+- Folder selection dialogs in Tools >> Project Options now start in the project directory.
+- Class Browser >> View Mode >> System Headers now also works with cached content.
+- Partially rewritten the file change monitor code. This should fix the thread handle bugs.
+- Fixed a bug that caused breakpoints to be placed on incorrect lines when using code folding above them.
+- Updated UI text capitalisation and spacing to adhere to the Windows Style Guide.
+- Added icons to the context menus of the project browser.
+- Cleaned up the context menus for folders and files in the project browser.
+- Added a close button to the context menu of the project root.
+- Added a "View Makefile" button to the Execute menu.
+- Removed the "Compile Current File" option.
+- When using "Save As", the class browser will now update when the "Current File" view is used.
+- Fixed a few bugs in the enum parser.
+
+Version 5.6.2 - 16 Maart 2014
+
+- Updated Japanese language files.
+- Templates can now now not set the built in compiler settings anymore when creating a project. Instead, compiler settings are set by the current compiler profile.
+- Fixed checkboxes in Tools >> Editor Options >> Completion >> Symbol Completion being unchecked instead of disabled/greyed when "Enable symbol completion" is changed.
+- Added some margin above the progress bar at Tools >> Editor Options >> Completion >> Code Completion.
+- When the Consolas font is unavailable, Dev-C++ will now try to use Courier New as the editor font instead of the alphabetically first font.
+- Fixed an undo bug in Move Selection Up/Down.
+- Fixed a bug that cut off toolbars around 800 pixels on 1024 pixel wide resolutions.
+- One can now change the shortcut for code completion in Tools >> Configure Shortcuts.
+- Fixed an out of bounds error in TCppParser when parsing incorrect code.
+- Fixed a formatting error when printing structs inside struct in the Debug watch variable tree.
+- Increased performance of the GDB interface.
+- Hopefully fixed the infamous "Thread Error" exceptions.
+
+Version 5.6.1 - 12 Februari 2014
+
+- Added rm.exe to MinGW 4.8.1 compiler sets. This prevents the "CreateProcess(rm.exe...)" error when rebuilding.
+- Updated blog URL in English.lng.
+- Fixed UI glitch in the Debug Tab: the gdb log was invisible.
+- Fixed an undo bug in Duplicate Line functionality.
+- Project unit information in .dev files is only read once instead of twice now.
+- Updated Chinese translations.
+- Added "Move Selection Up/Down" functionality (listens to Ctrl+Shift+Up/Down by default).
+- Specific symbol completion options are now greyed out when the global option is disabled in Editor Options.
+- When selecting a folder, one can now create, edit and delete folders inside the select window.
+- The Import from MSVC and "Tip of the day" windows now uses the global UI font.
+- Fixed some bugs in the preprocessor: more complete code completion is available now.
+- Improved code completion and formatting for function pointers.
+- Code completion input from included files is now preserved when editing files.
+- Removed ghost entries in the class browser that would randomly dissapear and cause crashes when clicked on.
+- More bugs that I forgot about or are not important enough to mention.
+- Added an icon and the company name information to the uninstaller in the Programs and Features list.
+
+Version 5.6.0 - 24 Januari 2014
+
+- Updated TDM64 and MinGW32 to version 4.8.1.
+- The class browser can now show the contents of system includes.
+- Added a compiler set selector to the toolbar.
+- The Remove Unit Form is resizable again.
+- Code completion now also works on modified files.
+- The parser now processes preprocessor lines too.
+- Parsing speed has been improved by around 400% (average of my own projects).
+- Added "Duplicate Line" and "Delete Line" functions to Menu >> Edit.
+- When only changing case during a Rename, the input file will not be deleted anymore.
+- Project templates now also accept the old "Catagory" input field again.
+- Fixed an "External Exception" when handling compiler sets.
+- When parsing, the status bar does not flicker anymore.
+- The executable version number is equal to the official version number again.
+- Added about twenty previously hardcoded text items to the language tables.
+- Cache saving speed has been improved infinitely when the cache is bigger than 16MiB.
+- Users can now input a correspondence e-mail into the crash reporter message.
+- In Editor Options, the "Symbol Completion" section has been moved to the "Code Completion" section.
+- Completed closing symbols are now deleted when the corresponding opening character is deleted.
+- Fixed a argument highlighting problem in the function tooltip.
+- As of 5.6.0 RC1, a different completion cache file format is used. Older versions are not forward compatible.
+- The console pauser can now pass 32K characters to the running program instead of just 1K.
+- Fixed a bug in the first time config window that caused a crash when no compilers were installed.
+- Updated Chinese and Chinese (traditional) translations.
+- Added a std::thread example. Only compiles on TDM-GCC based installations.
+
+Version 5.5.3 - 5 November 2013
+
+- Fixed lib32, -m32 and gdb32 not being used by default by 32bit profiles.
+- The function tooltip works again.
+- The function tooltip hides again when its editor goes out of focus.
+- Fixed a possible crash in the code completion window.
+- Removed some superfluous spaces from variables found in argument lists.
+
+Version 5.5.2 - 28 Oktober 2013
+
+- Rewritten the help files.
+- Fixed a bug in the shortcut editor window.
+- Fixed a bug when closing an editor.
+- Fixed a memory leak in the recent file list.
+- Switching editors is a bit faster now (class browser is only redrawn once instead of twice).
+- Fixed a crash in code completion caused by using mouseover hints at the same time.
+- Fixed a timer leak (the "Not enough timers available" bug).
+- Tidied up the File Properties window.
+- Renamed the file renaming procedure (fixes the "Thread error 6" bug).
+- Fixed a bug in the new project window.
+- Fixed a bug in the short editor window.
+
+Version 5.5.1 - 7 Oktober 2013
+
+- When editing a file opened in Dev-C++ elsewhere, Dev will only show one messagebox informing you of the change.
+- A bunch of bug fixes.
+
+Version 5.5.0 - 6 Oktober 2013
+
+- Dev-C++ can now parse C++ header files too.
+- Clicking in the gutter does not change the caret position anymore.
+- Mouseover hints are now also shown when hovering above #includes.
+- Fixed editor closing not always remembering the previous tab.
+- The matching brace highlighter now ignores text highlighted as 'Character'.
+- Custom compiler commands are now added to the end of the call to GCC.
+- The function tooltip now shows which class each function belongs to.
+- The compilation progress window has been moved/merged into Compile Log below.
+- The MRU list now does not reverse order each time it is loaded.
+- File Properties now does not add open files not belonging to the current project to project stats.
+- Editor mouseover tooltips now also shows which class each function belongs to.
+- The function tooltip now shows types again.
+- The MRU list now separates files and project files with a line.
+- Breakpoints are now moved when folding code.
+- Triple clicks now don't happen anymore when the mouse moves between clicks.
+- Updated Catalan translation.
+- The console pauser now does not show a "loading" cursor anymore.
+- Updated Japanese translation.
+- Added a toggle comment function (listens to Ctrl+/ by default).
+- Added the PlasticCodeWrap color style.
+- Cleaned up Project Options >> Compiler.
+- Changed the default font to Consolas.
+- Upgraded the parser: it now supports function pointer arguments and is a lot faster.
+- And much more.
+
+Version 5.4.2 - 24 Mei 2013
+
+- Shortcuts are now saved independently from the current language.
+- As of RC3, Dev-C++ will now play nicely with old settings files instead of showing a 0px high window.
+- Fixed compiler default selection not being saved on first startup.
+- Dev-C++ will now suggest to disable DEP instead of crash when trying to execute data.
+- The compiler set validator will now not add any duplicate paths anymore.
+- After saving as, the window caption will now update too.
+- Fixed a few out of bounds errors.
+- Fixed a rather common bug in the MRU list ("Invalid Pointer Operation").
+- Compiler Options now does not permanently change directories before hitting OK.
+- Fixed a crash in the parser, which didn't like "#include" without any followup.
+- Fixed a whole lot of other bugs.
+- Fixed random focus tabbing order in various windows.
+- Default code insertion snippets are now only loaded on first startup.
+- One can now hide the code tooltip for the current function using the Esc key.
+- Dev-C++ will now remember the window state on startup again.
+- Fixed an error in the project HTML exporter.
+- Dev-C++ now remembers tab history.
+- One can now delete the current line using Ctrl+D.
+- Implemented line selecting functionality using triple click.
+- Updated Chinese (traditional) translations (by TOCK Chiu, alias cin.getline).
+
+Version 5.4.1 - 17 Maart 2013
+
+- Fixed a startup crash when not using function tips.
+- When accidentally clearing the code completion list, one is now given a second wind before the list is hidden.
+- Fixed an out of bounds error in the code completion code.
+- Fixed an error that caused crashes in Compiler Options >> Settings under Windows 2000 (and older).
+- Typedef structs now get formatted as "struct Foo" instead of "structFoo" in mouseover hints.
+- The debugger now preserves the current working directory when running programs.
+- Redesigned the compiler output formatter code, which now uses half the amount of code and plays nicely with GCC 4.8.
+- The mouseover tooltip now shows scope information too.
+- When trying to run uncompiled projects, Dev-C++ will now suggest to compile.
+- Resource errors now use the same formatting as generic errors.
+- Compiler, resource and find output line numbers will be synchronized when editing files.
+- Moved the MRU list to File >> *here* from File >> Reopen to reduce clicks needed by one.
+- Fixed OriginalPath spamming in devcpp.ini.
+- Dev-C++ will now prefer selecting 32bit compiler profiles by default on x86 OS's.
+- Merged Example projects into the new project templates.
+- Compiler settings are now validated again when loaded.
+- Upgraded to FastMM 4.991 for what it's worth.
+
+Version 5.4.0 - 14 Februari 2013
+
+- The console pauser will now provide more detailed information when it decides not to work.
+- Startup time has been reduced by an order of magnitude.
+- The class browser now redraws at least numvisibleitems times faster.
+- "Search Again" (F3) is back from the dead.
+- The toolbars now do not get cut off on restart after about the 800th horizontal pixel.
+- The tip of the day form now does not show up anymore when opening files (again).
+- Gutter auto sizing now takes folding into account.
+- Files that aren't highlighted are now loaded much faster.
+- Added a few hardcoded labels to the lang tables.
+- Reworked the Window List form.
+- Fixed some set management issues in the Compiler Options form.
+- Slightly reduced compilation overhead of the IDE shell around GCC.
+- Reduced memory usage.
+- Exporting editors to HTML now provides a perfect copy of the color scheme.
+- Fixed a memory leak in the Tools window.
+- Updated Chinese, Chinese (TW) and Japanese translations.
+- Added an example save file name to Editor Options >> Autosave.
+- More bug fixes and feature additions here and there.
+- One can now refresh the current cache contents.
+- Improved array evaluating under mouse when debugging.
+- Fixed a bug that emerged in code folding and improved its performance thanks to that.
+- Redesigned the code tooltip and code completion: they now support (M)I and multiple levels of parent->member structures.
+- The class browser now supports multiple inheritance.
+- Many more bugfixes here and there.
+
+Version 5.3.0.4 - 31 December 2012
+
+- The class browser now always differentiates between private and public members.
+- Fixed the "String not found" messagebox appearing behind the find form.
+- Greatly enhanced the autosave feature. It can now save timestamps and filter by project too.
+- Reduced flicker when closing editors.
+- Added tcc files to the highlighting list.
+- Fixed some rare folding bugs, and improved their performance a bit.
+- When using Goto line or any other function that changes the current line, folds will be uncollapsed to make the destination line visible now.
+- Evaluate and GDB input edit controls now do not cut off the selection when autocompleting.
+- Double clicking on a find result now correctly shows the find result at the top line (instead of one line above that).
+- Errors now have more priority than warnings (which have more priority than other messages) when changing focus to a compilation issue.
+- Swap Header/Source now opens complementary files in a tab right next to the current file.
+- Translations in Goto function will now always fit.
+- Compile Log now shows a final warning count too.
+- Fixed the function tooltip highlighting wrong arguments when putting a space before (.
+- When renaming project files, you'll be asked before any overwriting takes place.
+- Removed WM_CLOSE handling from the default WinMain snippet. DefWindowProc will handle this.
+- The function parameter tooltip now shows class scope info too.
+- More bug fixes and feature additions here and there.
+
+Version 5.3.0.3 - 11 November 2012
+
+- Fixed really long watch variables being cut off sometimes.
+- Fixed the goto line form playing a beep when hitting enter.
+- Fixed an infinite loop bug when parsing inheritance.
+- The tip of the day window is now focused on startup, making hiding it using the keyboard easier.
+- The C++ parser now understands what to do with <cxxx> includes: parse <xxx.h> instead.
+- Simple replacing ("Replace") now correctly replaces matches by the replacement text instead of nothing.
+- Dev-C++ will now show a nice warning dialog about incompatible caches instead of throwing exceptions.
+- Startup time has been improved by as much as 20%.
+- Code completion now properly shows all global functions again.
+- Project closing is done instantly now when using 'Scan global includes'.
+- The function tooltip now also shows constructors and destructors.
+- Added a button to Compiler Options that will autodetect compilers.
+- Updated chinese (TW) translations.
+- CPU window now opens up 50% faster after a signal is received during debugging.
+- More bug fixes here and there.
+
+Version 5.3.0.2 - 24 Oktober 2012
+
+- Fixed error line focus dissapearing when moving focus on the same line.
+- The window caption now shows more information, like the debugging/compiling/executing status.
+- Fixed compilation failing when the compilation progress window is hidden.
+- CPU Window now updates faster.
+- One can now properly use Replace in Files to replace files not yet opened.
+- Upgraded the variable finder.
+- Added a find count to the bottom of the find output list.
+- Debug evaluation now hints the user when it contains old potentially invalid data.
+- When trying to debug, Dev-C++ now suggests to compile, instead of showing an error that the source isn't compiled.
+- Project options are now properly applied when not changing tabs in Project Options >> Compiler.
+- New projects now properly use the global compiler set by default.
+- Added two more themes. Credits go to Andrei Luca.
+- Improved parsing speed somewhat.
+- Improved startup time.
+- Reduced the amount of clicks needed to change compiler options.
+- Fixed numerous debugger bugs, most are related to watch variables.
+- When a signal is received by gdb, Dev-C++ now suggests to open up CPU window.
+- Fixed a lot more bugs.
+- Fixed a bug in the code completion form that prevented the source from being compiled on fresh Delphi IDEs.
+- Fixed an error in the relative path solver, making Dev-C++ fully portable again.
+
+Version 5.3.0.1 - 2 Oktober 2012
+
+- Searching is now done forward instead of backward by default
+- Search history is remembered while Dev-C++ is opened instead of while the find window is opened.
+- Fixed a bug in CPU window that causes Dev-C++ to consume an infinite amount of memory.
+- Dev-C++ now checks if there are any compilers installed before attempting to use them, avoiding crashes.
+- One can now view project information like total lines in the File Properties window.
+- Rewritten the code that reads profiling output, drastically reducing flicker.
+- One can now use copy in the file properties form.
+
+Version 5.3.0.0 - 30 September 2012
+
+- Completely rewritten the debugger interface.
+- Completely rewritten the find/replace form.
+- Improved some internal (compiler) data structures, reducing memory usage and potentially improving stability by simplifying code.
+- Improved startup speed, splashscreen is hidden (not even loaded) when startup times are estimated to be very low.
+- Fixed nearly all the memory leaks.
+- Indent guides are now painted faster, reducing flicker.
+- Code completion is now more clear and pops up faster.
+- Color selectors in Editor Options now properly set their own defaults, not those of other controls.
+- Automatic symbol completion and indentation is much faster now.
+- Added OpenMP libraries and tools to TDM-GCC x64.
+- Code folding is updated much faster now.
+- The code parser now understands multiple definitions after the } symbol of structs.
+- Much more performance enhancements in the typing/editing department.
+- Dev-C++ now autodetects compiler versions (using gcc -v) automatically on first startup, instead of assuming versions it shipped with.
+- One can now use Cut/Copy/Paste/... in the find form, incremental search form, CPU form and debug interfaces.
+- Compilers can now be downloaded separately from the SourceForge repository. They will be autodetected at first launch when put next to devcpp.exe.
+- Updated Japanese, Chinese, English and Portuguese translations.
+- Fixed loads of bugs.
+
+Version 5.2.0.3 - 25 Juni 2012
+
+- Fixed the function argument tip not selecting the function with the right number of arguments first.
+- Fixed that tip showing in various wrong places.
+- Added x86 GDB executables to TDM-GCC x64.
+- Tooltip balloons are now only triggered by words with identifier colors, saving lots of CPU time.
+- Adding watch variables by hovering over words now only adds words with identifier colors.
+- Pressing Alt now does not cause static controls to vanish anymore.
+- This version should scale pictures better on high DPI settings.
+- Moved to a new selection of built in compiler options.
+- Added filename tooltips when hovering above tabs.
+- Closing using the middle mouse button is now only triggered when the mouse is hovering above a tab.
+- Moved to a new selection of built in compiler options.
+- Updated the chinese (TC) translations (by cin.getline).
+- Fixed editor options not applying function tip timer settings properly, causing crashes when typing.
+- Updated the greek translations (by migf1).
+- Various dialogs and buttons are now more spacious, allowing longer translations.
+- Double clicking on errors now always correctly shows the caret.
+- Fixed a lot of erroneous translations of non-English and non-Chinese languages.
+
+Version 5.2.0.2 - 31 Mei 2012
+
+- Added a default compiler profile to TDM-GCC downloads to create 32-bit executables.
+- Ctrl+Click code browsing is more accurate now.
+- Added a function to projects which can change the C++/C default choice made when creating the project.
+- Fixed the comment/uncomment function not properly uncommenting single lines.
+- Watched variable deleting now does not delete wrong variables anymore.
+- Added TeX formatted code exporting.
+- Updated the Chinese (TC) translations (by cin.getline).
+- Compiling progress now properly updates error and warning count.
+- Warning and error logs are now updated while compiling.
+- Updated the new project window layout and fonts.
+- Fixed insert assuming an initial cursor position of (1;1).
+- Fixed a few code folding bugs regarding collapsing.
+- The mingw32-make.exe location checker now checks all bin directories instead of just the first one.
+- The function tooltip now waits 500ms after the last keystroke before parsing the code instead of parsing on each keystroke.
+- Projects with a lot of files to be opened now open a lot faster.
+- Code completion is even more accurate now, and it can now complete array items.
+- Switched to, on average, three to four times (up to 40x) faster locale variant string comparison.
+- Dev-C++'s memory manager now uses MMX instructions, making it incompatible with ancient processors.
+- Code completion cache is portable now.
+- Sped up the startup process by a few percents.
+- Typing is faster now.
+- More bug fixes.
+
+Version 5.2.0.1 - 28 April 2012
+
+- Function tooltips now properly hide when switching tabs again (regression).
+- One can now select to open nothing and the previously left open files on project reopen.
+- Folds are now only repainted when the gutter is invalidated, reducing flicker.
+- Updated the uncomment function: it now supports any newline standard.
+- Code completion now does not remove too much characters when completing by accident.
+- The debugger now wants you to add debugging symbols instead of ingoring it alltogether.
+- Updated the project templates.
+- The first time configuration window now loads its stuff before showing up.
+- Updated the chinese (Traditional) translations.
+- Tidied up a few other dialogs.
+- Insert, Goto bookmark and Insert bookmark are now disabled when no editor is visible.
+- The status bar is now cleared when no editors are open.
+
+Version 5.2.0.0 - 17 April 2012
+
+- Fixed maximize not covering the whole screen correctly on netbook screens.
+- Fixed some crashes regarding code folding.
+- Code folding is a bit faster now.
+- Opening files is a bit faster now.
+- The tip of the day form now does not show up when toggling fullscreen.
+- Panel resizers in the main form now hide when there's nothing to resize.
+- Fixed a mulitple struct definition after '};' detection bug.
+- Moved to a more recent SynEdit component.
+- Symbol completion is faster and has more options now.
+- Added a console pausing option to Environment options.
+- Fixed a font color issue in the function argument tooltip.
+- Added back trim trailing spaces.
+- Completed symbols are now skipped more smartly.
+- Windres is now, by default, forced to output i386 res files when compiling 32bit executables.
+- Loading using the standard caching options is now 0.1 second faster.
+- The Classes toolbar now hides variables of classes, making stuff a lot more readable.
+- Project opening is now quite a bit faster.
+- The SynEdit components in Editor Options now support code folding too.
+- Code Folding is a bit faster now.
+- DevCppPortable now accepts parameters and passes it to devcpp.exe.
+- Dev-C++ now uses FastMM4 to manage its memory, making allocations faster!
+- Fixed 'Close all but this' closing all tabs.
+- The code tooltip now properly hides when opening new tabs.
+- One can now edit text while using Incremental Search.
+- Commas inside strings inside function parameters don't make Dev-C++ seperate arguments anymore.
+- Added the user selectable font to all dialogs.
+- Redesigned some dialogs.
+- Simplified font selecting in Editor Options.
+- The compile progress window can now be translated.
+- Gutter colors are fixed: user themes can now properly modify its colors.
+- Updated the Chinese (TW) translations (translated by cin.getline).
+- Saved one fopen call per created tab in case you do not use default code snippets.
+- Newly created files will now be properly rescanned for folds.
+- The default code editor in Editor Options now retains focus when pressing tab.
+- Some more fixes I forgot about.
+
+Version 5.1.1.0 - 16 Februari 2012
+
+- Added code folding.
+- A few directory checks now use absolute paths instead of relative ones.
+- Added a few 32bit/64bit items to the FAQ.
+- Fixed the Help Menu Item not always working.
+- Added a few translations (translated by cin.getline).
+- Merged all new toolbar buttons to one 'master' button.
+- The class browser toolbar now sizes its dropdown menu to make its content fit.
+- Dev-C++ now uses Segoe UI 9pt as a default when it's installed.
+- Updated the statusbar and the toolbars.
+- Fixed a class browsing crash when not using a project.
+- And more minor things.
+- Fixed a crash when saving logs when no project is opened.
+- Fixed a lot of memory leaks.
+- Inserting classes and variables is faster now.
+- Code folding now automatically updates when creating new files from templates.
+- Fixed some more memory leaks. Folding doesn't leak anymore now.
+
+Version 5.1.0.0 - 27 December 2011
+
+- This is the first version to fully support 64bit MinGW compilers! Just place one in a folder called 'MinGW64' next to devcpp.exe, and Dev will automatically adapt itself to it!
+- When launching for the first time, Dev-C++ will set defaults based on available 32bit or 64bit compilers (favors 64bit). 
+- The XP style manifest creator now also supports 64bit.
+- The "Delete Profiling Information" button now does not check for the gmon.out file 60 times a second to keep itself updated.
+- Compiler information in the log now does not show up twice when rebuilding a single file.
+- Project files with dots in their names now do not confuse the executable namer anymore.
+- One more update to the compiler progress window: the warning counter was positioned a bit too much to the right.
+- Added formatting support for 'Sorry Unimplemented' and fixed up 'Unknown escape sequence'.
+- The main form now properly maximizes when not starting for the first time.
+- The main form child windows now properly scale themselves when the 'Tip of the Day' window is shown.
+- Slightly lowered startup times again.
+- The code browser toolbar now also shows types and struct members.
+- The code completer and code parser now use symmetric indices and _ID's, making them a lot faster.
+- Code completion cache is now created a bit faster and is smaller.
+- Updated the help file.
+- The tooltip now always shows up when it is supposed to, even the first time.
+- Added a new editor style called Classic Plus, which highlights symbols like { and (.
+- The Code Completion Cache creator can now also be told to cache a selection of files.
+- Updated MinGW32 to GCC 4.6.2. Added TDM-GCC 4.6.1 x64.
+- Updated the Chinese translations (translated by cin.getline).
+- More stuff I forgot about.
+
+Version 5.0.0.9 - 10 December 2011
+
+- Fixed a minor settings detection bug in the profiler.
+- The code completion dialog now hides its tooltips when the user chooses so by unticking "Enable editor hints", preventing an access error.
+- Reorganized parts of the interface: now makes better use of free space.
+- One can now select and copy the information in the file properties window.
+- Added a link to GCC's compiler documentation below the compiler options.
+- Added a few more options to -march, -std and -O. Note: this might change settings in pre-5.0.0.9 projects, please reapply them!
+- The code tooltip is quite a bit faster now.
+- Fixed a bug in the brace completion code, reported by garywho.
+- (RC2+) The function tooltip now does not show up when no prototype could be found (making it a lot faster).
+- The Environment Options UI font selector now properly shows the available fonts in an MS Word like manner.
+- Updated the compilation progress window layout.
+- Added profiles for both x86 and x64 compilers.
+- Above profiles now properly update the makefile and other settings.
+- Generic gcc and g++ errors like unrecongised command line options are now properly displayed in the list box.
+- Slightly lowered the (first time) launch speeds.
+
+Version 5.0.0.8 - 20 November 2011
+
+- Remapped all language IDs so that much more translations will fit nicely in the tables.
+- Profiling can now also be properly used without a project.
+- The function scanner now ignores comments.
+- Added an option to change the UI font.
+- Rescaled portions of the statusbar to accomodate other fonts.
+- Again updated big parts of the local variable scanner.
+- Removed 'Backspace Unindents' and 'Keep trailing spaces'. These options were too buggy and/or useless.
+- Set the mouseover delay to 1500 by default now.
+- Dev-C++ now does not stall when GCC complains about incorrect filenames. Instead, it shows GCC's error in the formatted log.
+- Added a few more previously hardcoded text items to the translations.
+- Fixed a few out of bounds errors in code scanning code.
+- Updated the Chinese (TW) translations thanks to 'cin.getline'.
+- Updated the CVS page.
+
+Version 5.0.0.7 - 9 November 2011
+
+- The compiler log output now always outputs the raw text even when no errors have been found in the code.
+- The parameters now default to nothing (let MinGW decide) instead of ISO C99.
+- The find output saver now correctly outputs its items.
+- Added a few more fixes to the tools menu.
+- New untitled files now get saved properly.
+- The { autocompletion now only inserts an extra newline when building function parameters and can also detect structs, and will append }; for them.
+- The code hint will now auto-hide after 10 seconds instead of 2,5.
+- Added a new autosave function.
+- Added some preparation code for TDM MinGW64.
+- The function tooltip now does not stay on the screen when leaving a function.
+- Added a build date to About.
+- And some more stuff I forgot about.
+
+Version 5.0.0.6 - 3 November 2011
+
+- Fixed an nil pointer read crash in the append closing brace code.
+- Updated the comment/uncomment functions.
+- The variable scanner now also supports local variables in non-class functions.
+- The scanner now does not scan the same word twice (making it 2x faster).
+- The Environment Options window now does not crash when its not allowed to edit file associations.
+- One can now use Ctrl+Scroll to edit text size, just like in browsers. Also added information about it in the Options menu.
+- Files now open up much faster thanks to avoiding repaints.
+- Fixed a buffer overflow in the tooltip generator and rewritten the locals scanner, which is now 50% faster.
+- The append closing braces function now works on every keyboard Win32 supports.
+- Removed any reference to DevTabs, which were too flaky edits (for example, the ComCtrl Manifest caused it to not paint child windows) of TPageControl and TTabControl.
+- Fixed a bug in the code that checks for the existence of tools.
+- Added new Chinese_TC translations created by cin.getline.
+- The uninstaller now does not forget to delete Dev's help file and folder if it's empty.
+
+Version 5.0.0.5 - 24 Oktober 2011
+
+- Rewritten the tooltip generator. It now uses better code scanning techniques and does not show up above what you were typing anymore.
+- Brace completion is now disabled inside strings and comments. It now also supports closing the < character.
+- The tooltip now also works when typing foo[bar].member and hovering above member.
+- The empty project now contains an empty Untitled unsaved file. Why would anyone NOT want or need that?
+- The function tooltip now also displays tips for completed and empty function parameter bodies.
+- The < character is now only inserted in lines starting with '#include'.
+- Highlighting checks in plain files now do not cause Dev to crash.
+- The Tips of the Day are back again!
+- The tab position of the editor is now changeable.
+- This version now uses a nine years more recent mingw32-make.exe makefile processor! The old GNU one will be omitted from the installer.
+- Projects are now saved upon creation.
+- Fixed two out-of-bounds errors in tooltip generation and code completion.
+- The source code is now more user friendly (DevCpp.dpk wouldn't compile straight away since some version), and 50% smaller.
+- Dev can now automatically log compiler messages to disk (the option can be found in Project Options >> Build Options).
+- The obj output directory now does not get created in the wrong 'current directory' in rare cases.
+- Dependency checking and compile delays are now saved, and on a per-compiler basis.
+- Restyled the editor tooltip balloon.
+- The function tooltip balloon now updates on the fly.
+- The editor hints option now properly disables hints.
+- Fixed a coloring bug when highlighting matching braces on the currently highlighted line.
+- Added a few more GUI togglable warning options.
+- Improved the sizing of the Specials Toolbar to make long translations fit.
+
+Version 5.0.0.4 - 25 September 2011
+
+- Upgraded the compiler to GCC 4.6.1.
+- The main tab control now has the optional (check Environment options) ability to spread tabs over multiple lines.
+- Added Goto Declaration and Goto Definition buttonsto the editor right click menu. This buttons make code navigation much easier.
+- The old code for Ctrl+Click now uses the new code for the buttons and uses two-way navigation.
+- Added Profiling tot the Compiler toolbar.
+- Removed the useless About/Help toolbar.
+- The splash screen now shows what Dev is currently loading.
+- Code Completion Cache can now also be browsed through.
+- Added icons for profiling buttons and added them to the compiling toolbar.
+- Updated the incremental Search window: it now has a previous and next button.
+- Corrected a few regression bugs in the class scanner.
+- Fixed a bug in the tooltip content generator.
+- And much more minor stuff...
+
+Version 5.0.0.3 - 8 September 2011
+
+- Rewritten and reorganized the Profile Analysis code.
+- Added an option to delete Profiling Information which detects by itself if it can be executed.
+- Corrected a few errors in the GCC profiling flag generation code.
+- Doubled the stack limits.
+- Improved Tab handling.
+- Fixed a memory leak in the Compiling form.
+- Restyled the Configure Tools window.
+- Remade the Help File. It now uses HTML Help (.chm) instead of WinHelp, which was removed from Vista and newer Windows OS's.
+- Help File couplings now directly take you to the help content of the currently open window.
+- Added optional automatic brace closing to the Editor Options.
+- Added an options tab to the Profiler.
+- Rewritten the GPROF output reader.
+- Removed any references to the flaky Help Item Customizer.
+- Added support for 'other' file counting in the Project Options window.
+- Resolved a few bugs that caused debugging and profiling options to not be saved.
+- Well, I've probably editted more stuff, but I can't recall.
+
+Version 5.0.0.2 - 30 Augustus 2011
+
+- Dev-C++ Portable now does not close a project with an exception error.
+- Shortcuts can now be saved properly by the portable version too.
+- Fixed a range error (unsigned 0 - 1) in the function prototype tooltip.
+- Copied the new class form to New >> Class..., making it easier to find.
+
+Version 5.0.0.1 - 28 Augustus 2011
+
+- Emergency update.
+- The Delete now does not get hijacked by the project browser anymore.
+- When nothing is selected, the tab key now puts a tab instead of doing nothing.
+- Dev-C++ now shows how long compiling took.
+
+Version 5.0.0.0 - 27 Augustus 2011
+
+- Restyled pretty much everything.
+- Reorganized a few windows to make better use of space.
+- Several SynEdits now do not have an infinitely long scrollbar anymore.
+- The splash screen now does not show up behind the tooltips anymore.
+- Improved startup speed for the New Look theme.
+- Updated the splash screen text.
+- Added more keyboard shortcuts to rightclick menus.
+- Removed everything XPMenu related. This shaves off about 7000 lines of code and makes Dev a bit faster.
+- Added a bunch of code insertion templates. For example, WinMain, WindProc and a do-while() loop.
+- Added copy all to right click menus of the rollout message sheet.
+- A bunch of Copy menu items now listen to shortcuts like Ctrl-C too.
+- Tab shortcuts now use Tabs instead of Shift-Ctrl-I and Shift-Ctrl-U (who came up with that fingerbreaking combination anyway?).
+- Removed a few borders around some tabs below, increasing used space and cleaning the UI up.
+- The Fullscreen close button is now visible again.
+- Removed a few deprecated components like TBevel.
+- Added Save all to rollout rightclick menus.
+- Improved layout of some Project Options tab and the welcome form.
+- You can now assign any combination of tab to any shortcut item you like.
+- I have to admit I've lost track of a lot of changes.
+
+Version 4.9.9.9 - 18 Augustus 2011
+
+- Fixed a regression: class or variable browsing by control clicking now works again.
+- Pasting chunks of code that require scrolling now force a refresh instead of showing gibberish.
+- The portable shortcut now runs .\devcpp.exe instead of one in Program Files.
+- Fixed: Typing stuff like foo[bar.member] spawned the completion tooltip of foo when typing the '.' after bar.
+- Added a D3D9 examplke template.
+- The shortcut is now a proper autoit executable.
+- Rewritten the GDB communication code that retrieves register contents.
+- Added a standards (-std) selection option.
+
+Version 4.9.9.8 - 1 Augustus 2011
+
+- Fixed the uninstallers name: it used to report '4.9.9.5'.
+- Added formatting for 'unknown escape sequence:'.
+- Portable configurations are now saved in .\config\ instead of '.\'. Looks much cleaner this way.
+- The Simple Window example now works correctly.
+- Added the flags that are actually set to Compiler Options.
+- The compiler now correctly remembers if it has created debug symbols.
+- And some more stuff I forgot about.
+
+Version 4.9.9.7 - 26 Juli 2011
+
+- Function candidates are now properly listed and formatted.
+- When code completion was disabled, block tabs/untabs weren't working.
+- Added formatting for the rare 'candidate is' (when there's one candidate of course) message.
+- Removed the include\sys directory from default auto includes. It was conflicting with ctime/time.h.
+- Updated a few English window and control captions.
+- Removed a faulty cast the Delhpi Debugger pointed me to.
+- Projects now open the first file in the list by default.
+- When switching between files, the statusbar (line:col and number of lines) now gets updated automatically.
+- Added formatting for "error: candidate is:".
+- Fixed a bug in the directory scanner: it used to omit every first file in any given directory.
+- Block indentation is now only triggered by tab when multiple lines are selected.
+- devDirs now saves relative paths too.
+
+Version 4.9.9.6 - 20 Juli 2011
+
+- Fixed the language option in the executable information tab. It didn't properly set the listbox to the saved setting (losing settings upon next save).
+- Fixed a bug in the file association code: icons were missing.
+- Lines like 'in member function', 'in constructor' and 'in destructor' are now properly formatted in the Compiler Tab (no line and col numbers anymore).
+- Added line and column formatting for 'In static member function'.
+- Fixed the file version string: it now keeps in sync with incremented build numbers.
+- The spin edits which control the Project file version are now kept in sync with the strings below.
+- Added an option to synchronize product and file versions.
+- Set the default installation directory to (Program Files)\Dev-C++ instead of C:\Dev-Cpp.
+
+Version 4.9.9.5 - 16 Juli 2011
+
+- Added column reporting for a few more error types.
+- Made a proper portable version this time: it comes in a 7zip file, saving a few more registry entries compared to 4.9.9.4's portable setup.
+- Dev-C++ now adds itself to Windows' "Programs and Features" list.
+
+Version 4.9.9.4 - 12 Juli 2011
+
+- Added a %path% macro to every path. Use this string in the config files to add relative paths to Compiler Directories.
+- Fixed a bug in the Code Completion Cache Creator (CCCC :D): it used to add two copies of every file (one relatively referred to and one referred to with a full path).
+- Cleaned up a few duplicate and unused headers and binaries. The installer is now a whopping 200KiB smaller.
+- Updated the make.exe searcher to check for GCC 4.5.2's make.exe.
+- Added a few NSIS installation profiles: minimalist and portable.
+- Fixed a few grammar errors.
+- Updated the About window layout and text.
+- Added an icon to the NSIS installer.
+
+Version 4.9.9.3 - 24 Juni 2011
+
+- Upgraded the default compiler to GCC 4.5.2.
+- When encountering an error, Dev-C++ will now position the caret next to it.
+- Added some more -march optimization options, including core2, k8-sse3, amdfam10, 'native' and 'generic'.
+- Cleaned up the explicit -m(instruction set) options by removing outdated and unsupported ones. Added a couple of modern instructions
+- Cleaned up the TODO viewer layout.
+- Fixed a bug in the compiler error parser: it used to read 1 byte too much afer the \0 of each error line, possibly causing crashes.
+- Added a 'Column' column in the Compiler log.
+- Tweaked the default settings, by enabling line numbers by default for example.
+- Fixed a bug in the compiler set creator: it wasn't storing storing command line options for each compiler.
+- Added more UI controls for frequently used GCC flags like -Wall, -Wextra and -pedantic.
+- Moved warning related flag options to a new section called 'Code Warnings'.
+- Removed the compiler optimization tree controls. Now has a proper None/Low/Med/High combobox.
+- Updated the default directory listings to GCC 4.5.2's directories.
+- Removed the [Compiler] section from the ini file. Instead of saving the current Compiler Set twice, it saves a Compiler index to refer to.
+- And some more stuff I forgot about.
+
+#########################################################################################################################################################
+
+Version 4.9.9.2
+* Changes unknown to mankind
+
+Version 4.9.9.1
+* Many bug fixes
+* Improved editor
+
+Version 4.9.9.0
+* Support for latest Mingw compiler system builds
+* Bug fixes
+
+Version 4.9.8.9
+* New code tooltip display
+* Improved Indent/Unindent and Remove Comment
+* Improved automatic indent
+* Added support for the "interface" keyword
+* WebUpdate should now report installation problems from PackMan
+* New splash screen and association icons
+* Improved installer
+* Many bug fixes
+
+Version 4.9.8.7
+* Added support for GCC > 3.2
+* Debug variables are now resent during next debug session
+* Watched Variables not in correct context are now kept and updated when it is needed
+* Added new compiler/linker options: 
+  - Strip executable
+  - Generate instructions for a specific machine (i386, i486, i586, i686, pentium, pentium-mmx, pentiumpro, pentium2, pentium3, pentium4, 
+    k6, k6-2, k6-3, athlon, athlon-tbird, athlon-4, athlon-xp, athlon-mp, winchip-c6, winchip2, k8, c3 and c3-2)
+  - Enable use of processor specific built-in functions (mmmx, sse, sse2, pni, 3dnow)
+* "Default" button in Compiler Options is back
+* Error messages parsing improved
+* Bug fixes
+
+Version 4.9.8.5
+* Added the possibility to modify the value of a variable during debugging (right click on a watch variable and select "Modify value")
+* During Dev-C++ First Time COnfiguration window, users can now choose between using or not class browser and code completion features.
+* Many bug fixes
+
+Version 4.9.8.4
+* Added the possibility to specify an include directory for the code completion cache to be created at Dev-C++ first startup
+* Improved code completion cache
+* WebUpdate will now backup downloaded DevPaks in Dev-C++\Packages directory, and Dev-C++ executable in devcpp.exe.BACKUP
+* Big speed up in function parameters listing while editing
+* Bug fixes
+
+Version 4.9.8.3
+* On Dev-C++ first time configuration dialog, a code completion cache of all the standard 
+  include files can now be generated.
+* Improved WebUpdate module
+* Many bug fixes
+
+Version 4.9.8.2
+* New debug feature for DLLs: attach to a running process
+* New project option: Use custom Makefile. 
+* New WebUpdater module.
+* Allow user to specify an alternate configuration file in Environment Options 
+  (still can be overriden by using "-c" command line parameter).
+* Lots of bug fixes.
+
+Version 4.9.8.1
+* When creating a DLL, the created static lib respects now the project-defined output directory
+
+Version 4.9.8.0
+* Changed position of compiler/linker parameters in Project Options.
+* Improved help file
+* Bug fixes
+
+Version 4.9.7.9
+* Resource errors are now reported in the Resource sheet
+* Many bug fixes
+
+Version 4.9.7.8
+* Made whole bottom report control floating instead of only debug output.
+* Many bug fixes
+
+Version 4.9.7.7
+* Printing settings are now saved
+* New environment options : "watch variable under mouse" and "Report watch errors"
+* Bug fixes
+
+Version 4.9.7.6
+* Debug variable browser
+* Added possibility to include in a Template the Project's directories (include, libs and ressources)
+* Changed tint of Class browser pictures colors to match the New Look style
+* Bug fixes
+
+Version 4.9.7.5
+* Bug fixes
+
+Version 4.9.7.4
+* When compiling with debugging symbols, an extra definition is passed to the
+  compiler: -D__DEBUG__
+* Each project creates a <project_name>_private.h file containing version
+  information definitions
+* When compiling the current file only, no dependency checks are performed
+* ~300% Speed-up in class parser
+* Added "External programs" in Tools/Environment Options (for units "Open with")
+* Added "Open with" in project units context menu
+* Added "Classes" toolbar
+* Fixed pre-compilation dependency checks to work correctly
+* Added new file menu entry: Save Project As
+* Bug-fix for double quotes in devcpp.cfg file read by vUpdate
+* Other bug fixes
+
+Version 4.9.7.3
+* When adding debugging symbols on request, remove "-s" option from linker
+* Compiling progress window
+* Environment options : "Show progress window" and "Auto-close progress window"
+* Bug fixes
+
+Version 4.9.7.2
+* Bug fixes
+
+Version 4.9.7.1
+* "Build priority" per-unit
+* "Include file in linking process" per-unit
+* New feature: compile current file only
+* Separated C++ compiler options from C compiler options in Makefile (see bug report #654744)
+* Separated C++ include dirs from C include dirs in Makefile (see bug report #654744)
+* Necessary UI changes in Project Options
+* Added display of project filename, project output and a summary of the project files in Project Options General tab.
+* Fixed the "compiler-dirs-with-spaces" bug that crept-in in 4.9.7.0
+* Multi-select files in project-view (when "double-click to open" is configured in Environment Settings)
+* Resource files are treated as ordinary files now
+* Updates in "Project Options/Files" code
+* MSVC import now creates the folders structure of the original VC project
+* Bug fixes
+
+Version 4.9.7.0
+* Allow customizing of per-unit compile command in projects
+* Added two new macros: <DATE> and <DATETIME>
+* Added support for macros in the "default source code" (Tools/Editor Options/Code)
+* Separated layout info from project file. It is now kept in a different file
+  (the same filename as the project's but with extension ".layout"). If you
+  have your project under CVS control, you ''ll know why this had to happen...
+* Compiler settings per-project
+* Compiler set per-project
+* Implemented new compiler settings framework
+* "Compile as C++" per-unit
+* "Include file in compilation process" per-unit
+* Project version info (creates the relevant VERSIONINFO struct in the private
+  resource)
+* Support XP Themes (creates the CommonControls 6.0 manifest file and includes
+  it in the private resource)
+* Added CVS "login" and "logout" commands
+* Project manager and debugging window (in Debug tab) can now be trasnformed into floating windows.
+* Added "Add Library" button in Project Options
+* Bug fixes
+
+Version 4.9.6.9
+* Implemented search in help files for the word at cursor (context sensitive help)
+* Implemented "compiler sets" infrastructure to switch between different compilers easily (e.g. gcc-2.95 and gcc-3.2)
+* Added "Files" tab in CVS form to allow selection of more than one file for
+  the requested CVS action
+  
+Version 4.9.6.8
+* support for DLL application hosting, for debugging and executing DLLs under Dev-C++.
+* New class browser option: "Show inherited members"
+* Added support for the '::' member access operator in code-completion
+* Added *working* function arguments hint
+* Added bracket highlighting. When the caret is on a bracket, that bracket and
+  its counterpart are highlighted
+* Nested folders in project view
+
+Version 4.9.6.7
+* XP Theme support
+* Added CVS commands "Add" and "Remove"
+* Added configuration option for "Templates Directory" in "Environment Options"
+* Code-completion updates
+* Bug fixes
+
+Version 4.9.6.6
+* Editor colors are initialized properly on Dev-C++ first-run
+* Added doxygen-style comments in NewClass, NewMemberFunction and NewMemberVariable wizards
+* Added file's date/time stamp in File/Properties window
+* Current windows listing in Window menu
+* Bug fixes
+
+Version 4.9.6.5
+* CVS support
+* Window list (in Window menu)
+* bug fixes
+
+version 4.9.6.4
+* added ENTER key for opening file in project browser, DEL to delete from the project.
+* bug fixes
+
+version 4.9.6.3
+* Bug fixes
+
+version 4.9.6.2
+* Bug fixes
+
+version 4.9.6.1
+* New "Abort compilation" button
+* Bug fixes
+* Now checks for vRoach existance when sending a crash report
+
+Version 4.9.5.5
+* New option in Editor Options: Show editor hints. User can disable the hints
+  displayed in the editor when the mouse moves over a word. Since this was the
+  cause of many errors (although it should be fixed by now), we are giving the
+  user the option to disable this feature.
+* New option in Editor Options (code-completion): Use code-completion cache.
+  Well, it adds caching to code-completion. Depending on the cache size,
+  the program may take a bit longer to start-up, but provides very fast
+  code-completion and the user has all the commands (belonging to the files
+  he added in the cache) at his fingertips. If, for example, the user adds
+  "windows.h", he gets all the WinAPI! If he adds "wx/wx.h", he gets all of
+  wxWindows! You get the picture...
+* Removed "Only show classes from current file" option in class browser settings.
+  It used to be a checkbox, allowing only two states (on or off), but there is
+  a third relevant option now: "Project classes" so it didn't fit the purpose...
+  The user can define this in the class browser's context menu under "View mode".
+* Fixed the dreaded "Clock skew detected" compiler warning!
+* Fixed many class browser bugs, including some that had to do with class folders.
+
+Version 4.9.5.4
+* Under NT, 2000 and XP, user application data directory will be used to store config files (i.e : C:\Documents and Settings\Username\Local Settings\Application Data)
+
+Version 4.9.5.3
+* Added ExceptionsAnalyzer. If the devcpp.map file is in the devcpp.exe directory
+  then we even get a stack trace in the bug report!
+* Added new WebUpdate module (inactive temporarily).
+* Added new code for code-completion caching of files (disabled - work in progress).
+
+Version 4.9.5.2
+* Added new option in class-browser: Use colors
+  (available when right-clicking the class-browser
+  and selecting "View mode").
+* Dev-C++ now traps access violation of your programs (and of itself too ;)
+
+Version 4.9.5.1
+* Implemented the "File/Export/Project to HTML" function.
+* Added "Tip of the day" system.
+* When running a source file in explorer, don't spawn new instance.
+  Instead open the file in an already launched Dev-C++.
+* Class-parser speed-up (50% to 85% improvement timed!!!)
+* Many code-completion updates. Now takes into account context,
+  class inheritance and visibility (shows items only from files
+  #included directly or indirectly)!
+* Caching of result set of code-completion for speed-up.
+* New option "Execution/Parameters" (and "Debug/Parameters").
+
+Version 4.9.5.0 (5.0 beta 5):
+* CPU Window (still in development)
+* ToDo  list
+* Backtrace in debugging
+* Run to cursor
+* Folders in Project and Class Browser
+* Send custom commands to GDB
+* Makefile can now be customized.
+* Modified the behaviour of the -c param : 
+  -c <config file directory>
+* Saving of custom syntax parameter group
+* Possibility of changing compilers and tools filename.
+* Many bug fixes
+
+
+Version 4.9.4.1 (5.0 beta 4.1):
+
+* back to gcc 2.95.3
+* Profiling support
+* new update/packages checker (vUpdate)
+* Lots of bugfixes
