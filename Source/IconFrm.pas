@@ -137,7 +137,7 @@ begin
 end;
 
 procedure TIconForm.IconViewInfoTip(Sender: TObject; Item: TListItem;
-  var InfoTip: AnsiString);
+  var InfoTip: string);
 begin
   InfoTip:= Item.SubItems[0];
 end;

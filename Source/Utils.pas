@@ -336,7 +336,7 @@ var
 begin
   SubTextLocation := Length(text) - Length(subtext) + 1;
   if (SubTextLocation > 0) and (subtext <> '') then
-    Result := StrComp(Pointer(subtext), Pointer(@text[SubTextLocation])) = 0
+    Result := StrComp(PAnsiChar(subtext), PAnsiChar(@text[SubTextLocation])) = 0
   else
     Result := False;
 end;
@@ -347,7 +347,7 @@ var
 begin
   SubTextLocation := Length(text) - Length(subtext) + 1;
   if (SubTextLocation > 0) and (subtext <> '') then
-    Result := StrIComp(Pointer(subtext), Pointer(@text[SubTextLocation])) = 0
+    Result := StrIComp(PAnsiChar(subtext), PAnsiChar(@text[SubTextLocation])) = 0
   else
     Result := False;
 end;

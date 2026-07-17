@@ -1,0 +1,1305 @@
+object CompOptForm: TCompOptForm
+  Left = 618
+  Top = 174
+  Margins.Left = 2
+  Margins.Top = 2
+  Margins.Right = 2
+  Margins.Bottom = 2
+  BorderStyle = bsDialog
+  Caption = 'Compiler options'
+  ClientHeight = 579
+  ClientWidth = 514
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  Position = poMainFormCenter
+  ShowHint = True
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnShow = InterfaceSave
+  DesignSize = (
+    514
+    579)
+  TextHeight = 15
+  object btnOk: TBitBtn
+    Left = 224
+    Top = 545
+    Width = 90
+    Height = 27
+    Margins.Left = 2
+    Margins.Top = 2
+    Margins.Right = 2
+    Margins.Bottom = 2
+    Anchors = [akLeft, akBottom]
+    Caption = '&OK'
+    Default = True
+    Glyph.Data = {
+      DE010000424DDE01000000000000760000002800000024000000120000000100
+      0400000000006801000000000000000000001000000000000000000000000000
+      80000080000000808000800000008000800080800000C0C0C000808080000000
+      FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00333333333333
+      3333333333333333333333330000333333333333333333333333F33333333333
+      00003333344333333333333333388F3333333333000033334224333333333333
+      338338F3333333330000333422224333333333333833338F3333333300003342
+      222224333333333383333338F3333333000034222A22224333333338F338F333
+      8F33333300003222A3A2224333333338F3838F338F33333300003A2A333A2224
+      33333338F83338F338F33333000033A33333A222433333338333338F338F3333
+      0000333333333A222433333333333338F338F33300003333333333A222433333
+      333333338F338F33000033333333333A222433333333333338F338F300003333
+      33333333A222433333333333338F338F00003333333333333A22433333333333
+      3338F38F000033333333333333A223333333333333338F830000333333333333
+      333A333333333333333338330000333333333333333333333333333333333333
+      0000}
+    ModalResult = 1
+    NumGlyphs = 2
+    TabOrder = 0
+    OnClick = btnOkClick
+  end
+  object btnCancel: TBitBtn
+    Left = 320
+    Top = 545
+    Width = 90
+    Height = 27
+    Margins.Left = 2
+    Margins.Top = 2
+    Margins.Right = 2
+    Margins.Bottom = 2
+    Anchors = [akLeft, akBottom]
+    Cancel = True
+    Caption = '&Cancel'
+    Glyph.Data = {
+      DE010000424DDE01000000000000760000002800000024000000120000000100
+      0400000000006801000000000000000000001000000000000000000000000000
+      80000080000000808000800000008000800080800000C0C0C000808080000000
+      FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00333333333333
+      333333333333333333333333000033338833333333333333333F333333333333
+      0000333911833333983333333388F333333F3333000033391118333911833333
+      38F38F333F88F33300003339111183911118333338F338F3F8338F3300003333
+      911118111118333338F3338F833338F3000033333911111111833333338F3338
+      3333F8330000333333911111183333333338F333333F83330000333333311111
+      8333333333338F3333383333000033333339111183333333333338F333833333
+      00003333339111118333333333333833338F3333000033333911181118333333
+      33338333338F333300003333911183911183333333383338F338F33300003333
+      9118333911183333338F33838F338F33000033333913333391113333338FF833
+      38F338F300003333333333333919333333388333338FFF830000333333333333
+      3333333333333333333888330000333333333333333333333333333333333333
+      0000}
+    ModalResult = 2
+    NumGlyphs = 2
+    TabOrder = 1
+    OnClick = btnCancelClick
+  end
+  object btnHelp: TBitBtn
+    Left = 416
+    Top = 545
+    Width = 90
+    Height = 27
+    Margins.Left = 2
+    Margins.Top = 2
+    Margins.Right = 2
+    Margins.Bottom = 2
+    Anchors = [akLeft, akBottom]
+    Enabled = False
+    Kind = bkHelp
+    NumGlyphs = 2
+    TabOrder = 2
+    OnClick = btnHelpClick
+  end
+  object OptionPages: TPageControl
+    Left = 0
+    Top = 0
+    Width = 516
+    Height = 533
+    Margins.Left = 2
+    Margins.Top = 2
+    Margins.Right = 2
+    Margins.Bottom = 2
+    ActivePage = tabCompilerSet
+    TabOrder = 3
+    object tabCompilerSet: TTabSheet
+      Margins.Left = 2
+      Margins.Top = 2
+      Margins.Right = 2
+      Margins.Bottom = 2
+      Caption = 'Compiler Set'
+      object grpCompSet: TGroupBox
+        Left = 13
+        Top = 9
+        Width = 492
+        Height = 56
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        Caption = 'Compiler set to configure'
+        TabOrder = 0
+        object btnAddBlankCompilerSet: TSpeedButton
+          Left = 384
+          Top = 22
+          Width = 23
+          Height = 23
+          Hint = 'Add a new compiler set'
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Glyph.Data = {
+            36030000424D3603000000000000360000002800000010000000100000000100
+            18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+            0000002F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F2F
+            2F000000BFBFBFBFBFBFBFBFBFBFBFBF000000D0D0D0B8B8B8B8B8B8B8B8B8B8
+            B8B8B8B8B8B8B8B8B8B8B8B8B8B89696962F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3D0D0D0D0D0D0D0D0D0D0D0D0CFCFCFCFCFCFCFCFCFCFCFCFB8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3D0D0D0D0D0D0D0D0D0D0
+            D0D0D0D0D0CFCFCFCFCFCFCFCFCFB8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3DFDFDFD0D0D0D0D0D0D0D0D0D0D0D0D0D0D0CFCFCFCFCFCFB8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3DFDFDFDFDFDFD0D0D0D0
+            D0D0D0D0D0D0D0D0D0D0D0CFCFCFB8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3DFDFDFDFDFDFD0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0B8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3DFDFDFDFDFDFDFDFDFD0
+            D0D0D0D0D0D0D0D0D0D0D0D0D0D0B8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3DFDFDFDFDFDFDFDFDFDFDFDFD0D0D0D0D0D0D0D0D0D0D0D0B8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3DFDFDFDFDFDFDFDFDFDF
+            DFDFD0D0D0D0D0D0D0D0D0D0D0D0B8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3DFDFDFDFDFDFDFDFDFDFDFDFDFDFDFD0D0D0D0D0D0D0D0D0B8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3DFDFDFDFDFDFDFDFDFDF
+            DFDFDFDFDFDFDFDFD0D0D0D0D0D0B8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000F3F3F3DFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFD0D0D0B8B8
+            B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF000000F3F3F3DFDFDFDFDFDFDFDFDFDF
+            DFDFDFDFDFDFDFDFDFDFDFDFDFDFB8B8B82F2F2FBFBFBFBFBFBFBFBFBFBFBFBF
+            000000FFFFFFF3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3DFDF
+            DF2F2F2FBFBFBFBFBFBFBFBFBFBFBFBF6868682F2F2F2F2F2F2F2F2F2F2F2F2F
+            2F2F2F2F2F2F2F2F000000000000000000000000BFBFBFBFBFBF}
+          OnClick = btnAddBlankCompilerSetClick
+        end
+        object btnDelCompilerSet: TSpeedButton
+          Left = 461
+          Top = 22
+          Width = 23
+          Height = 23
+          Hint = 'Delete the selected compiler set'
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Glyph.Data = {
+            36030000424D3603000000000000360000002800000010000000100000000100
+            18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBF0000000000A5000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000A50000
+            00BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000000000FF0000D30000A5000000BF
+            BFBFBFBFBF0000000000D30000D30000A5000000BFBFBFBFBFBFBFBFBF000000
+            7D7DFF6F6FFF0000FF0000D30000A50000000000000000D30000FF0000FF0000
+            D30000A5000000BFBFBFBFBFBFBFBFBF0000007D7DFF6F6FFF0000FF0000D300
+            00FF0000FF0000FF0000FF0000FF0000D3000000BFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBF0000007D7DFF6F6FFF0000FF0000FF0000FF0000FF0000FF0000D30000
+            00BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000000000FF0000FF00
+            00FF0000FF0000FF0000FF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBF0000000000FF0000FF0000FF0000FF0000FF0000FF000000BFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000006F6FFF0000FF0000FF00
+            00FF0000FF0000FF0000D30000A5000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            0000006F6FFF0000FF0000FF0000FF0000FF0000FF6F6FFF0000FF0000D30000
+            A5000000BFBFBFBFBFBFBFBFBF0000007D7DFF6F6FFF0000FF0000FF6F6FFF00
+            00000000007D7DFF6F6FFF0000FF0000D30000A5000000BFBFBFBFBFBFBFBFBF
+            0000007D7DFF6F6FFF6F6FFF000000BFBFBFBFBFBF0000007D7DFF6F6FFF0000
+            FF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000007D7DFF000000BFBFBFBF
+            BFBFBFBFBFBFBFBF0000007D7DFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+          OnClick = btnDelCompilerSetClick
+        end
+        object btnRenameCompilerSet: TSpeedButton
+          Left = 435
+          Top = 22
+          Width = 23
+          Height = 23
+          Hint = 'Rename the selected compiler set'
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Glyph.Data = {
+            36030000424D3603000000000000360000002800000010000000100000000100
+            18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBF00000037C84537C845000000BFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF00000099E3A0
+            72D87C72D87C37C845000000BFBFBFBFBFBFBFBFBFBFBFBF00000037C8450000
+            00BFBFBFBFBFBFBFBFBF00000099E3A099E3A072D87C72D87C37C84500000000
+            0000BFBFBFBFBFBF00000072D87C37C845000000BFBFBFBFBFBFBFBFBF686868
+            00000099E3A099E3A099E3A072D87C72D87C00000000000000000072D87C72D8
+            7C37C845000000BFBFBFBFBFBFBFBFBFBFBFBF68686800000000000099E3A099
+            E3A099E3A099E3A099E3A072D87C72D87C72D87C37C845000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBF00000000000000000000000000000099E3A072D8
+            7C99E3A0000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBF00000099E3A099E3A0000000BFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF68686899E3A00000
+            00BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+          OnClick = btnRenameCompilerSetClick
+        end
+        object btnFindCompilers: TSpeedButton
+          Left = 358
+          Top = 22
+          Width = 24
+          Height = 23
+          Hint = 'Find and automatically configure compilers'
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -12
+          Font.Name = 'Segoe UI'
+          Font.Style = [fsBold]
+          Glyph.Data = {
+            36030000424D3603000000000000360000002800000010000000100000000100
+            18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000BFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBF00000000E0FF00B0C8000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBF000000000000BFBFBFBFBFBFBFBFBF00000000E0FF00B0C80000
+            00BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000E0FF00B0C800000000
+            000000000000000000E0FF00B0C8000000000000000000BFBFBFBFBFBFBFBFBF
+            BFBFBF00000000E0FF00B0C800000000BAD300B0C800B0C800E0FF00B0C800B0
+            C800B0C800B0C8000000BFBFBF00000000000000000000E0FF00B0C800000000
+            000000000000BAD300E0FF00E0FF00E0FF00E0FF00E0FF00000000000000E0FF
+            00B0C800B0C800E0FF00B0C800B0C800B0C800B0C840404000BAD300B0C80000
+            00000000000000BFBFBF00000000E0FF00E0FF00E0FFFFFFFF00E0FF00E0FF00
+            E0FF00E0FF40404000BAD300B0C8000000BFBFBFBFBFBFBFBFBFBFBFBF000000
+            00000068686800E0FF00B0C840404040404040404000000000E0FF00E0FF0000
+            00BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000E0FF00B0C8404040BF
+            BFBFBFBFBFBFBFBF000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBF00000000E0FF00E0FF404040BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000BFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+          ParentFont = False
+          OnClick = btnFindCompilersClick
+        end
+        object btnAddFilledCompilerSet: TSpeedButton
+          Left = 410
+          Top = 22
+          Width = 23
+          Height = 23
+          Hint = 'Add a new compiler set'
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Glyph.Data = {
+            36030000424D3603000000000000360000002800000010000000100000000100
+            18000000000000030000C30E0000C30E00000000000000000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBF000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000000000
+            C5DE000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBF00000000000000C5DE00BDD600BDD6000000BFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000ADBD00000000
+            BDD600ADBD00C5DE00C5DE000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBF00000000BDD600000000C5DE00BDCE00BDD600BDD600BDD600C5
+            DE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000ADBD00ADBD00000000
+            BDD600ADBD00C5DE00BDD600BDD600C5DE00BDD6000000BFBFBFBFBFBFBFBFBF
+            BFBFBF00000000C5DE00C5DE00000000C5DE00BDCE00ADBD00BDD600BDCE00BD
+            CE00ADBD00BDD6000000BFBFBFBFBFBF00000000BDD600C5DE00C5DE00000000
+            BDD600BDD600C5DE00BDD600ADBD00BDD600C5DE00BDD6000000BFBFBFBFBFBF
+            00000000BDD600C5DE00C5DE00000000BDCE00ADBD00BDD600ADBD00BDD600BD
+            CE00ADBD00ADBD000000BFBFBF00000000C5DE00C5DE00C5DE00C5DE00C5DE00
+            000000000000000000BDCE00BDCE00ADBD00BDCE00ADBD000000BFBFBF000000
+            00BDD600BDD600C5DE00C5DE00C5DE00C5DE00C5DE00C5DE00000000ADBD00AD
+            BD00ADBD00BDCE00000000000000BDD600ADBD00BDD600C5DE00C5DE00C5DE00
+            C5DE00C5DE00C5DE00C5DE00000000000000BDCE00ADBD00000000000000C5DE
+            00BDD600000000000000C5DE00BDD600C5DE00C5DE00C5DE00C5DE00C5DE00C5
+            DE00000000ADBD000000BFBFBF000000000000BFBFBFBFBFBF00000000000000
+            000000ADBD00BDD600C5DE00C5DE000000BFBFBF000000000000BFBFBFBFBFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF00000000000000ADBD000000BFBF
+            BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+            BFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+          OnClick = btnAddFilledCompilerSetClick
+        end
+        object cmbCompilerSetComp: TComboBox
+          Left = 9
+          Top = 22
+          Width = 342
+          Height = 23
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Style = csDropDownList
+          TabOrder = 0
+          OnChange = cmbCompilerSetCompChange
+          OnEnter = cmbCompilerSetCompEnter
+        end
+      end
+      object MainPages: TPageControl
+        Tag = 2
+        Left = 0
+        Top = 74
+        Width = 512
+        Height = 432
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        ActivePage = tabCompiler
+        TabOrder = 1
+        object tabCompiler: TTabSheet
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Caption = 'General'
+          DesignSize = (
+            504
+            402)
+          object cbCompAdd: TCheckBox
+            Left = 10
+            Top = 6
+            Width = 474
+            Height = 19
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = [akLeft, akTop, akRight]
+            Caption = 'Add the following commands when calling the compiler:'
+            TabOrder = 0
+            OnClick = cbCompAddClick
+            ExplicitWidth = 476
+          end
+          object Commands: TMemo
+            Left = 20
+            Top = 32
+            Width = 473
+            Height = 129
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = []
+            ScrollBars = ssVertical
+            TabOrder = 1
+            WantReturns = False
+            OnChange = InterfaceChange
+            ExplicitLeft = 21
+          end
+          object cbLinkerAdd: TCheckBox
+            Left = 10
+            Top = 173
+            Width = 474
+            Height = 18
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = [akLeft, akTop, akRight]
+            Caption = 'Add these commands to the linker command line'
+            TabOrder = 2
+            OnClick = cbLinkerAddClick
+            ExplicitWidth = 476
+          end
+          object Linker: TMemo
+            Left = 20
+            Top = 197
+            Width = 473
+            Height = 142
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = []
+            ScrollBars = ssVertical
+            TabOrder = 3
+            WantReturns = False
+            OnChange = InterfaceChange
+            ExplicitLeft = 21
+            ExplicitTop = 198
+          end
+          object cbStaticLinkStdlib: TCheckBox
+            Left = 10
+            Top = 378
+            Width = 474
+            Height = 18
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = [akLeft, akTop, akRight]
+            Caption = 'Static Link stdlib'
+            TabOrder = 4
+            ExplicitWidth = 476
+          end
+          object cbAddCharset: TCheckBox
+            Left = 10
+            Top = 346
+            Width = 474
+            Height = 18
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Anchors = [akLeft, akTop, akRight]
+            Caption = 'Add Charset options'
+            TabOrder = 5
+            ExplicitWidth = 476
+          end
+        end
+        object tabCodeGen: TTabSheet
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Caption = 'Settings'
+          object OptionsTip: TLabel
+            Left = 0
+            Top = 358
+            Width = 508
+            Height = 22
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Alignment = taCenter
+            AutoSize = False
+            Caption = 'For more information about GCC'#39's options, please visit'
+          end
+          object OptionsLink: TLabel
+            Left = 0
+            Top = 378
+            Width = 508
+            Height = 22
+            Cursor = crHandPoint
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Alignment = taCenter
+            AutoSize = False
+            Caption = 'http://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html'
+            Color = clBtnFace
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlue
+            Font.Height = -12
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsUnderline]
+            ParentColor = False
+            ParentFont = False
+            OnClick = OptionsLinkClick
+          end
+          inline CompOptionsFrame1: TCompOptionsFrame
+            Left = 0
+            Top = 0
+            Width = 635
+            Height = 444
+            HorzScrollBar.Visible = False
+            VertScrollBar.Visible = False
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -12
+            Font.Name = 'Segoe UI'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 0
+            ExplicitWidth = 635
+            ExplicitHeight = 444
+            inherited tabs: TTabControl
+              Width = 635
+              Height = 444
+              ExplicitWidth = 635
+              ExplicitHeight = 444
+              inherited vle: TCompOptionsList
+                Width = 627
+                Height = 434
+                ExplicitWidth = 627
+                ExplicitHeight = 434
+              end
+            end
+          end
+        end
+        object tabDirectories: TTabSheet
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Caption = 'Directories'
+          object DirTabs: TTabControl
+            Left = 0
+            Top = 0
+            Width = 504
+            Height = 402
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Align = alClient
+            TabOrder = 0
+            Tabs.Strings = (
+              'Binaries'
+              'Libraries'
+              'C Includes'
+              'C++ Includes')
+            TabIndex = 0
+            OnChange = DirTabsChange
+            DesignSize = (
+              504
+              402)
+            object btnUp: TSpeedButton
+              Left = 468
+              Top = 148
+              Width = 25
+              Height = 23
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akRight, akBottom]
+              Enabled = False
+              Glyph.Data = {
+                36050000424D360500000000000036040000280000000F000000100000000100
+                0800000000000001000000000000000000000001000000010000000000000000
+                80000080000000808000800000008000800080800000C0C0C000C0DCC000F0CA
+                A60000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF00000080000000FFFF00008080000000FF000000
+                8000FF00FF0080008000FFFBF0008080400000FF800000404000A4C8F0000080
+                FF00A0A0A40000408000FF00800040008000C0DCC00080400000000000000000
+                80000080000000808000800000008000800080800000C0C0C000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF00000080000000FFFF00008080000000FF000000
+                8000FF00FF0080008000FFFBF0008080400000FF800000404000A4C8F0000080
+                FF00A0A0A40000408000FF00800040008000C0DCC00080400000000000000000
+                80000080000000808000800000008000800080800000C0C0C000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF000000800000F0FBFF00A4A0A000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D00000000000D0D0D0D0D000D0D0D0D0D00
+                060606000D0D0D0D0D000D0D0D0D0D00060606000D0D0D0D0D000D0D0D0D0D00
+                060606000D0D0D0D0D000D0D00000000060606000000000D0D000D0D0D000606
+                0606060606000D0D0D000D0D0D0D000606060606000D0D0D0D000D0D0D0D0D00
+                060606000D0D0D0D0D000D0D0D0D0D0D0006000D0D0D0D0D0D000D0D0D0D0D0D
+                0D000D0D0D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D00}
+              OnClick = UpDownClick
+              ExplicitLeft = 470
+              ExplicitTop = 150
+            end
+            object btnDown: TSpeedButton
+              Left = 468
+              Top = 180
+              Width = 25
+              Height = 23
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akRight, akBottom]
+              Enabled = False
+              Glyph.Data = {
+                36050000424D360500000000000036040000280000000F000000100000000100
+                0800000000000001000000000000000000000001000000010000000000000000
+                80000080000000808000800000008000800080800000C0C0C000C0DCC000F0CA
+                A60000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF00000080000000FFFF00008080000000FF000000
+                8000FF00FF0080008000FFFBF0008080400000FF800000404000A4C8F0000080
+                FF00A0A0A40000408000FF00800040008000C0DCC00080400000000000000000
+                80000080000000808000800000008000800080800000C0C0C000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF00000080000000FFFF00008080000000FF000000
+                8000FF00FF0080008000FFFBF0008080400000FF800000404000A4C8F0000080
+                FF00A0A0A40000408000FF00800040008000C0DCC00080400000000000000000
+                80000080000000808000800000008000800080800000C0C0C000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00FFFFFF000000
+                0000C0C0C00080808000FF00000080000000FFFF00008080000000FF00000080
+                000000FFFF00008080000000FF0000008000FF00FF0080008000FFFBF0008080
+                400000FF800000404000A4C8F0000080FF00A0A0A40000408000FF0080004000
+                8000C0DCC0008040000000000000000080000080000000808000800000008000
+                800080800000C0C0C000808080000000FF0000FF000000FFFF00FF000000FF00
+                FF00FFFF0000FFFFFF00FFFFFF0000000000C0C0C00080808000FF0000008000
+                0000FFFF00008080000000FF000000800000F0FBFF00A4A0A000808080000000
+                FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D0D000D0D0D0D0D0D0D000D0D0D0D0D0D
+                0006000D0D0D0D0D0D000D0D0D0D0D00060606000D0D0D0D0D000D0D0D0D0006
+                06060606000D0D0D0D000D0D0D0006060606060606000D0D0D000D0D00000000
+                060606000000000D0D000D0D0D0D0D00060606000D0D0D0D0D000D0D0D0D0D00
+                060606000D0D0D0D0D000D0D0D0D0D00060606000D0D0D0D0D000D0D0D0D0D00
+                000000000D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D
+                0D0D0D0D0D0D0D0D0D000D0D0D0D0D0D0D0D0D0D0D0D0D0D0D00}
+              OnClick = UpDownClick
+              ExplicitLeft = 470
+              ExplicitTop = 182
+            end
+            object btnBrowse: TSpeedButton
+              Left = 474
+              Top = 330
+              Width = 25
+              Height = 24
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Glyph.Data = {
+                36030000424D3603000000000000360000002800000010000000100000000100
+                18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+                00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+                BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+                00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+                00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+                BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+                00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+                000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+                96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+                00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+                AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+                00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+                CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+                5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+                BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+              OnClick = btnBrowseClick
+            end
+            object lstDirs: TListBox
+              Left = 4
+              Top = 28
+              Width = 464
+              Height = 298
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              ItemHeight = 15
+              TabOrder = 0
+              OnClick = lstDirsClick
+              OnDblClick = lstDirsDblClick
+            end
+            object edEntry: TEdit
+              Left = 4
+              Top = 328
+              Width = 458
+              Height = 23
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akLeft, akRight, akBottom]
+              TabOrder = 1
+              OnChange = edEntryChange
+              OnKeyUp = edEntryKeyUp
+              ExplicitTop = 323
+            end
+            object btnDelInval: TButton
+              Tag = 4
+              Left = 356
+              Top = 364
+              Width = 107
+              Height = 24
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akLeft, akBottom]
+              Caption = 'Delete &Invalid'
+              TabOrder = 5
+              OnClick = ButtonClick
+              ExplicitTop = 366
+            end
+            object btnDelete: TButton
+              Tag = 3
+              Left = 239
+              Top = 364
+              Width = 107
+              Height = 24
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akLeft, akBottom]
+              Caption = '&Delete'
+              Enabled = False
+              TabOrder = 4
+              OnClick = ButtonClick
+              ExplicitTop = 366
+            end
+            object btnAdd: TButton
+              Tag = 2
+              Left = 122
+              Top = 364
+              Width = 106
+              Height = 24
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akLeft, akBottom]
+              Caption = '&Add'
+              Enabled = False
+              TabOrder = 3
+              OnClick = ButtonClick
+              ExplicitTop = 366
+            end
+            object btnReplace: TButton
+              Tag = 1
+              Left = 4
+              Top = 364
+              Width = 107
+              Height = 24
+              Margins.Left = 2
+              Margins.Top = 2
+              Margins.Right = 2
+              Margins.Bottom = 2
+              Anchors = [akLeft, akBottom]
+              Caption = '&Replace'
+              Enabled = False
+              TabOrder = 2
+              OnClick = ButtonClick
+              ExplicitTop = 366
+            end
+          end
+        end
+        object tabPrograms: TTabSheet
+          Margins.Left = 2
+          Margins.Top = 2
+          Margins.Right = 2
+          Margins.Bottom = 2
+          Caption = 'Programs'
+          object lblProgramsText: TLabel
+            Left = 26
+            Top = 17
+            Width = 398
+            Height = 30
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 
+              'You may want to change the programs filenames that are used in D' +
+              'ev-C++ (for example when using a cross compiler):'
+            WordWrap = True
+          end
+          object lblgcc: TLabel
+            Left = 26
+            Top = 77
+            Width = 25
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'gcc: '
+          end
+          object lblgpp: TLabel
+            Left = 26
+            Top = 124
+            Width = 29
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'g++: '
+          end
+          object lblmake: TLabel
+            Left = 26
+            Top = 170
+            Width = 35
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'make: '
+          end
+          object lblgdb: TLabel
+            Left = 26
+            Top = 218
+            Width = 27
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'gdb: '
+          end
+          object lblwindres: TLabel
+            Left = 26
+            Top = 265
+            Width = 47
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'windres: '
+          end
+          object lblgprof: TLabel
+            Left = 26
+            Top = 307
+            Width = 35
+            Height = 15
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Caption = 'gprof: '
+          end
+          object btnBrowse2: TSpeedButton
+            Tag = 2
+            Left = 447
+            Top = 71
+            Width = 24
+            Height = 24
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object btnBrowse3: TSpeedButton
+            Tag = 3
+            Left = 447
+            Top = 119
+            Width = 24
+            Height = 24
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object btnBrowse4: TSpeedButton
+            Tag = 4
+            Left = 447
+            Top = 166
+            Width = 24
+            Height = 24
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object btnBrowse5: TSpeedButton
+            Tag = 5
+            Left = 447
+            Top = 214
+            Width = 24
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object btnBrowse6: TSpeedButton
+            Tag = 6
+            Left = 447
+            Top = 260
+            Width = 24
+            Height = 24
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object btnBrowse8: TSpeedButton
+            Tag = 7
+            Left = 447
+            Top = 307
+            Width = 24
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            Glyph.Data = {
+              36030000424D3603000000000000360000002800000010000000100000000100
+              18000000000000030000120B0000120B00000000000000000000BFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF0000000000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000BF
+              BFBF000000BFBFBF0000005DCCFF5DCCFF5DCCFF000000BFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBF000000BFBFBFBFBFBFBFBFBFBFBFBF6868680000000000
+              00000000000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF000000000000
+              000000000000000000000000000000000000000000000000000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF00000000AEFF0096DB0096DB0096DB0096DB0096DB00
+              96DB0096DB0082BE000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF00AEFF00AEFF00AEFF00
+              AEFF00AEFF0096DB000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF0000005DCCFF
+              00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF00AEFF0096DB000000BFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBF0000005DCCFF00AEFF00AEFF5DCCFF5DCCFF5DCCFF5D
+              CCFF5DCCFF00AEFF000000BFBFBFBFBFBFBFBFBFBFBFBFBFBFBF686868BDEBFF
+              5DCCFF5DCCFF000000000000000000000000000000000000BFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBF000000000000000000BFBFBFBFBFBFBFBFBFBF
+              BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBF}
+            OnClick = btnBrws1Click
+          end
+          object GccEdit: TEdit
+            Left = 86
+            Top = 73
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 0
+            OnChange = InterfaceChange
+          end
+          object GppEdit: TEdit
+            Left = 86
+            Top = 119
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 1
+            OnChange = InterfaceChange
+          end
+          object MakeEdit: TEdit
+            Left = 86
+            Top = 166
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 2
+            OnChange = InterfaceChange
+          end
+          object GdbEdit: TEdit
+            Left = 86
+            Top = 214
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 3
+            OnChange = InterfaceChange
+          end
+          object WindresEdit: TEdit
+            Left = 86
+            Top = 260
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 4
+            OnChange = InterfaceChange
+          end
+          object GprofEdit: TEdit
+            Left = 86
+            Top = 307
+            Width = 350
+            Height = 23
+            Margins.Left = 2
+            Margins.Top = 2
+            Margins.Right = 2
+            Margins.Bottom = 2
+            TabOrder = 5
+            OnChange = InterfaceChange
+          end
+        end
+      end
+    end
+    object tabAutoLink: TTabSheet
+      Margins.Left = 2
+      Margins.Top = 2
+      Margins.Right = 2
+      Margins.Bottom = 2
+      Caption = 'Auto Links'
+      ImageIndex = 1
+      DesignSize = (
+        508
+        503)
+      object lvAutoLinks: TStringGrid
+        Left = 9
+        Top = 54
+        Width = 393
+        Height = 145
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        ColCount = 2
+        DefaultColWidth = 92
+        FixedCols = 0
+        RowCount = 2
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = []
+        Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goColSizing, goEditing, goTabs, goAlwaysShowEditor]
+        ParentFont = False
+        TabOrder = 0
+        OnSelectCell = lvAutoLinksSelectCell
+        OnSetEditText = lvAutoLinksSetEditText
+      end
+      object btnAddAutoLink: TButton
+        Left = 410
+        Top = 80
+        Width = 83
+        Height = 26
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        Caption = 'Add'
+        TabOrder = 1
+        OnClick = btnAddAutoLinkClick
+      end
+      object btnRemoveAutoLink: TButton
+        Left = 407
+        Top = 114
+        Width = 86
+        Height = 26
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        Caption = 'Remove'
+        TabOrder = 2
+        OnClick = btnRemoveAutoLinkClick
+      end
+      object AutoLinks: TMemo
+        Left = 6
+        Top = 230
+        Width = 488
+        Height = 238
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        Lines.Strings = (
+          'AutoLinks')
+        TabOrder = 3
+        OnChange = AutoLinksChange
+      end
+      object chkEnableAutoLinks: TCheckBox
+        Left = 10
+        Top = 13
+        Width = 474
+        Height = 18
+        Margins.Left = 2
+        Margins.Top = 2
+        Margins.Right = 2
+        Margins.Bottom = 2
+        Anchors = [akLeft, akTop, akRight]
+        Caption = 'Enable Auto Links'
+        TabOrder = 4
+        OnClick = chkEnableAutoLinksClick
+        ExplicitWidth = 476
+      end
+    end
+  end
+end

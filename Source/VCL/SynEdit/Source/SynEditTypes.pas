@@ -1,4 +1,4 @@
-{-------------------------------------------------------------------------------
+ï»¿{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -44,7 +44,7 @@ unit SynEditTypes;
 interface
 
 const
-  TSynSpecialChars = ['À'..'Ö', 'Ø'..'ö', 'ø'..'ÿ'];
+  TSynSpecialChars = ['Ã€'..'Ã–', 'Ã˜'..'Ã¶', 'Ã¸'..'Ã¿'];
 {  // utf8 identifier support
   TSynValidStringChars = ['_', '0'..'9', 'A'..'Z', 'a'..'z',#128..#255] + TSynSpecialChars;
 }
@@ -59,10 +59,10 @@ const
 var
 //These might need to be localized depending on the characterset because they might be
 //interpreted as valid ident characters.
-  SynTabGlyph:String;        //'»'
-  SynSoftBreakGlyph:String;//'¬'
-  SynLineBreakGlyph:String; //'¶'
-  SynSpaceGlyph:String;    //'·'
+  SynTabGlyph:String;        //'Â»'
+  SynSoftBreakGlyph:String;//'Â¬'
+  SynLineBreakGlyph:String; //'Â¶'
+  SynSpaceGlyph:String;    //'Â·'
 
 
 type
@@ -117,7 +117,7 @@ var
 begin
   len := (Length(s)+1)*4;
   lpWC := AllocMem(len);
-  MultibyteToWideChar(CP_UTF8,0,PChar(s),Length(s),
+  MultibyteToWideChar(CP_UTF8,0,PAnsiChar(s),Length(s),
     lpWC,len);
   Result :=lpWC;
   FreeMem(lpWC);
@@ -125,7 +125,7 @@ end;
 
 function UnicodeToAnsi(s:WideString):AnsiString;
 var
-  lpC : PChar;
+  lpC : PAnsiChar;
   len:integer;
 begin
   len := (Length(s)+1)*4;
@@ -146,10 +146,10 @@ end;
 
 initialization
 begin
-  SynTabGlyph := UnicodeToAnsi(#$2192);       //'»'
-  SynSoftBreakGlyph := UnicodeToAnsi(#$2193); //'¬'
-  SynLineBreakGlyph := UnicodeToAnsi(#$2193); //'¶'
-  SynSpaceGlyph := '.';     //'·'
+  SynTabGlyph := UnicodeToAnsi(#$2192);       //'Â»'
+  SynSoftBreakGlyph := UnicodeToAnsi(#$2193); //'Â¬'
+  SynLineBreakGlyph := UnicodeToAnsi(#$2193); //'Â¶'
+  SynSpaceGlyph := '.';     //'Â·'
 
 end;
 

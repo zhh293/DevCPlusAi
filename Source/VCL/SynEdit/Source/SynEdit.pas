@@ -1,4 +1,4 @@
-{-------------------------------------------------------------------------------
+﻿{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -2868,7 +2868,7 @@ var
   // Store the token chars with the attributes in the TokenAccu
   // record. This will paint any chars already stored if there is
   // a (visible) change in the attributes.
-  procedure AddHighlightToken(const Token: AnsiString;
+  procedure AddHighlightToken(const Token: string;
     CharsBefore, TokenLen: integer; cRow:integer; p_Attri: TSynHighlighterAttributes);
   var
     bSpacesTest, bIsSpaces: boolean;
@@ -4340,7 +4340,7 @@ begin
         ScrollInfo.fMask := ScrollInfo.fMask or SIF_DISABLENOSCROLL;
       end;
 
-      if (fScrollBars in [ssBoth, ssHorizontal]) then begin
+      if (fScrollBars in [StdCtrls.ssBoth, StdCtrls.ssHorizontal]) then begin
         if eoScrollPastEol in Options then
           nMaxScroll := MaxScrollWidth
         else
@@ -4378,7 +4378,7 @@ begin
       end else
         ShowScrollBar(Handle, SB_HORZ, False);
 
-      if fScrollBars in [ssBoth, ssVertical] then begin
+      if fScrollBars in [StdCtrls.ssBoth, StdCtrls.ssVertical] then begin
         nMaxScroll := DisplayLineCount;
         if (eoScrollPastEof in Options) then
           Inc(nMaxScroll, LinesInWindow - 1);
@@ -6024,7 +6024,8 @@ var
   Len: Integer;
   Temp: string;
   Temp2: string;
-  Temp3: AnsiString;
+  Temp3: string;
+  S: string;
   helper: string;
   TabBuffer: string;
   SpaceBuffer: string;
@@ -9976,9 +9977,9 @@ end;
 procedure TCustomSynEdit.ScanForFoldRanges(TopFoldRanges: TSynEditFoldRanges; LinesToScan: TStrings);
 var
   FoldIndex: integer;
-  token: AnsiString;
+  token: string;
   attr: TSynHighlighterAttributes;
-  CurLine: AnsiString;
+  CurLine: string;
   ParentFoldRanges: TSynEditFoldRanges;
 
   function LineHasChar(Line: integer; character: char): boolean; // faster than Pos!

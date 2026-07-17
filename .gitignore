@@ -43,6 +43,10 @@
 *.cfg
 *Resource.rc
 
+*.dproj
+*.res
+*.ico
+manifest.res
 # Delphi local files (user-specific info)
 *.local
 *.identcache

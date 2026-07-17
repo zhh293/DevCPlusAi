@@ -1,4 +1,4 @@
-{-------------------------------------------------------------------------------
+﻿{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -10,7 +10,7 @@ the specific language governing rights and limitations under the License.
 
 The Original Code is: SynEditRegexSearch.pas, released 2002-07-26.
 
-Original Code by Eduardo Mauro, Gerald Nunn and Fl�vio Etrusco.
+Original Code by Eduardo Mauro, Gerald Nunn and Flávio Etrusco.
 All Rights Reserved.
 
 Contributors to the SynEdit project are listed in the Contributors.txt file.
@@ -105,7 +105,7 @@ begin
   begin
     AddResult( fRegex.MatchPos[0], fRegex.MatchLen[0] );
     Result := 1;
-    while fRegex.ExecNext do
+    while fRegex.ExecNext(False) do
     begin
       AddResult( fRegex.MatchPos[0], fRegex.MatchLen[0] );
       Inc( Result );

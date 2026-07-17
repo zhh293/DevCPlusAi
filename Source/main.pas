@@ -1175,7 +1175,7 @@ type
     procedure StopTabnine;
     procedure ChangeEncoding(encoding:TFileEncodingType);
     procedure UpdateDebugInfo;
-    procedure OpenShell(Sender: TObject;const folder; const shellName:string);
+    procedure OpenShell(Sender: TObject; const Folder, ShellName: string);
     procedure UpdateStatementsType;
     procedure setLeftPageControlPage( page: TTabSheet);
     procedure CppParserTotalProgress(var message:TMessage); message WM_PARSER_PROGRESS;
@@ -2685,6 +2685,7 @@ end;
 procedure TMainForm.OpenFile(const FileName: AnsiString; Encoding:TFileEncodingType);
 var
   e: TEditor;
+  MsgText, MsgCaption: string;
 begin
   // Don't bother opening duplicates
   e := fEditorList.FileIsOpen(FileName);
@@ -2695,7 +2696,9 @@ begin
 
   // Issue an error if it doesn't exist
   if not FileExists(FileName) then begin
-    MessageBox(Application.Handle, PAnsiChar(Format(Lang[ID_ERR_FILENOTFOUND], [FileName])), PChar(Lang[ID_ERROR]),
+    MsgText := Format(Lang[ID_ERR_FILENOTFOUND], [FileName]);
+    MsgCaption := Lang[ID_ERROR];
+    MessageBoxW(Application.Handle, PWideChar(MsgText), PWideChar(MsgCaption),
       MB_ICONHAND);
     Exit;
   end;
@@ -3151,6 +3154,7 @@ end;
 procedure TMainForm.actNewProjectExecute(Sender: TObject);
 var
   s: AnsiString;
+  MsgText, MsgCaption: string;
 begin
   with TNewProjectForm.Create(nil) do try
     rbCpp.Checked := devData.DefCpp;
@@ -3212,7 +3216,9 @@ begin
       // Assign the selected template to it
       if not fProject.AssignTemplate(s, GetTemplate) then begin
         FreeAndNil(fProject);
-        MessageBox(Application.Handle, PAnsiChar(Lang[ID_ERR_TEMPLATE]), PAnsiChar(Lang[ID_ERROR]), MB_OK or
+        MsgText := Lang[ID_ERR_TEMPLATE];
+        MsgCaption := Lang[ID_ERROR];
+        MessageBoxW(Application.Handle, PWideChar(MsgText), PWideChar(MsgCaption), MB_OK or
           MB_ICONERROR);
         Exit;
       end;
@@ -3831,7 +3837,7 @@ end;
 procedure TMainForm.actUnitRenameExecute(Sender: TObject);
 var
   I, ProjIndex: integer;
-  OldName, NewName, CurDir: AnsiString;
+  OldName, NewName, CurDir: string;
   e: TEditor;
 begin
   if not assigned(fProject) then
@@ -4048,7 +4054,7 @@ end;
 procedure TMainForm.actFindExecute(Sender: TObject);
 var
   e: TEditor;
-  s: AnsiString;
+  s: string;
 begin
   e := fEditorList.GetEditor;
   if Assigned(e) then begin
@@ -5249,7 +5255,7 @@ end;
 
 procedure TMainForm.actAddWatchExecute(Sender: TObject);
 var
-  s: AnsiString;
+  s: string;
   e: TEditor;
 begin
   s := '';
@@ -6278,7 +6284,8 @@ end;
 
 procedure TMainForm.actProjectNewFolderExecute(Sender: TObject);
 var
-  fp, S: AnsiString;
+  fp: AnsiString;
+  S: string;
 begin
   S := 'New folder';
   if ShowInputQuery(Lang[ID_POP_ADDFOLDER], Lang[ID_MSG_ADDBROWSERFOLDER], S) and (S <> '') then begin
@@ -6312,7 +6319,7 @@ end;
 
 procedure TMainForm.actProjectRenameFolderExecute(Sender: TObject);
 var
-  S: AnsiString;
+  S: string;
 begin
   if Assigned(ProjectView.Selected) and (ProjectView.Selected.Data = Pointer(-1)) then begin
     S := ProjectView.Selected.Text;
@@ -6952,6 +6959,7 @@ var
   idx, idx2: integer;
   item: TMenuItem;
   e: TEditor;
+  ProgramName, TargetFile, WorkingDir: string;
 begin
   if (Sender = mnuOpenWith) and (mnuOpenWith.Count > 0) then
     Exit;
@@ -6981,24 +6989,28 @@ begin
   if Assigned(e) then
     fEditorList.CloseEditor(e);
 
+  TargetFile := fProject.Units[idx2].FileName;
+  WorkingDir := SysUtils.ExtractFilePath(TargetFile);
   if idx > -1 then begin // devcpp-based
-    ShellExecute(0, 'open',
-      PAnsiChar(devExternalPrograms.ProgramName[idx]),
-      PAnsiChar(fProject.Units[idx2].FileName),
-      PAnsiChar(ExtractFilePath(fProject.Units[idx2].FileName)),
+    ProgramName := devExternalPrograms.ProgramName[idx];
+    ShellExecuteW(0, 'open',
+      PWideChar(ProgramName),
+      PWideChar(TargetFile),
+      PWideChar(WorkingDir),
       SW_SHOW)
       // idx=-2 means we prompted the user for a program, but didn't select one
   end else if idx = -1 then begin// registry-based
-    ShellExecute(0, 'open',
-      PAnsiChar(fProject.Units[idx2].FileName),
+    ShellExecuteW(0, 'open',
+      PWideChar(TargetFile),
       nil,
-      PAnsiChar(ExtractFilePath(fProject.Units[idx2].FileName)),
+      PWideChar(WorkingDir),
       SW_SHOW);
   end else if idx = -3 then begin// ResEd.exe
-    ShellExecute(0, 'open',
-      PAnsiChar(devDirs.Exec + 'ResEd/ResEd.exe'),
-      PAnsiChar(fProject.Units[idx2].FileName),
-      PAnsiChar(ExtractFilePath(fProject.Units[idx2].FileName)),
+    ProgramName := devDirs.Exec + 'ResEd/ResEd.exe';
+    ShellExecuteW(0, 'open',
+      PWideChar(ProgramName),
+      PWideChar(TargetFile),
+      PWideChar(WorkingDir),
       SW_SHOW);
   end
 end;
@@ -7066,10 +7078,10 @@ end;
 procedure TMainForm.actModifyWatchExecute(Sender: TObject);
 var
   curnode: TTreeNode;
-  fullname: AnsiString;
-  value : AnsiString;
+  fullname: string;
+  value: string;
 
-  function GetNodeName(node: TTreeNode): AnsiString;
+  function GetNodeName(node: TTreeNode): string;
   var
     epos: integer;
   begin
@@ -7079,7 +7091,7 @@ var
       Result := Copy(node.Text, 1, epos - 1);
   end;
 
-  function GetNodeValue(node: TTreeNode): AnsiString;
+  function GetNodeValue(node: TTreeNode): string;
   var
     epos: integer;
   begin
@@ -7387,6 +7399,8 @@ begin
 end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
+var
+  MsgText, MsgCaption: string;
 begin
   Application.HintHidePause:=300000; //5mins before the hint auto disapear
   fMenuItemHint := TMenuItemHint.Create(self);
@@ -7595,7 +7609,9 @@ begin
     try
       CheckAssociations(true); // check and fix
     except
-      MessageBox(Application.Handle, PAnsiChar(Lang[ID_ENV_UACERROR]), PAnsiChar(Lang[ID_ERROR]), MB_OK);
+      MsgText := Lang[ID_ENV_UACERROR];
+      MsgCaption := Lang[ID_ERROR];
+      MessageBoxW(Application.Handle, PWideChar(MsgText), PWideChar(MsgCaption), MB_OK);
       devData.CheckAssocs := false; // don't bother again
     end;
   end;
@@ -8258,13 +8274,13 @@ end;
 procedure TMainForm.actOpenFolderExecute(Sender: TObject);
 var
   e: TEditor;
-  Folder: AnsiString;
+  Folder: string;
 begin
   e := fEditorList.GetEditor;
   if Assigned(e) then begin
     Folder := ExtractFilePath(e.FileName);
     if Folder <> '' then
-      ShellExecute(Application.Handle, 'open', 'explorer.exe', PAnsiChar(Folder), nil, SW_SHOWNORMAL);
+      ShellExecuteW(Application.Handle, 'open', 'explorer.exe', PWideChar(Folder), nil, SW_SHOWNORMAL);
   end;
 end;
 
@@ -8450,8 +8466,8 @@ end;
 
 procedure TMainForm.actDonateExecute(Sender: TObject);
 begin
-  ShellExecute(GetDesktopWindow(), 'open',
-    PAnsiChar('https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=7FD675DNV8KKJ'), nil, nil,
+  ShellExecuteW(GetDesktopWindow(), 'open',
+    'https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=7FD675DNV8KKJ', nil, nil,
     SW_SHOWNORMAL);
 end;
 
@@ -8882,7 +8898,7 @@ begin
   fDebugger.CommandChanged := true;
 end;
 
-procedure TMainForm.OpenShell(Sender: TObject;const folder; const shellName:string);
+procedure TMainForm.OpenShell(Sender: TObject; const Folder, ShellName: string);
 var
   buffer: PChar;
   size,ret,i: integer;
@@ -8919,7 +8935,7 @@ begin
           Format('Set content of environment variable ''PATH'' failed: %s',[SysErrorMessage(GetLastError)]));
         Exit;
       end;
-      ShellExecute(Application.Handle, 'open', pAnsiChar(shellName),  nil,PAnsiChar(Folder), SW_SHOWNORMAL);
+      ShellExecuteW(Application.Handle, 'open', PWideChar(ShellName), nil, PWideChar(Folder), SW_SHOWNORMAL);
 end;
 
 
@@ -8940,8 +8956,8 @@ end;
 procedure TMainForm.WatchViewDblClick(Sender: TObject);
 var
   curnode: TTreeNode;
-  name: AnsiString;
-  newName: AnsiString;
+  name: string;
+  newName: string;
 begin
   curnode := WatchView.Selected;
   if Assigned(curnode) then begin // only edit members
@@ -9033,18 +9049,18 @@ end;
 
 procedure TMainForm.actOpenProjectFoloderExecute(Sender: TObject);
 var
-  Folder: AnsiString;
+  Folder: string;
 begin
   if not Assigned(fProject) then
     Exit;
   Folder := fProject.Directory;
   if Folder <> '' then
-    ShellExecute(Application.Handle, 'open', 'explorer.exe', PAnsiChar(Folder), nil, SW_SHOWNORMAL);
+    ShellExecuteW(Application.Handle, 'open', 'explorer.exe', PWideChar(Folder), nil, SW_SHOWNORMAL);
 end;
 
 procedure TMainForm.actOpenProjectConsoleExecute(Sender: TObject);
 var
-  Folder: AnsiString;
+  Folder: string;
   buffer: PChar;
   size,ret,i: integer;
   path:AnsiString;
@@ -9083,7 +9099,7 @@ begin
           Format('Set content of environment variable ''PATH'' failed: %s',[SysErrorMessage(GetLastError)]));
         Exit;
       end;
-      ShellExecute(Application.Handle, 'open', 'cmd',  nil,PAnsiChar(Folder), SW_SHOWNORMAL);
+      ShellExecuteW(Application.Handle, 'open', 'cmd', nil, PWideChar(Folder), SW_SHOWNORMAL);
     end;
   end;
 end;
@@ -9091,7 +9107,7 @@ end;
 procedure TMainForm.actExtractMacroExecute(Sender: TObject);
 var
   e:TEditor;
-  newName:AnsiString;
+  newName: string;
 begin
   e:=EditorList.GetEditor();
   if Assigned(e) then begin
@@ -9167,7 +9183,7 @@ begin
   fActAIFocus := TAction.Create(Self);
   fActAIFocus.ActionList := ActionList;
   fActAIFocus.Caption := '聚焦 AI 输入框';
-  fActAIFocus.ShortCut := ShortCut(VK_L, [ssCtrl]);
+  fActAIFocus.ShortCut := ShortCut(Ord('L'), [ssCtrl]);
   fActAIFocus.OnExecute := AgentFocusExecute;
 
   // Reuse the first-run form as a settings dialog so users can change the
@@ -9182,7 +9198,7 @@ begin
 
   // Add lightweight selection actions to the editor context menu. They are
   // created at runtime so the legacy DFM remains compatible with upstream.
-  EditorPagePopup.Insert(0, TMenuItem.Create(Self));
+  EditorPagePopup.Items.Insert(0, TMenuItem.Create(Self));
   EditorPagePopup.Items[0].Caption := '-';
   for I := 3 downto 0 do begin
     fAgentSelectionActions[I] := TAction.Create(Self);
@@ -9197,7 +9213,7 @@ begin
   for I := 0 to 3 do begin
     mi := TMenuItem.Create(Self);
     mi.Action := fAgentSelectionActions[I];
-    EditorPagePopup.Insert(I, mi);
+    EditorPagePopup.Items.Insert(I, mi);
   end;
 
   // Initial visibility follows the config switch.
@@ -10478,7 +10494,7 @@ var
 begin
   Folder := fileBrowser.CurrentFolder;
   if Folder <> '' then
-    ShellExecute(Application.Handle, 'open', 'explorer.exe', PAnsiChar(fileBrowser.CurrentFolder), nil, SW_SHOWNORMAL);
+    ShellExecuteW(Application.Handle, 'open', 'explorer.exe', PWideChar(Folder), nil, SW_SHOWNORMAL);
 end;
 
 procedure TMainForm.actOpenCurrentFolderUpdate(Sender: TObject);
@@ -10520,6 +10536,7 @@ var
   idx: integer;
   item: TMenuItem;
   e: TEditor;
+  ProgramName, TargetFile, WorkingDir: string;
 begin
   if (Sender = mnuFileBrowserOpenWith) and (mnuFileBrowserOpenWith.Count > 0) then
     Exit;
@@ -10542,24 +10559,28 @@ begin
   if Assigned(e) then
     fEditorList.CloseEditor(e);
 
+  TargetFile := FileBrowser.SelectedFile;
+  WorkingDir := SysUtils.ExtractFilePath(TargetFile);
   if idx > -1 then begin // devcpp-based
-    ShellExecute(0, 'open',
-      PAnsiChar(devExternalPrograms.ProgramName[idx]),
-      PAnsiChar(FileBrowser.SelectedFile),
-      PAnsiChar(ExtractFilePath(FileBrowser.SelectedFile)),
+    ProgramName := devExternalPrograms.ProgramName[idx];
+    ShellExecuteW(0, 'open',
+      PWideChar(ProgramName),
+      PWideChar(TargetFile),
+      PWideChar(WorkingDir),
       SW_SHOW)
       // idx=-2 means we prompted the user for a program, but didn't select one
   end else if idx = -1 then begin// registry-based
-    ShellExecute(0, 'open',
-      PAnsiChar(FileBrowser.SelectedFile),
+    ShellExecuteW(0, 'open',
+      PWideChar(TargetFile),
       nil,
-      PAnsiChar(ExtractFilePath(FileBrowser.SelectedFile)),
+      PWideChar(WorkingDir),
       SW_SHOW);
   end else if idx = -3 then begin// ResEd.exe
-    ShellExecute(0, 'open',
-      PAnsiChar(devDirs.Exec + 'ResEd/ResEd.exe'),
-      PAnsiChar(FileBrowser.SelectedFile),
-      PAnsiChar(ExtractFilePath(FileBrowser.SelectedFile)),
+    ProgramName := devDirs.Exec + 'ResEd/ResEd.exe';
+    ShellExecuteW(0, 'open',
+      PWideChar(ProgramName),
+      PWideChar(TargetFile),
+      PWideChar(WorkingDir),
       SW_SHOW);
   end
 end;

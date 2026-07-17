@@ -99,6 +99,9 @@ begin
 end;
 
 procedure TTemplate.ReadTemplateFile(const FileName: AnsiString);
+var
+  ErrorMessage: string;
+  MessageCaption: string;
 begin
   if assigned(fTemplate) then fTemplate.Free;
   if FileExists(FileName) then
@@ -108,9 +111,11 @@ begin
    end
   else
    begin
-     MessageBox(Application.mainform.handle,
-       PAnsiChar(Format(Lang[ID_ERR_TEMPFNF], [fFileName])),
-       PAnsiChar(Lang[ID_INFO]), MB_OK or MB_ICONINFORMATION);
+     ErrorMessage := string(Format(Lang[ID_ERR_TEMPFNF], [fFileName]));
+     MessageCaption := string(Lang[ID_INFO]);
+     MessageBoxW(Application.mainform.handle,
+       PWideChar(ErrorMessage), PWideChar(MessageCaption),
+       MB_OK or MB_ICONINFORMATION);
      exit;
    end;
 
@@ -264,11 +269,17 @@ begin
 end;
 
 procedure TTemplate.SetOldData(value: TTemplateRec);
+var
+  ErrorMessage: string;
+  MessageCaption: string;
 begin
   if not assigned(fTemplate) then
    begin
-     MessageBox(Application.MainForm.Handle,
-      PAnsiChar(Lang[ID_ERR_NOTEMPLATE]), PAnsiChar(Lang[ID_INFO]), MB_OK or MB_ICONWARNING);
+     ErrorMessage := string(Lang[ID_ERR_NOTEMPLATE]);
+     MessageCaption := string(Lang[ID_INFO]);
+     MessageBoxW(Application.MainForm.Handle,
+       PWideChar(ErrorMessage), PWideChar(MessageCaption),
+       MB_OK or MB_ICONWARNING);
      exit;
    end;
 
