@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
-    [string]$Version = 'dev'
+    [string]$Version = 'dev',
+    [switch]$SelfExtracting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,7 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $distRoot = Join-Path $RepoRoot 'dist'
 $packageRoot = Join-Path $distRoot 'DevCPlusAi'
 $zipPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-windows-no-compiler.zip" -f $Version)
+$sfxPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-windows-no-compiler-self-extracting.exe" -f $Version)
 
 if (Test-Path -LiteralPath $packageRoot) {
     $resolvedDist = [System.IO.Path]::GetFullPath($distRoot).TrimEnd('\') + '\'
@@ -168,6 +170,69 @@ if ($sevenZip) {
     if ($LASTEXITCODE -ne 0) {
         throw "7-Zip archive test failed with exit code $LASTEXITCODE"
     }
+}
+
+if ($SelfExtracting) {
+    if (-not $sevenZip) {
+        throw '7-Zip is required to build the self-extracting portable package.'
+    }
+    $sevenZipDirectory = Split-Path -Parent $sevenZipPath
+    $sfxModule = Join-Path $sevenZipDirectory '7z.sfx'
+    $sevenZipLicense = Join-Path $sevenZipDirectory 'License.txt'
+    if (-not (Test-Path -LiteralPath $sfxModule -PathType Leaf)) {
+        throw "7-Zip SFX module was not found: $sfxModule"
+    }
+    if (-not (Test-Path -LiteralPath $sevenZipLicense -PathType Leaf)) {
+        throw "7-Zip redistribution license was not found: $sevenZipLicense"
+    }
+    Copy-Item -LiteralPath $sevenZipLicense -Destination (
+        Join-Path $packageRoot '7-ZIP-LICENSE.txt') -Force
+
+    if (Test-Path -LiteralPath $sfxPath) {
+        Remove-Item -LiteralPath $sfxPath -Force
+    }
+    Push-Location $packageRoot
+    try {
+        # The payload already contains compressed Node/CLI assets. Moderate
+        # compression keeps local release builds bounded without materially
+        # inflating the self-extracting artifact.
+        & $sevenZipPath 'a' '-t7z' '-mx=3' '-mmt=on' ("-sfx{0}" -f $sfxModule) $sfxPath '.\*'
+        if ($LASTEXITCODE -ne 0) {
+            Remove-Item -LiteralPath $sfxPath -Force -ErrorAction SilentlyContinue
+            throw "7-Zip SFX creation failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host 'Testing every self-extracting archive entry with 7-Zip...'
+    & $sevenZipPath 't' '-bso0' '-bsp0' $sfxPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "7-Zip SFX archive test failed with exit code $LASTEXITCODE"
+    }
+    $listedPaths = @(
+        & $sevenZipPath 'l' '-slt' $sfxPath |
+            Where-Object { $_ -like 'Path = *' } |
+            ForEach-Object { $_.Substring(7) }
+    )
+    foreach ($requiredEntry in @(
+        'devcpp.exe',
+        'nodejs\node.exe',
+        'claude-cli\bin\claude.exe',
+        'AGENT-RUNTIME-VERSIONS.txt',
+        'BUILD-INFO.txt',
+        '7-ZIP-LICENSE.txt'
+    )) {
+        if ($listedPaths -notcontains $requiredEntry) {
+            throw "Self-extracting package is missing: $requiredEntry"
+        }
+    }
+    $sfx = Get-Item -LiteralPath $sfxPath
+    $sfxHash = (Get-FileHash -LiteralPath $sfxPath -Algorithm SHA256).Hash
+    Write-Host ("Self-extracting package: {0}" -f $sfx.FullName)
+    Write-Host ("Size: {0} bytes" -f $sfx.Length)
+    Write-Host ("SHA256: {0}" -f $sfxHash)
 }
 
 $zip = Get-Item -LiteralPath $zipPath

@@ -95,3 +95,4 @@ package-lock.json
 /.tools/
 /dist/
 /DevCPlusAi-*-windows-no-compiler.zip
+/DevCPlusAi-*-windows-no-compiler-self-extracting.exe

@@ -203,6 +203,14 @@ tools\verify-release.cmd -PackageType NoCompiler
 tools\package-portable.cmd -Version dev
 ```
 
+如果构建机已安装带 `7z.sfx` 的 7-Zip，也可以同时生成单文件自解压免安装版：
+
+```bat
+tools\package-self-extracting.cmd -Version dev
+```
+
+双击生成的 `DevCPlusAi-<版本>-windows-no-compiler-self-extracting.exe` 后选择目录即可解压运行，不需要管理员权限。它是便携分发形式，不会创建开始菜单快捷方式或卸载项；需要这些系统集成功能时仍应使用 NSIS 安装包。构建脚本会附带并校验 `7-ZIP-LICENSE.txt`，同时对 SFX 内全部文件执行完整性测试。
+
 脚本会核对关键文件的 SHA-256；如果本机装有 7-Zip，还会对 ZIP 中的全部
 条目执行 CRC 完整性测试。包内的 `BUILD-INFO.txt` 会记录源码提交、工作区
 状态、运行时版本以及四个可执行文件的 SHA-256。
