@@ -80,7 +80,7 @@ type
 implementation
 
 uses
-  DataFrm;
+  devCFG;
 
 type
   TAgentDataBlob = record

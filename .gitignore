@@ -36,6 +36,8 @@
 *.rsm
 *.tds
 *.dcu
+/Source/manifest.RES
+/Source/Tests/AgentProtocolSmoke.exe
 *.lib
 *.ddp
 
@@ -86,3 +88,7 @@ package-lock.json
 /nodejs/
 /claude-cli/
 /AGENT-RUNTIME-VERSIONS.txt
+/.firecrawl/
+/.tools/
+/dist/
+/DevCPlusAi-*-windows-no-compiler.zip

@@ -75,47 +75,29 @@ jobs:
 
       - name: Build with Delphi
         shell: cmd
-        working-directory: Source
         run: |
-          dcc32.exe -B devcpp.dpr -E. -NU.\dcu
-          if not exist devcpp.exe exit /b 1
+          tools\build-windows.cmd
 
-      # ----------------------------------------------------------------------
-      # 4. 收集运行时所需文件，组装成一个可分发的目录
-      #    把 exe 与运行时资源（语言包、模板、图标、帮助、清单等）放到一起。
-      # ----------------------------------------------------------------------
-      - name: Assemble package
-        shell: pwsh
+      - name: Verify release resources
+        shell: cmd
         run: |
-          $pkg = "dist/DevCPlusAi"
-          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-
-          # 主程序
-          Copy-Item "Source\devcpp.exe" -Destination $pkg -Force
-
-          # 运行时资源。Agent runtime 是发布包的必需内容，缺少时直接失败。
-          $assets = @("Lang", "Templates", "Icons", "Help", "RedPanda.ico", "devcpp.exe.manifest", "LICENSE", "NEWS.txt", "README.md", "AGENT-RUNTIME-VERSIONS.txt", "nodejs", "claude-cli")
-          foreach ($a in $assets) {
-            if (Test-Path $a) {
-              Copy-Item $a -Destination $pkg -Recurse -Force
-              Write-Host "已打包: $a"
-            } else {
-              throw "缺少发布资源: $a"
-            }
-          }
+          tools\verify-release.cmd -PackageType NoCompiler
 
       # ----------------------------------------------------------------------
-      # 5. 压缩为 zip（产物名带版本号）
+      # 4. 使用与本地相同的脚本生成并校验免安装发布包。
       # ----------------------------------------------------------------------
-      - name: Create zip archive
+      - name: Create portable package
         id: zip
         shell: pwsh
         run: |
           $ver = "${{ steps.ver.outputs.version }}"
-          $zip = "DevCPlusAi-$ver-win.zip"
-          Compress-Archive -Path "dist/DevCPlusAi/*" -DestinationPath $zip -Force
+          ./tools/package-portable.ps1 -Version $ver
+          $zip = "DevCPlusAi-$ver-windows-no-compiler.zip"
+          if (-not (Test-Path $zip -PathType Leaf)) {
+            throw "Portable package was not created: $zip"
+          }
           echo "zipname=$zip" >> $env:GITHUB_OUTPUT
-          Write-Host "已生成压缩包: $zip"
+          Write-Host "Created portable package: $zip"
 
       # ----------------------------------------------------------------------
       # 6. 上传到本次构建的 Artifacts（即使不是 tag 触发也能下载到产物）

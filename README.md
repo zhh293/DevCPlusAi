@@ -173,12 +173,35 @@ nodejs/ claude-cli/ AGENT-RUNTIME-VERSIONS.txt
 
 ```bat
 cd Source
-dcc32.exe -B devcpp.dpr -E. -NU.\dcu
+dcc32.exe -B devcpp.dpr -E. -N.\dcu
 cd ..
 copy /Y Source\devcpp.exe devcpp.exe
 ```
 
-如果需要生成 NSIS 依赖的辅助程序，也要分别编译 `Source\Tools\Packman\Packman.dpr` 和 `Source\Tools\PackMaker\PackMaker.dpr`，并把生成的 exe 放到仓库根目录。`ConsolePauser.exe` 不是主 Delphi 工程的一部分，需要使用已有 Windows 构建产物或单独构建后放到根目录。
+也可以在仓库根目录执行一键构建脚本。它会编译资源、主程序、Packman、
+PackMaker 和 ConsolePauser，并把发布所需的四个 EXE 复制到仓库根目录：
+
+```bat
+tools\build-windows.cmd
+```
+
+如果 Delphi 的完整 `Lib` 不在默认安装目录，可通过
+`-DelphiLibPath <目录>` 指定包含 `Spin.dcu` 的目录。
+
+构建后可检查无编译器安装包所需资源及锁定的 Agent 运行时版本：
+
+```bat
+tools\verify-release.cmd -PackageType NoCompiler
+```
+
+生成包含 Agent 运行时的免安装 ZIP：
+
+```bat
+tools\package-portable.cmd -Version dev
+```
+
+一键脚本会同时生成 NSIS 依赖的 `Packman.exe`、`PackMaker.exe` 和
+`ConsolePauser.exe`；后者使用当前 `PATH` 中的 `g++.exe` 静态编译。
 
 ### 4. 构建安装器
 

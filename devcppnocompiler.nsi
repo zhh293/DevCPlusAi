@@ -139,6 +139,20 @@ Section "$(SectionMainName)" SectionMain
   File /nonfatal /r "contributes\*"
 SectionEnd
 
+Section "AI Agent Runtime" SectionAIRuntime
+  SectionIn 1 3
+
+  ; The no-compiler package is still an AI-enabled DevCPlusAi distribution.
+  ; Keep these files mandatory so the installer cannot silently ship without
+  ; its Agent runtime.
+  SetOutPath $INSTDIR
+  File "AGENT-RUNTIME-VERSIONS.txt"
+  SetOutPath $INSTDIR\nodejs
+  File /r "nodejs\*"
+  SetOutPath $INSTDIR\claude-cli
+  File /r "claude-cli\*"
+SectionEnd
+
 Section "$(SectionIconsName)" SectionIcons
   SectionIn 1 3
   
@@ -593,6 +607,7 @@ Section "Uninstall"
   Delete "$INSTDIR\ConsolePauser.exe"
   Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\README.MD"
+  Delete "$INSTDIR\AGENT-RUNTIME-VERSIONS.txt"
 
   RMDir /r "$INSTDIR\Lang"
   RMDir /r "$INSTDIR\Examples"
@@ -605,6 +620,8 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\Contributes"
   RMDir /r "$INSTDIR\MinGW32"
   RMDir /r "$INSTDIR\MinGW64"
+  RMDir /r "$INSTDIR\nodejs"
+  RMDir /r "$INSTDIR\claude-cli"
 
   StrCpy $0 "$INSTDIR"
   Call un.DeleteDirIfEmpty

@@ -84,8 +84,10 @@ procedure ResetProtocolState;
 // True when the event marks the end of a turn.
 function IsStreamComplete(const Event: TAgentEvent): Boolean;
 
-// Extract the file path referenced by a tool_use event (if any).
-function ExtractFilePath(const Event: TAgentEvent): String;
+// Extract the file path referenced by a tool_use event (if any).  Keep this
+// name distinct from SysUtils.ExtractFilePath because units importing both
+// APIs otherwise resolve ordinary string paths to the event overload.
+function ExtractEventFilePath(const Event: TAgentEvent): String;
 
 implementation
 
@@ -595,6 +597,11 @@ begin
   NestedType := LowerCase(GetStr(Nested, 'type'));
   Base.Subtype := NestedType;
   Base.BlockIndex := GetStr(Nested, 'index');
+  // uLkJSON represents a numeric zero with an empty Variant value in some
+  // Delphi 7 builds.  Its serialized form is still correct and keeps block
+  // correlation stable for the common index=0 stream.
+  if Base.BlockIndex = '' then
+    Base.BlockIndex := GetJSONText(GetObj(Nested, 'index'));
 
   if NestedType = 'message_start' then begin
     MessageNode := GetObj(Nested, 'message');
@@ -652,6 +659,11 @@ begin
       PartialJSON := GetStr(DeltaNode, 'partial_json');
       State := FindToolInput('', Base.BlockIndex);
       if State <> nil then begin
+        // content_block_start normally carries an empty input object.  The
+        // following deltas contain the actual JSON document, so keeping the
+        // serialized empty object would produce an invalid "{}{...}" stream.
+        if State.PartialJSON = '{}' then
+          State.PartialJSON := '';
         State.PartialJSON := State.PartialJSON + PartialJSON;
         Event.ToolId := State.ToolId;
         Event.ToolName := State.ToolName;
@@ -772,7 +784,7 @@ begin
     Event.Summary := Event.Summary + '，耗时 ' + Event.DurationMs + ' ms';
   if Event.CostUSD <> '' then
     Event.Summary := Event.Summary + '，费用 $' + Event.CostUSD;
-  if Event.PermissionDenials <> '' and
+  if (Event.PermissionDenials <> '') and
      (Event.PermissionDenials <> '[]') then
     Event.Summary := Event.Summary + '，存在权限拒绝';
   AppendEvent(Events, Event);
@@ -979,7 +991,7 @@ begin
   Result := Event.EventType = aetResult;
 end;
 
-function ExtractFilePath(const Event: TAgentEvent): String;
+function ExtractEventFilePath(const Event: TAgentEvent): String;
 begin
   Result := Event.FilePath;
 end;

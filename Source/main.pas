@@ -9167,7 +9167,7 @@ begin
   fActAIFocus := TAction.Create(Self);
   fActAIFocus.ActionList := ActionList;
   fActAIFocus.Caption := '聚焦 AI 输入框';
-  fActAIFocus.ShortCut := ShortCut(VK_L, [ssCtrl]);
+  fActAIFocus.ShortCut := ShortCut(Ord('L'), [ssCtrl]);
   fActAIFocus.OnExecute := AgentFocusExecute;
 
   // Reuse the first-run form as a settings dialog so users can change the
@@ -9182,7 +9182,7 @@ begin
 
   // Add lightweight selection actions to the editor context menu. They are
   // created at runtime so the legacy DFM remains compatible with upstream.
-  EditorPagePopup.Insert(0, TMenuItem.Create(Self));
+  EditorPagePopup.Items.Insert(0, TMenuItem.Create(Self));
   EditorPagePopup.Items[0].Caption := '-';
   for I := 3 downto 0 do begin
     fAgentSelectionActions[I] := TAction.Create(Self);
@@ -9197,7 +9197,7 @@ begin
   for I := 0 to 3 do begin
     mi := TMenuItem.Create(Self);
     mi.Action := fAgentSelectionActions[I];
-    EditorPagePopup.Insert(I, mi);
+    EditorPagePopup.Items.Insert(I, mi);
   end;
 
   // Initial visibility follows the config switch.
