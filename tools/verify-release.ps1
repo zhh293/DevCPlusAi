@@ -41,6 +41,33 @@ function Warn-OptionalDirectory {
     }
 }
 
+function Invoke-AgentAsciiSourceCheck {
+    $sourceRoot = Join-Path $RepoRoot 'Source'
+    $files = @(
+        Get-ChildItem -LiteralPath $sourceRoot -File | Where-Object {
+            $_.Name -like 'Agent*.pas' -or $_.Name -like 'Agent*.dfm'
+        }
+    )
+    if ($files.Count -eq 0) {
+        $failures.Add('No Agent Pascal or DFM sources were found for the encoding check.')
+        return
+    }
+
+    $failed = $false
+    foreach ($file in $files) {
+        $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+        $highByte = $bytes | Where-Object { $_ -gt 127 } | Select-Object -First 1
+        if ($null -ne $highByte) {
+            $relativePath = $file.FullName.Substring($RepoRoot.Length).TrimStart('\')
+            $failures.Add("Agent source must remain ASCII for Delphi 7 locale safety: $relativePath")
+            $failed = $true
+        }
+    }
+    if (-not $failed) {
+        Write-Host "Agent source encoding check passed ($($files.Count) ASCII files)."
+    }
+}
+
 function Invoke-InstallerStaticCheck {
     param([string]$RelativePath)
 
@@ -238,6 +265,8 @@ foreach ($installerScript in @(
 )) {
     Invoke-InstallerStaticCheck $installerScript
 }
+
+Invoke-AgentAsciiSourceCheck
 
 Invoke-VersionCheck 'nodejs\node.exe' 'v24.18.0'
 Invoke-VersionCheck 'claude-cli\bin\claude.exe' '2.1.211'
