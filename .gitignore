@@ -39,6 +39,7 @@
 /Source/manifest.RES
 /Source/spin.RES
 /Source/Tests/AgentProtocolSmoke.exe
+/Source/Tests/AgentReaderSmoke.exe
 *.lib
 *.ddp
 

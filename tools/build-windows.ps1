@@ -169,6 +169,13 @@ try {
         ('-U' + $SourceRoot + ';' + (Join-Path $SourceRoot 'VCL\DevCpp'))
     ) 'Compile AgentProtocol smoke test'
     Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentProtocolSmoke.exe')
+    Invoke-NativeBuild $Dcc32Path @(
+        '-B',
+        'AgentReaderSmoke.dpr',
+        '-N.\dcu',
+        ('-U' + $SourceRoot)
+    ) 'Compile AgentReader smoke test'
+    Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentReaderSmoke.exe')
 }
 finally {
     Pop-Location

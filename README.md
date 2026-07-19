@@ -253,4 +253,4 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 
 ## 开发状态
 
-基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。仍需完成真实 API 对话和安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。仍需完成真实 API 对话和安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。

@@ -9500,9 +9500,8 @@ begin
   fAgentResumeAttempted := sessionId <> '';
 
   // Wire the background reader to the protocol parser -> panel pipe.
-  fAgentReader := TAgentReader.Create(fAgentProcess.OutputRead);
-  fAgentReader.OnLineReady := AgentLineReady;
-  fAgentReader.OnProcessExit := AgentProcessExit;
+  fAgentReader := TAgentReader.Create(fAgentProcess.OutputRead,
+    AgentLineReady, AgentProcessExit);
 
   if Assigned(devAgentConfig) then
     fAgentPanelFrame.SetModelName(devAgentConfig.Model);

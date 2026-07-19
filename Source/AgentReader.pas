@@ -48,23 +48,51 @@ type
   protected
     procedure Execute; override;
   public
-    constructor Create(PipeHandle: THandle);
+    constructor Create(PipeHandle: THandle; AOnLineReady: TAgentLineEvent;
+      AOnProcessExit: TAgentExitEvent);
     property OnLineReady: TAgentLineEvent read fOnLineReady write fOnLineReady;
     property OnProcessExit: TAgentExitEvent read fOnProcessExit write fOnProcessExit;
   end;
 
 implementation
 
-uses
-  Utils;
-
-constructor TAgentReader.Create(PipeHandle: THandle);
+function UTF8BytesToAnsi(const Value: AnsiString): String;
+var
+  WideLength, AnsiLength: Integer;
+  WideValue: WideString;
 begin
-  // Create suspended is not necessary; we want it running immediately.
+  Result := '';
+  if Value = '' then
+    Exit;
+  WideLength := MultiByteToWideChar(CP_UTF8, 0, PAnsiChar(Value),
+    Length(Value), nil, 0);
+  if WideLength <= 0 then begin
+    Result := String(Value);
+    Exit;
+  end;
+  SetLength(WideValue, WideLength);
+  MultiByteToWideChar(CP_UTF8, 0, PAnsiChar(Value), Length(Value),
+    PWideChar(WideValue), WideLength);
+  AnsiLength := WideCharToMultiByte(CP_ACP, 0, PWideChar(WideValue),
+    WideLength, nil, 0, nil, nil);
+  if AnsiLength <= 0 then
+    Exit;
+  SetLength(Result, AnsiLength);
+  WideCharToMultiByte(CP_ACP, 0, PWideChar(WideValue), WideLength,
+    PAnsiChar(Result), AnsiLength, nil, nil);
+end;
+
+constructor TAgentReader.Create(PipeHandle: THandle;
+  AOnLineReady: TAgentLineEvent; AOnProcessExit: TAgentExitEvent);
+begin
+  // Bind callbacks before resuming so fast CLI output cannot be lost between
+  // construction and the caller assigning event properties.
   inherited Create(True);
   fPipeRead := PipeHandle;
   fLineBuffer := '';
   fCurrentLine := '';
+  fOnLineReady := AOnLineReady;
+  fOnProcessExit := AOnProcessExit;
   FreeOnTerminate := False;
   Resume;
 end;
@@ -103,7 +131,7 @@ begin
       c := Buffer[i];
       if c = #10 then begin
         // Complete line: decode UTF-8 and hand it to the main thread.
-        fCurrentLine := UTF8ToAnsi(fLineBuffer);
+        fCurrentLine := UTF8BytesToAnsi(fLineBuffer);
         Synchronize(DoLineReady);
         fLineBuffer := '';
       end else if c <> #13 then
@@ -114,7 +142,7 @@ begin
 
   // Flush any trailing partial line (no LF before EOF).
   if (fLineBuffer <> '') and not Terminated then begin
-    fCurrentLine := UTF8ToAnsi(fLineBuffer);
+    fCurrentLine := UTF8BytesToAnsi(fLineBuffer);
     Synchronize(DoLineReady);
     fLineBuffer := '';
   end;
