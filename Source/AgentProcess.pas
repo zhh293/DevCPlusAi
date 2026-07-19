@@ -45,9 +45,12 @@ type
     fRunning: Boolean;      // running flag
     fWorkDir: String;       // working directory of the child process
     fCliPath: String;       // path to the claude CLI launcher
+    fSystemPromptFile: String; // UTF-8 prompt file kept for child lifetime
     fResumeSessionId: String; // project session to resume, if any
     fLastError: String;     // last error message (for graceful failures)
     function GetIsRunning: Boolean;
+    procedure DeleteSystemPromptFile;
+    function CreateSystemPromptFile(const Prompt: String): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
@@ -586,6 +589,7 @@ begin
   fRunning := False;
   fWorkDir := '';
   fCliPath := '';
+  fSystemPromptFile := '';
   fResumeSessionId := '';
   fLastError := '';
 end;
@@ -594,7 +598,60 @@ destructor TAgentProcess.Destroy;
 begin
   Stop;
   CloseOutputRead;
+  DeleteSystemPromptFile;
   inherited;
+end;
+
+procedure TAgentProcess.DeleteSystemPromptFile;
+begin
+  if fSystemPromptFile = '' then
+    Exit;
+  try
+    if FileExists(fSystemPromptFile) then
+      DeleteFile(fSystemPromptFile);
+  except
+    // A stale prompt file is non-fatal; Windows cleans the temp directory.
+  end;
+  fSystemPromptFile := '';
+end;
+
+function TAgentProcess.CreateSystemPromptFile(const Prompt: String): Boolean;
+var
+  TempPath: array[0..MAX_PATH] of Char;
+  Utf8: AnsiString;
+  Stream: TFileStream;
+begin
+  Result := False;
+  DeleteSystemPromptFile;
+  if Trim(Prompt) = '' then begin
+    Result := True;
+    Exit;
+  end;
+  if GetTempPath(SizeOf(TempPath), TempPath) = 0 then
+    Exit;
+  fSystemPromptFile := IncludeTrailingPathDelimiter(String(TempPath)) +
+    'devcpp-agent-prompt-' + IntToStr(GetCurrentProcessId) + '-' +
+    IntToStr(GetTickCount) + '.txt';
+  if not IsSafeCliPath(fSystemPromptFile) then begin
+    fSystemPromptFile := '';
+    Exit;
+  end;
+  Stream := nil;
+  try
+    try
+      Utf8 := AnsiToUTF8(Prompt);
+      Stream := TFileStream.Create(fSystemPromptFile, fmCreate or fmShareExclusive);
+      if Length(Utf8) > 0 then
+        Stream.WriteBuffer(Utf8[1], Length(Utf8));
+      Result := True;
+    except
+      Result := False;
+    end;
+  finally
+    Stream.Free;
+    if not Result then
+      DeleteSystemPromptFile;
+  end;
 end;
 
 function TAgentProcess.Start(const WorkDir: String): Boolean;
@@ -603,6 +660,7 @@ var
   si: TStartupInfo;
   pi: TProcessInformation;
   CmdLine, CommandShell, ModelArg, PermissionArg, ResumeArg: String;
+  SystemPromptArg: String;
   McpArg, PluginArg: String;
   EnvBlock: PChar;
   WorkDirPtr: PChar;
@@ -610,6 +668,7 @@ var
 begin
   Result := False;
   fLastError := '';
+  DeleteSystemPromptFile;
 
   // A previous failed launch may have closed a handle without resetting the
   // field. Normalize all fields before attempting another launch.
@@ -713,11 +772,25 @@ begin
 
   McpArg := '';
   PluginArg := '';
+  SystemPromptArg := '';
   if Assigned(devAgentConfig) then begin
     McpArg := BuildPathOption('--mcp-config', devAgentConfig.McpConfigFiles,
       WorkDir, False);
     PluginArg := BuildPathOption('--plugin-dir', devAgentConfig.PluginDirs,
       WorkDir, True);
+    if Trim(devAgentConfig.SystemPrompt) <> '' then begin
+      if not CreateSystemPromptFile(devAgentConfig.SystemPrompt) then begin
+        fLastError := 'Could not create the temporary system prompt file.';
+        LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
+        CloseAgentHandle(fOutputRead);
+        CloseAgentHandle(fOutputWrite);
+        CloseAgentHandle(fInputRead);
+        CloseAgentHandle(fInputWrite);
+        Exit;
+      end;
+      SystemPromptArg := ' --append-system-prompt-file "' +
+        fSystemPromptFile + '"';
+    end;
   end;
 
   // CreateProcess cannot execute .cmd/.bat files directly. Route launcher
@@ -731,12 +804,14 @@ begin
     CmdLine := '"' + CommandShell + '" /d /s /c ""' + fCliPath +
       '" --print --input-format stream-json --output-format stream-json --verbose' +
       ' --include-partial-messages --include-hook-events --prompt-suggestions' +
-      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg + '"';
+      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg +
+      SystemPromptArg + '"';
   end else
     CmdLine := '"' + fCliPath +
       '" --print --input-format stream-json --output-format stream-json --verbose' +
       ' --include-partial-messages --include-hook-events --prompt-suggestions' +
-      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg;
+      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg +
+      SystemPromptArg;
 
   EnvBlock := nil;
   EnvBlock := BuildEnvironmentBlock(WorkDir);
@@ -763,6 +838,7 @@ begin
       CloseAgentHandle(fOutputWrite);
       CloseAgentHandle(fInputRead);
       CloseAgentHandle(fInputWrite);
+      DeleteSystemPromptFile;
       if JobHandle <> 0 then
         CloseHandle(JobHandle);
       Exit;
@@ -791,8 +867,10 @@ end;
 
 procedure TAgentProcess.Stop;
 begin
-  if not fRunning and (fProcessHandle = 0) and (fJobHandle = 0) then
+  if not fRunning and (fProcessHandle = 0) and (fJobHandle = 0) then begin
+    DeleteSystemPromptFile;
     Exit;
+  end;
 
   fRunning := False;
 
@@ -822,6 +900,7 @@ begin
   end;
 
   fProcessId := 0;
+  DeleteSystemPromptFile;
 end;
 
 procedure TAgentProcess.CloseOutputRead;

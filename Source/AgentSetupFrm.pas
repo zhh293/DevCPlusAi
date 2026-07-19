@@ -38,12 +38,16 @@ type
     edtBaseUrl: TEdit;
     lblModel: TLabel;
     edtModel: TEdit;
+    lblCliPath: TLabel;
+    edtCliPath: TEdit;
     lblPermissionMode: TLabel;
     cboPermissionMode: TComboBox;
     lblMcpConfig: TLabel;
     edtMcpConfig: TEdit;
     lblPluginDirs: TLabel;
     edtPluginDirs: TEdit;
+    lblSystemPrompt: TLabel;
+    memoSystemPrompt: TMemo;
     lblSkillInfo: TLabel;
     btnValidate: TButton;
     lblHelp: TLabel;
@@ -102,9 +106,11 @@ begin
   lblApiKey.Caption := 'API Key:';
   lblBaseUrl.Caption := 'Custom endpoint (Base URL):';
   lblModel.Caption := 'Model:';
+  lblCliPath.Caption := 'Claude CLI path (empty uses bundled runtime):';
   lblPermissionMode.Caption := 'CLI permission mode:';
   lblMcpConfig.Caption := 'MCP config files (semicolon separated):';
   lblPluginDirs.Caption := 'Plugin dirs or ZIP files (semicolon separated):';
+  lblSystemPrompt.Caption := 'Additional system prompt:';
   lblSkillInfo.Caption := 'Skills are loaded from project .claude\skills and active plugins.';
   btnValidate.Caption := 'Validate';
   lblHelp.Caption := 'How to get an API key?';
@@ -155,8 +161,10 @@ begin
   edtApiKey.Text := devAgentConfig.ApiKey;
   edtBaseUrl.Text := devAgentConfig.BaseUrl;
   edtModel.Text := devAgentConfig.Model;
+  edtCliPath.Text := devAgentConfig.CliPath;
   edtMcpConfig.Text := devAgentConfig.McpConfigFiles;
   edtPluginDirs.Text := devAgentConfig.PluginDirs;
+  memoSystemPrompt.Text := devAgentConfig.SystemPrompt;
   if SameText(devAgentConfig.PermissionMode, 'acceptEdits') then
     cboPermissionMode.ItemIndex := 1
   else if SameText(devAgentConfig.PermissionMode, 'auto') then
@@ -206,8 +214,8 @@ end;
 procedure TAgentSetupForm.btnValidateClick(Sender: TObject);
 var
   proc: TAgentProcess;
-  OldProvider, OldApiKey, OldBaseUrl, OldModel, OldPermissionMode: String;
-  OldMcpConfigFiles, OldPluginDirs: String;
+  OldProvider, OldApiKey, OldBaseUrl, OldModel, OldCliPath: String;
+  OldPermissionMode, OldMcpConfigFiles, OldPluginDirs, OldSystemPrompt: String;
 begin
   lblStatus.Font.Color := clNavy;
   lblStatus.Caption := 'Checking the CLI...';
@@ -219,24 +227,30 @@ begin
   OldApiKey := '';
   OldBaseUrl := '';
   OldModel := '';
+  OldCliPath := '';
   OldPermissionMode := '';
   OldMcpConfigFiles := '';
   OldPluginDirs := '';
+  OldSystemPrompt := '';
   if Assigned(devAgentConfig) then begin
     OldProvider := devAgentConfig.Provider;
     OldApiKey := devAgentConfig.ApiKey;
     OldBaseUrl := devAgentConfig.BaseUrl;
     OldModel := devAgentConfig.Model;
+    OldCliPath := devAgentConfig.CliPath;
     OldPermissionMode := devAgentConfig.PermissionMode;
     OldMcpConfigFiles := devAgentConfig.McpConfigFiles;
     OldPluginDirs := devAgentConfig.PluginDirs;
+    OldSystemPrompt := devAgentConfig.SystemPrompt;
     devAgentConfig.Provider := ProviderId;
     devAgentConfig.ApiKey := Trim(edtApiKey.Text);
     devAgentConfig.BaseUrl := Trim(edtBaseUrl.Text);
     devAgentConfig.Model := Trim(edtModel.Text);
+    devAgentConfig.CliPath := Trim(edtCliPath.Text);
     devAgentConfig.PermissionMode := PermissionModeId;
     devAgentConfig.McpConfigFiles := Trim(edtMcpConfig.Text);
     devAgentConfig.PluginDirs := Trim(edtPluginDirs.Text);
+    devAgentConfig.SystemPrompt := Trim(memoSystemPrompt.Text);
   end;
 
   proc := TAgentProcess.Create;
@@ -258,9 +272,11 @@ begin
       devAgentConfig.ApiKey := OldApiKey;
       devAgentConfig.BaseUrl := OldBaseUrl;
       devAgentConfig.Model := OldModel;
+      devAgentConfig.CliPath := OldCliPath;
       devAgentConfig.PermissionMode := OldPermissionMode;
       devAgentConfig.McpConfigFiles := OldMcpConfigFiles;
       devAgentConfig.PluginDirs := OldPluginDirs;
+      devAgentConfig.SystemPrompt := OldSystemPrompt;
     end;
   end;
 end;
@@ -286,9 +302,11 @@ begin
     devAgentConfig.Provider := ProviderId;
     devAgentConfig.ApiKey := Trim(edtApiKey.Text);
     devAgentConfig.Model := Trim(edtModel.Text);
+    devAgentConfig.CliPath := Trim(edtCliPath.Text);
     devAgentConfig.PermissionMode := PermissionModeId;
     devAgentConfig.McpConfigFiles := Trim(edtMcpConfig.Text);
     devAgentConfig.PluginDirs := Trim(edtPluginDirs.Text);
+    devAgentConfig.SystemPrompt := Trim(memoSystemPrompt.Text);
     if edtBaseUrl.Visible then
       devAgentConfig.BaseUrl := Trim(edtBaseUrl.Text);
     if not edtBaseUrl.Visible then

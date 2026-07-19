@@ -106,19 +106,24 @@ function Invoke-ClaudeCompatibilityCheck {
     }
 
     # Exercise the exact non-interactive base flags with an empty, closed stdin.
-    # No prompt is sent and therefore this does not make an API request.
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $path
-    $startInfo.Arguments = '--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions --permission-mode manual'
-    $startInfo.WorkingDirectory = $RepoRoot
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardInput = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
+    # The file form of append-system-prompt is hidden from the short help in
+    # current Claude builds, so this behavior check is its compatibility test.
+    # No user prompt is sent and therefore this does not make an API request.
+    $promptFile = [System.IO.Path]::GetTempFileName()
+    [System.IO.File]::WriteAllText($promptFile, 'verify')
+    $process = $null
     try {
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $path
+        $startInfo.Arguments = '--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions --permission-mode manual --append-system-prompt-file "' + $promptFile + '"'
+        $startInfo.WorkingDirectory = $RepoRoot
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardInput = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
         if (-not $process.Start()) {
             $failures.Add('Claude CLI argument smoke test did not start.')
             return
@@ -135,7 +140,10 @@ function Invoke-ClaudeCompatibilityCheck {
         }
     }
     finally {
-        $process.Dispose()
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+        Remove-Item -LiteralPath $promptFile -Force -ErrorAction SilentlyContinue
     }
 }
 

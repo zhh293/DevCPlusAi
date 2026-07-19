@@ -43,7 +43,7 @@ DevCPlusAi 把 AI 能力拆分为几个职责单一、相互解耦的 Object Pas
 IDE 启动 AI 子进程时使用的命令形如：
 
 ```
-"<CliPath>" --print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions
+"<CliPath>" --print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions [--append-system-prompt-file "<temporary-utf8-file>"]
 ```
 
 子进程以独立进程组（`CREATE_NEW_PROCESS_GROUP`）创建，便于精确地向子进程单独投递中断信号；环境变量块沿用 Delphi 7 工程的 ANSI 表示。`AgentReader` 在后台线程中按行读取子进程标准输出，交由 `AgentProtocol` 解析成结构化事件后，再通过线程安全的方式回调到 UI 面板上渲染。
@@ -81,7 +81,7 @@ AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
 | `ApiKey` | API 密钥（首启向导中填写，掩码显示） | 空 |
 | `Model` | 使用的模型 | 空（由向导/服务商决定） |
 | `BaseUrl` | 自定义端点 | 空 |
-| `CliPath` | AI CLI 可执行文件路径 | `<程序目录>\claude-cli\bin\claude.exe` |
+| `CliPath` | AI CLI 可执行文件路径；可在英文设置窗口中修改 | `<程序目录>\claude-cli\bin\claude.exe` |
 | `PanelPosition` | 面板停靠位置 | `right` |
 | `PanelWidth` | 面板宽度（像素） | `400` |
 | `FontSize` | 面板字体大小 | `10` |
@@ -89,7 +89,7 @@ AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
 | `PermissionMode` | Claude CLI 原生权限模式 | `manual` |
 | `McpConfigFiles` | 传给 `--mcp-config` 的配置文件路径，多个路径用 `;` 分隔 | 空 |
 | `PluginDirs` | 传给 `--plugin-dir` 的目录或 ZIP 路径，多个路径用 `;` 分隔 | 空 |
-| `SystemPrompt` | 系统提示词 | 空 |
+| `SystemPrompt` | 追加系统提示词；以无 BOM UTF-8 临时文件传给 CLI，并在子进程结束后删除 | 空 |
 
 配置随 IDE 设置一并保存，下次启动自动加载。项目会话目录只保存 Claude 的 `session_id`，不保存完整聊天内容；API Key 写入配置前会通过 Windows DPAPI 加密。
 
@@ -253,4 +253,4 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 
 ## 开发状态
 
-基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启、文件/图片附件、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。仍需在 Windows + Delphi 环境完成真实编译和运行验收；GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、CLI 参数、ConsolePauser 冒烟测试已通过；仍需完成真实 API 对话和安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
