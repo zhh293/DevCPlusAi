@@ -623,6 +623,7 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\Contributes"
   RMDir /r "$INSTDIR\MinGW32"
   RMDir /r "$INSTDIR\MinGW64"
+  Delete "$INSTDIR\AGENT-RUNTIME-VERSIONS.txt"
   RMDir /r "$INSTDIR\nodejs"
   RMDir /r "$INSTDIR\claude-cli"
 

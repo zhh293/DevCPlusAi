@@ -1121,6 +1121,7 @@ type
     fAgentResumeAttempted : Boolean;
     fAgentIgnoreSavedSession : Boolean;
     fAgentRestartTimer : TTimer;
+    fAgentResponseTimer : TTimer;
     fAgentRestartAttempts : Integer;
     fAgentExpectedStop : Boolean;
     procedure SetupAgentPanel;
@@ -1136,6 +1137,9 @@ type
     procedure RefreshAgentFile(const FileName: String);
     procedure UpdateAgentCompileContext;
     procedure AgentRestartTimerTick(Sender: TObject);
+    procedure AgentRequestStarted(Sender: TObject);
+    procedure AgentRequestEnded(Sender: TObject);
+    procedure AgentResponseTimerTick(Sender: TObject);
     function AgentSessionFileName(const WorkDir: String): String;
     function LoadAgentSession(const FileName: String): String;
     procedure SaveAgentSession(const FileName, SessionId: String);
@@ -9129,6 +9133,10 @@ begin
   fAgentRestartTimer.Interval := 1000;
   fAgentRestartTimer.Enabled := False;
   fAgentRestartTimer.OnTimer := AgentRestartTimerTick;
+  fAgentResponseTimer := TTimer.Create(Self);
+  fAgentResponseTimer.Interval := 60000;
+  fAgentResponseTimer.Enabled := False;
+  fAgentResponseTimer.OnTimer := AgentResponseTimerTick;
 
   // Splitter (placed before the panel so alRight ordering is correct)
   fAgentSplitter := TSplitter.Create(Self);
@@ -9150,8 +9158,12 @@ begin
   fAgentPanelFrame := TAgentPanelFrame.Create(Self);
   fAgentPanelFrame.Parent := fAgentPanel;
   fAgentPanelFrame.Align := alClient;
-  if Assigned(devAgentConfig) then
+  fAgentPanelFrame.OnRequestStarted := AgentRequestStarted;
+  fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
+  if Assigned(devAgentConfig) then begin
     fAgentPanelFrame.SetSendKey(devAgentConfig.SendKey);
+    fAgentPanelFrame.SetFontSize(devAgentConfig.FontSize);
+  end;
 
   // Create the toggle action and add a View menu item for it.
   fActAIAssistant := TAction.Create(Self);
@@ -9496,6 +9508,8 @@ begin
     fAgentPanelFrame.SetModelName(devAgentConfig.Model);
   if Assigned(devAgentConfig) then
     fAgentPanelFrame.SetSendKey(devAgentConfig.SendKey);
+  if Assigned(devAgentConfig) then
+    fAgentPanelFrame.SetFontSize(devAgentConfig.FontSize);
   fAgentPanelFrame.SetStatus(asReady);
   if Assigned(fAgentRestartTimer) then
     fAgentRestartTimer.Enabled := False;
@@ -9505,6 +9519,10 @@ procedure TMainForm.RestartAgentForCurrentProject;
 begin
   if fQuitting then
     Exit;
+  if Assigned(fAgentPanelFrame) and Assigned(devAgentConfig) then begin
+    fAgentPanelFrame.SetSendKey(devAgentConfig.SendKey);
+    fAgentPanelFrame.SetFontSize(devAgentConfig.FontSize);
+  end;
   StopAgent;
   fAgentRestartAttempts := 0;
   if Assigned(fAgentRestartTimer) then
@@ -9520,6 +9538,8 @@ procedure TMainForm.StopAgent;
 begin
   if Assigned(fAgentRestartTimer) then
     fAgentRestartTimer.Enabled := False;
+  if Assigned(fAgentResponseTimer) then
+    fAgentResponseTimer.Enabled := False;
   fAgentExpectedStop := True;
   // Terminate the child first so a blocking ReadFile in AgentReader returns.
   if Assigned(fAgentProcess) then begin
@@ -9612,6 +9632,8 @@ end;
 
 procedure TMainForm.AgentProcessExit;
 begin
+  if Assigned(fAgentResponseTimer) then
+    fAgentResponseTimer.Enabled := False;
   if fAgentExpectedStop or fQuitting then
     Exit;
   if fAgentResumeAttempted and not fAgentIgnoreSavedSession then begin
@@ -9632,6 +9654,33 @@ begin
     end;
   end else if Assigned(fAgentPanelFrame) then
     fAgentPanelFrame.AppendSystemMessage('The AI process exited. Automatic retries stopped; check the CLI, network, and API Key.');
+end;
+
+procedure TMainForm.AgentRequestStarted(Sender: TObject);
+begin
+  if not Assigned(fAgentResponseTimer) then
+    Exit;
+  fAgentResponseTimer.Enabled := False;
+  fAgentResponseTimer.Enabled := True;
+end;
+
+procedure TMainForm.AgentRequestEnded(Sender: TObject);
+begin
+  if Assigned(fAgentResponseTimer) then
+    fAgentResponseTimer.Enabled := False;
+end;
+
+procedure TMainForm.AgentResponseTimerTick(Sender: TObject);
+begin
+  if Assigned(fAgentResponseTimer) then
+    fAgentResponseTimer.Enabled := False;
+  if Assigned(fAgentPanelFrame) then begin
+    fAgentPanelFrame.AppendSystemMessage(
+      'No response was received within 60 seconds. The request was stopped.');
+    fAgentPanelFrame.SetStatus(asError);
+  end;
+  if Assigned(fAgentProcess) and fAgentProcess.IsRunning then
+    fAgentProcess.SendInterrupt;
 end;
 
 procedure TMainForm.AgentRestartTimerTick(Sender: TObject);

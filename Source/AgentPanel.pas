@@ -69,6 +69,9 @@ type
     fStreamingMessageId: String;
     fStreamingText: String;
     fStreamingActive: Boolean;
+    fWaitingForResponse: Boolean;
+    fOnRequestStarted: TNotifyEvent;
+    fOnRequestEnded: TNotifyEvent;
     procedure AppendText(const Text: String; Color: TColor; Bold: Boolean);
     procedure AppendUserMessageInternal(const Text: String);
     procedure AppendAITextInternal(const Text: String);
@@ -81,6 +84,8 @@ type
     function AddAttachment(const FileName: String): Boolean;
     procedure AddAttachmentList(Files: TStrings);
     function SaveClipboardImage: String;
+    procedure BeginResponseWait;
+    procedure EndResponseWait;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -97,6 +102,7 @@ type
     procedure AppendSystemMessage(const Text: String);
     procedure SetContext(const Text: String);
     procedure SetSendKey(const Value: String);
+    procedure SetFontSize(Value: Integer);
 
     // Status / model display.
     procedure SetStatus(Status: TAgentStatus);
@@ -113,6 +119,8 @@ type
     procedure AddDroppedFiles(Files: TStrings);
 
     property Status: TAgentStatus read fStatus;
+    property OnRequestStarted: TNotifyEvent read fOnRequestStarted write fOnRequestStarted;
+    property OnRequestEnded: TNotifyEvent read fOnRequestEnded write fOnRequestEnded;
   end;
 
 implementation
@@ -131,11 +139,15 @@ begin
   fStreamingMessageId := '';
   fStreamingText := '';
   fStreamingActive := False;
+  fWaitingForResponse := False;
+  fOnRequestStarted := nil;
+  fOnRequestEnded := nil;
   SetStatus(asDisconnected);
 end;
 
 destructor TAgentPanelFrame.Destroy;
 begin
+  fWaitingForResponse := False;
   fAttachments.Free;
   inherited Destroy;
 end;
@@ -206,12 +218,31 @@ end;
 
 procedure TAgentPanelFrame.ClearChat;
 begin
+  EndResponseWait;
   reChat.Clear;
   memoInput.Clear;
   fAttachments.Clear;
   lbAttachments.Items.Clear;
   fContextText := '';
   ResetStreamingDisplay;
+end;
+
+procedure TAgentPanelFrame.BeginResponseWait;
+begin
+  if fWaitingForResponse then
+    Exit;
+  fWaitingForResponse := True;
+  if Assigned(fOnRequestStarted) then
+    fOnRequestStarted(Self);
+end;
+
+procedure TAgentPanelFrame.EndResponseWait;
+begin
+  if not fWaitingForResponse then
+    Exit;
+  fWaitingForResponse := False;
+  if Assigned(fOnRequestEnded) then
+    fOnRequestEnded(Self);
 end;
 
 procedure TAgentPanelFrame.ResetStreamingDisplay;
@@ -375,6 +406,18 @@ begin
   memoInput.WantReturns := True;
 end;
 
+procedure TAgentPanelFrame.SetFontSize(Value: Integer);
+begin
+  if Value < 8 then
+    Value := 8
+  else if Value > 24 then
+    Value := 24;
+  reChat.Font.Size := Value;
+  memoInput.Font.Size := Value;
+  lbAttachments.Font.Size := Value;
+  lbAttachments.ItemHeight := Value + 6;
+end;
+
 { ------------------------------------------------------------------ }
 { Event dispatch                                                     }
 { ------------------------------------------------------------------ }
@@ -383,6 +426,9 @@ procedure TAgentPanelFrame.HandleAgentEvent(const Event: TAgentEvent);
 var
   Text, ToolDetails: String;
 begin
+  if Event.EventType in [aetAssistant, aetToolUse, aetToolResult,
+      aetResult, aetError] then
+    EndResponseWait;
   case Event.EventType of
     aetAssistant:
       begin
@@ -493,6 +539,8 @@ procedure TAgentPanelFrame.SetStatus(Status: TAgentStatus);
 var
   s: String;
 begin
+  if Status in [asReady, asError, asDisconnected] then
+    EndResponseWait;
   fStatus := Status;
   case Status of
     asReady:        s := '[OK] Ready';
@@ -550,6 +598,7 @@ begin
   fAttachments.Clear;
   lbAttachments.Items.Clear;
   SetStatus(asThinking);
+  BeginResponseWait;
 end;
 
 procedure TAgentPanelFrame.SendPrompt(const Text: String);
@@ -565,6 +614,7 @@ end;
 
 procedure TAgentPanelFrame.btnStopClick(Sender: TObject);
 begin
+  EndResponseWait;
   if Assigned(fAgentProcess) then
     fAgentProcess.SendInterrupt;
   SetStatus(asReady);

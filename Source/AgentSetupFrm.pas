@@ -38,10 +38,14 @@ type
     edtBaseUrl: TEdit;
     lblModel: TLabel;
     edtModel: TEdit;
+    lblFontSize: TLabel;
+    edtFontSize: TEdit;
     lblCliPath: TLabel;
     edtCliPath: TEdit;
     lblPermissionMode: TLabel;
     cboPermissionMode: TComboBox;
+    lblSendKey: TLabel;
+    cboSendKey: TComboBox;
     lblMcpConfig: TLabel;
     edtMcpConfig: TEdit;
     lblPluginDirs: TLabel;
@@ -106,8 +110,10 @@ begin
   lblApiKey.Caption := 'API Key:';
   lblBaseUrl.Caption := 'Custom endpoint (Base URL):';
   lblModel.Caption := 'Model:';
+  lblFontSize.Caption := 'Panel font size:';
   lblCliPath.Caption := 'Claude CLI path (empty uses bundled runtime):';
   lblPermissionMode.Caption := 'CLI permission mode:';
+  lblSendKey.Caption := 'Send key:';
   lblMcpConfig.Caption := 'MCP config files (semicolon separated):';
   lblPluginDirs.Caption := 'Plugin dirs or ZIP files (semicolon separated):';
   lblSystemPrompt.Caption := 'Additional system prompt:';
@@ -161,10 +167,15 @@ begin
   edtApiKey.Text := devAgentConfig.ApiKey;
   edtBaseUrl.Text := devAgentConfig.BaseUrl;
   edtModel.Text := devAgentConfig.Model;
+  edtFontSize.Text := IntToStr(devAgentConfig.FontSize);
   edtCliPath.Text := devAgentConfig.CliPath;
   edtMcpConfig.Text := devAgentConfig.McpConfigFiles;
   edtPluginDirs.Text := devAgentConfig.PluginDirs;
   memoSystemPrompt.Text := devAgentConfig.SystemPrompt;
+  if SameText(devAgentConfig.SendKey, 'ctrl+enter') then
+    cboSendKey.ItemIndex := 1
+  else
+    cboSendKey.ItemIndex := 0;
   if SameText(devAgentConfig.PermissionMode, 'acceptEdits') then
     cboPermissionMode.ItemIndex := 1
   else if SameText(devAgentConfig.PermissionMode, 'auto') then
@@ -282,7 +293,16 @@ begin
 end;
 
 procedure TAgentSetupForm.btnOKClick(Sender: TObject);
+var
+  PanelFontSize: Integer;
 begin
+  PanelFontSize := StrToIntDef(Trim(edtFontSize.Text), 0);
+  if (PanelFontSize < 8) or (PanelFontSize > 24) then begin
+    lblStatus.Font.Color := clRed;
+    lblStatus.Caption := 'Panel font size must be between 8 and 24.';
+    edtFontSize.SetFocus;
+    Exit;
+  end;
   if Trim(edtApiKey.Text) = '' then begin
     lblStatus.Font.Color := clRed;
     lblStatus.Caption := 'Enter an API Key, or click Skip.';
@@ -302,6 +322,11 @@ begin
     devAgentConfig.Provider := ProviderId;
     devAgentConfig.ApiKey := Trim(edtApiKey.Text);
     devAgentConfig.Model := Trim(edtModel.Text);
+    devAgentConfig.FontSize := PanelFontSize;
+    if cboSendKey.ItemIndex = 1 then
+      devAgentConfig.SendKey := 'ctrl+enter'
+    else
+      devAgentConfig.SendKey := 'enter';
     devAgentConfig.CliPath := Trim(edtCliPath.Text);
     devAgentConfig.PermissionMode := PermissionModeId;
     devAgentConfig.McpConfigFiles := Trim(edtMcpConfig.Text);

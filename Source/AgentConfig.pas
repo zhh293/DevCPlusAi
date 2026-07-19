@@ -273,6 +273,15 @@ begin
           not SameText(fPermissionMode, 'dontAsk') and
           not SameText(fPermissionMode, 'plan') then
     fPermissionMode := 'manual';
+  if (fPanelWidth < 200) or (fPanelWidth > 1200) then
+    fPanelWidth := 400;
+  if (fFontSize < 8) or (fFontSize > 24) then
+    fFontSize := 10;
+  if not SameText(fSendKey, 'enter') and
+     not SameText(fSendKey, 'ctrl+enter') then
+    fSendKey := 'enter';
+  if not SameText(fPanelPosition, 'right') then
+    fPanelPosition := 'right';
   StoredApiKey := fApiKey;
   if Pos(AGENT_KEY_PREFIX, LowerCase(StoredApiKey)) = 1 then begin
     if UnprotectApiKey(StoredApiKey, PlainApiKey) then

@@ -41,6 +41,34 @@ function Warn-OptionalDirectory {
     }
 }
 
+function Invoke-InstallerStaticCheck {
+    param([string]$RelativePath)
+
+    $path = Join-Path $RepoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $failures.Add("Missing installer script: $RelativePath")
+        return
+    }
+    $text = [System.IO.File]::ReadAllText($path)
+    $requiredFragments = @(
+        'Section "AI Agent Runtime"',
+        'File "AGENT-RUNTIME-VERSIONS.txt"',
+        'File /r "nodejs\*"',
+        'File /r "claude-cli\*"',
+        'Delete "$INSTDIR\AGENT-RUNTIME-VERSIONS.txt"',
+        'RMDir /r "$INSTDIR\nodejs"',
+        'RMDir /r "$INSTDIR\claude-cli"'
+    )
+    foreach ($fragment in $requiredFragments) {
+        if (-not $text.Contains($fragment)) {
+            $failures.Add("Installer invariant missing in ${RelativePath}: $fragment")
+        }
+    }
+    if ($text.IndexOf('cc-switch', [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        $failures.Add("Installer must not bundle cc-switch: $RelativePath")
+    }
+}
+
 function Invoke-VersionCheck {
     param(
         [string]$RelativePath,
@@ -174,6 +202,12 @@ if ($PackageType -eq 'X64Compiler') {
 }
 Warn-OptionalDirectory 'AStyle'
 Warn-OptionalDirectory 'ResEd'
+
+foreach ($installerScript in @(
+    'devcpp-i686.nsi', 'devcpp-x64.nsi', 'devcppnocompiler.nsi'
+)) {
+    Invoke-InstallerStaticCheck $installerScript
+}
 
 Invoke-VersionCheck 'nodejs\node.exe' 'v24.18.0'
 Invoke-VersionCheck 'claude-cli\bin\claude.exe' '2.1.211'

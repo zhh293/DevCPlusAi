@@ -48,6 +48,13 @@ object AgentSetupForm: TAgentSetupForm
     Height = 15
     Caption = 'Model:'
   end
+  object lblFontSize: TLabel
+    Left = 252
+    Top = 244
+    Width = 90
+    Height = 15
+    Caption = 'Panel font size:'
+  end
   object lblCliPath: TLabel
     Left = 16
     Top = 300
@@ -62,6 +69,13 @@ object AgentSetupForm: TAgentSetupForm
     Height = 15
     Caption = 'Permission mode:'
   end
+  object lblSendKey: TLabel
+    Left = 252
+    Top = 356
+    Width = 60
+    Height = 15
+    Caption = 'Send key:'
+  end
   object lblMcpConfig: TLabel
     Left = 16
     Top = 406
@@ -74,7 +88,7 @@ object AgentSetupForm: TAgentSetupForm
     Top = 424
     Width = 348
     Height = 23
-    TabOrder = 7
+    TabOrder = 9
   end
   object lblPluginDirs: TLabel
     Left = 16
@@ -88,7 +102,7 @@ object AgentSetupForm: TAgentSetupForm
     Top = 474
     Width = 348
     Height = 23
-    TabOrder = 8
+    TabOrder = 10
   end
   object lblSystemPrompt: TLabel
     Left = 16
@@ -103,7 +117,7 @@ object AgentSetupForm: TAgentSetupForm
     Width = 348
     Height = 60
     ScrollBars = ssVertical
-    TabOrder = 9
+    TabOrder = 11
   end
   object lblSkillInfo: TLabel
     Left = 16
@@ -117,11 +131,11 @@ object AgentSetupForm: TAgentSetupForm
   object cboPermissionMode: TComboBox
     Left = 16
     Top = 374
-    Width = 348
+    Width = 230
     Height = 23
     Style = csDropDownList
     ItemIndex = 0
-    TabOrder = 6
+    TabOrder = 7
     Text = 'manual'
     Items.Strings = (
       'manual'
@@ -130,6 +144,19 @@ object AgentSetupForm: TAgentSetupForm
       'bypassPermissions'
       'dontAsk'
       'plan')
+  end
+  object cboSendKey: TComboBox
+    Left = 252
+    Top = 374
+    Width = 112
+    Height = 23
+    Style = csDropDownList
+    ItemIndex = 0
+    TabOrder = 8
+    Text = 'Enter'
+    Items.Strings = (
+      'Enter'
+      'Ctrl+Enter')
   end
   object lblHelp: TLabel
     Left = 240
@@ -198,16 +225,24 @@ object AgentSetupForm: TAgentSetupForm
   object edtModel: TEdit
     Left = 16
     Top = 262
-    Width = 348
+    Width = 230
     Height = 23
     TabOrder = 4
+  end
+  object edtFontSize: TEdit
+    Left = 252
+    Top = 262
+    Width = 112
+    Height = 23
+    TabOrder = 5
+    Text = '10'
   end
   object edtCliPath: TEdit
     Left = 16
     Top = 318
     Width = 348
     Height = 23
-    TabOrder = 5
+    TabOrder = 6
   end
   object btnOK: TButton
     Left = 200
@@ -216,7 +251,7 @@ object AgentSetupForm: TAgentSetupForm
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 10
+    TabOrder = 12
     OnClick = btnOKClick
   end
   object btnSkip: TButton
@@ -225,7 +260,7 @@ object AgentSetupForm: TAgentSetupForm
     Width = 75
     Height = 25
     Caption = 'Skip'
-    TabOrder = 11
+    TabOrder = 13
     OnClick = btnSkipClick
   end
 end
