@@ -55,10 +55,10 @@ $gitCommand = Get-Command 'git.exe' -ErrorAction SilentlyContinue
 $sourceCommit = 'unknown'
 $sourceDirty = 'unknown'
 if ($gitCommand) {
-    $sourceCommitOutput = & $gitCommand.Source -C $RepoRoot rev-parse HEAD 2>$null
+    $sourceCommitOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot rev-parse HEAD 2>$null
     if ($LASTEXITCODE -eq 0) {
         $sourceCommit = ($sourceCommitOutput | Out-String).Trim()
-        $dirtyOutput = & $gitCommand.Source -C $RepoRoot status --porcelain 2>$null
+        $dirtyOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot status --porcelain 2>$null
         if ($LASTEXITCODE -eq 0) {
             if ($dirtyOutput) {
                 $sourceDirty = 'true'
