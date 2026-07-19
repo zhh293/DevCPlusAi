@@ -438,7 +438,7 @@ SendKey=enter
 
 [Permissions]
 ; Claude CLI 原生权限模式
-PermissionMode=default
+PermissionMode=manual
 
 [Extensions]
 ; 可选 MCP 配置文件，多个路径用分号分隔

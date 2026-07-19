@@ -156,8 +156,12 @@ begin
     Result := 'dontAsk'
   else if SameText(Value, 'plan') then
     Result := 'plan'
+  else if SameText(Value, 'manual') or SameText(Value, 'default') then
+    // Claude CLI 2.1.211 documents "manual". Treat the legacy "default"
+    // value as an alias so old IDE configurations keep their safe behavior.
+    Result := 'manual'
   else
-    Result := 'default';
+    Result := 'manual';
 end;
 
 procedure CloseAgentHandle(var Handle: THandle);

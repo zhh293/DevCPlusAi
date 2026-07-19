@@ -234,7 +234,7 @@ begin
   fPanelWidth := 400;
   fFontSize := 10;
   fSendKey := 'enter';
-  fPermissionMode := 'default';
+  fPermissionMode := 'manual';
   fMcpConfigFiles := '';
   fPluginDirs := '';
   fAutoAllowRead := True;     // reading is non-destructive, allow by default
@@ -259,8 +259,20 @@ begin
     else if not fAutoAllowRead then
       fPermissionMode := 'dontAsk'
     else
-      fPermissionMode := 'default';
+      fPermissionMode := 'manual';
   end;
+  // "default" was accepted by older Claude CLI builds but 2.1.211 documents
+  // the equivalent safe mode as "manual". Normalize persisted legacy and
+  // invalid values before they reach the process command line.
+  if SameText(fPermissionMode, 'default') then
+    fPermissionMode := 'manual'
+  else if not SameText(fPermissionMode, 'manual') and
+          not SameText(fPermissionMode, 'acceptEdits') and
+          not SameText(fPermissionMode, 'auto') and
+          not SameText(fPermissionMode, 'bypassPermissions') and
+          not SameText(fPermissionMode, 'dontAsk') and
+          not SameText(fPermissionMode, 'plan') then
+    fPermissionMode := 'manual';
   StoredApiKey := fApiKey;
   if Pos(AGENT_KEY_PREFIX, LowerCase(StoredApiKey)) = 1 then begin
     if UnprotectApiKey(StoredApiKey, PlainApiKey) then

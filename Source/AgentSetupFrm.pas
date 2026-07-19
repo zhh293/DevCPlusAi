@@ -134,7 +134,7 @@ begin
     4: Result := 'dontAsk';
     5: Result := 'plan';
   else
-    Result := 'default';
+    Result := 'manual';
   end;
 end;
 
@@ -167,7 +167,7 @@ begin
     cboPermissionMode.ItemIndex := 4
   else if SameText(devAgentConfig.PermissionMode, 'plan') then
     cboPermissionMode.ItemIndex := 5
-  else
+  else // "manual", legacy "default", and invalid values use the safe mode.
     cboPermissionMode.ItemIndex := 0;
 end;
 

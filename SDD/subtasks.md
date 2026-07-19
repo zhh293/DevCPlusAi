@@ -84,7 +84,7 @@
 7. `SendMessage` 写入合法 JSONL `user` 事件，并循环处理部分写入。
 8. `SendInterrupt` 首选进程组 Ctrl+C，失败时使用确定性的停止路径。
 9. `ResumeSessionId` 非空时追加 `--resume <session-id>`。session id 由项目会话文件提供，不能由用户输入直接拼接未经校验的参数。
-10. `PermissionMode` 只允许 Claude CLI 支持的值：`default`、`acceptEdits`、`auto`、`bypassPermissions`、`dontAsk`、`plan`。
+10. `PermissionMode` 只允许锁定 Claude CLI 支持的值：`manual`、`acceptEdits`、`auto`、`bypassPermissions`、`dontAsk`、`plan`；旧 `default` 配置迁移为 `manual`。
 
 **验收**
 
@@ -244,12 +244,12 @@ end;
 
 - 只传 CLI 原生 `--permission-mode` 值。
 - 不弹出一个看似能取消已执行操作的 IDE 权限窗。
-- `default`、`acceptEdits`、`bypassPermissions`、`dontAsk`、`plan`、`auto` 的行为以当前 Claude CLI 版本为准，并在版本升级时重新验收。
+- `manual`、`acceptEdits`、`bypassPermissions`、`dontAsk`、`plan`、`auto` 的行为以当前 Claude CLI 版本为准，并在版本升级时重新验收。
 
 **验收**
 
 - 每个模式都能在启动命令中准确出现。
-- 无效配置被规范化为 `default`。
+- 旧 `default` 和无效配置被规范化为安全的 `manual`。
 - IDE 不向 stdin 发送 `yes/no` 权限文本。
 
 ### P2.4 工具调用可视化

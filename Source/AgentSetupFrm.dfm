@@ -100,9 +100,9 @@ object AgentSetupForm: TAgentSetupForm
     Style = csDropDownList
     ItemIndex = 0
     TabOrder = 5
-    Text = 'default'
+    Text = 'manual'
     Items.Strings = (
-      'default'
+      'manual'
       'acceptEdits'
       'auto'
       'bypassPermissions'

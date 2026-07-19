@@ -183,7 +183,7 @@ Claude CLI 本身负责加载项目和用户范围的 Skill、Plugin、MCP 以�
 Claude CLI 的权限模型是 CLI 级别的 `--permission-mode`，不能用三个独立布尔值精确表达“读允许、写询问、执行拒绝”。因此配置使用单一 `PermissionMode`，取值限制为当前 CLI 支持的模式：
 
 ```text
-default | acceptEdits | auto | bypassPermissions | dontAsk | plan
+manual | acceptEdits | auto | bypassPermissions | dontAsk | plan
 ```
 
 IDE 不弹出一个发生在 tool event 之后的假确认框，也不向 JSONL 输入通道发送 `yes/no`。真实权限行为由 CLI 在工具执行前决定。

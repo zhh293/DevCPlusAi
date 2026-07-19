@@ -86,7 +86,7 @@ AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
 | `PanelWidth` | 面板宽度（像素） | `400` |
 | `FontSize` | 面板字体大小 | `10` |
 | `SendKey` | 发送快捷键 | `enter` |
-| `PermissionMode` | Claude CLI 原生权限模式 | `default` |
+| `PermissionMode` | Claude CLI 原生权限模式 | `manual` |
 | `McpConfigFiles` | 传给 `--mcp-config` 的配置文件路径，多个路径用 `;` 分隔 | 空 |
 | `PluginDirs` | 传给 `--plugin-dir` 的目录或 ZIP 路径，多个路径用 `;` 分隔 | 空 |
 | `SystemPrompt` | 系统提示词 | 空 |
