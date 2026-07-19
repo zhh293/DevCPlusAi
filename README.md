@@ -22,7 +22,7 @@ DevCPlusAi 在保留一个轻量、纯 Windows 原生 C/C++ IDE 的基础上，�
 
 * **项目级会话恢复。** Claude CLI 自己保存对话上下文，IDE 只按项目保存 `session_id`，重新打开项目时通过 `--resume` 恢复；CLI 意外退出时最多自动重启 3 次。
 
-* **附件与扩展能力。** 输入区支持选择文件、从 Windows 资源管理器拖放文件、粘贴剪贴板图片和发送 PNG/JPEG/GIF/WebP 图片内容；普通文件以路径附件交给 Claude 的文件工具读取。设置中可填写项目级 MCP 配置文件和 Plugin 目录，CLI 输出中的 system、hook、MCP、Plugin、Skill 相关事件会保留在面板中。
+* **附件与扩展能力。** 输入区支持选择文件、从 Windows 资源管理器拖放文件、粘贴剪贴板图片和发送 PNG/JPEG/GIF/WebP 图片内容；普通文件以路径附件交给 Claude 的文件工具读取。剪贴板图片使用唯一临时文件名，发送、移除、切换项目或关闭 IDE 时自动清理；用户手动选择的原文件不会被删除。设置中可填写项目级 MCP 配置文件和 Plugin 目录，CLI 输出中的 system、hook、MCP、Plugin、Skill 相关事件会保留在面板中。
 
 * **中文优先的交互体验。** 配置向导、面板与提示信息均提供中文界面，降低初学者的使用门槛。
 

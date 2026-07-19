@@ -66,6 +66,7 @@ type
     fContextText: String;
     fSendOnCtrlEnter: Boolean;
     fAttachments: TStringList;
+    fTemporaryAttachments: TStringList;
     fStreamingMessageId: String;
     fStreamingText: String;
     fStreamingActive: Boolean;
@@ -83,6 +84,8 @@ type
     function AttachmentSummary: String;
     function AddAttachment(const FileName: String): Boolean;
     procedure AddAttachmentList(Files: TStrings);
+    procedure RemoveAttachmentAt(Index: Integer);
+    procedure ClearAttachments;
     function SaveClipboardImage: String;
     procedure BeginResponseWait;
     procedure EndResponseWait;
@@ -136,6 +139,7 @@ begin
   fContextText := '';
   fSendOnCtrlEnter := False;
   fAttachments := TStringList.Create;
+  fTemporaryAttachments := TStringList.Create;
   fStreamingMessageId := '';
   fStreamingText := '';
   fStreamingActive := False;
@@ -146,8 +150,14 @@ begin
 end;
 
 destructor TAgentPanelFrame.Destroy;
+var
+  I: Integer;
 begin
   fWaitingForResponse := False;
+  if fTemporaryAttachments <> nil then
+    for I := 0 to fTemporaryAttachments.Count - 1 do
+      DeleteFile(fTemporaryAttachments[I]);
+  fTemporaryAttachments.Free;
   fAttachments.Free;
   inherited Destroy;
 end;
@@ -221,8 +231,7 @@ begin
   EndResponseWait;
   reChat.Clear;
   memoInput.Clear;
-  fAttachments.Clear;
-  lbAttachments.Items.Clear;
+  ClearAttachments;
   fContextText := '';
   ResetStreamingDisplay;
 end;
@@ -367,37 +376,83 @@ begin
   AddAttachmentList(Files);
 end;
 
+procedure TAgentPanelFrame.RemoveAttachmentAt(Index: Integer);
+var
+  TempIndex: Integer;
+  Path: String;
+begin
+  if (Index < 0) or (Index >= fAttachments.Count) then
+    Exit;
+  Path := fAttachments[Index];
+  TempIndex := fTemporaryAttachments.IndexOf(Path);
+  if TempIndex >= 0 then begin
+    DeleteFile(Path);
+    fTemporaryAttachments.Delete(TempIndex);
+  end;
+  fAttachments.Delete(Index);
+  lbAttachments.Items.Delete(Index);
+end;
+
+procedure TAgentPanelFrame.ClearAttachments;
+var
+  I: Integer;
+begin
+  for I := 0 to fTemporaryAttachments.Count - 1 do
+    DeleteFile(fTemporaryAttachments[I]);
+  fTemporaryAttachments.Clear;
+  fAttachments.Clear;
+  lbAttachments.Items.Clear;
+end;
+
 function TAgentPanelFrame.SaveClipboardImage: String;
 var
   Bitmap: TBitmap;
   JpegImage: TJPEGImage;
   TempPath: array[0..MAX_PATH] of Char;
+  TempFileName: array[0..MAX_PATH] of Char;
   TempDir: String;
+  TempPlaceholder: String;
   Format: Word;
 begin
   Result := '';
+  TempPlaceholder := '';
   if not Clipboard.HasFormat(CF_BITMAP) and not Clipboard.HasFormat(CF_DIB) then
     Exit;
   if GetTempPath(SizeOf(TempPath), TempPath) = 0 then
     Exit;
   TempDir := IncludeTrailingPathDelimiter(String(TempPath));
-  Result := TempDir + 'devcpp-agent-' + IntToStr(GetTickCount) + '.jpg';
-  Bitmap := TBitmap.Create;
-  JpegImage := TJPEGImage.Create;
-  try
-    if Clipboard.HasFormat(CF_BITMAP) then
-      Format := CF_BITMAP
-    else
-      Format := CF_DIB;
-    Bitmap.LoadFromClipboardFormat(Format, Clipboard.GetAsHandle(Format), 0);
-    JpegImage.Assign(Bitmap);
-    JpegImage.CompressionQuality := 90;
-    JpegImage.SaveToFile(Result);
-  except
+  if GetTempFileName(PChar(TempDir), 'dca', 0, TempFileName) = 0 then
+    Exit;
+  TempPlaceholder := String(TempFileName);
+  Result := ChangeFileExt(TempPlaceholder, '.jpg');
+  if FileExists(Result) then begin
+    DeleteFile(TempPlaceholder);
     Result := '';
+    Exit;
   end;
-  JpegImage.Free;
-  Bitmap.Free;
+  Bitmap := nil;
+  JpegImage := nil;
+  try
+    try
+      Bitmap := TBitmap.Create;
+      JpegImage := TJPEGImage.Create;
+      if Clipboard.HasFormat(CF_BITMAP) then
+        Format := CF_BITMAP
+      else
+        Format := CF_DIB;
+      Bitmap.LoadFromClipboardFormat(Format, Clipboard.GetAsHandle(Format), 0);
+      JpegImage.Assign(Bitmap);
+      JpegImage.CompressionQuality := 90;
+      JpegImage.SaveToFile(Result);
+    except
+      DeleteFile(Result);
+      Result := '';
+    end;
+  finally
+    DeleteFile(TempPlaceholder);
+    JpegImage.Free;
+    Bitmap.Free;
+  end;
 end;
 
 procedure TAgentPanelFrame.SetSendKey(const Value: String);
@@ -595,8 +650,7 @@ begin
   fAgentProcess.SendMessageWithAttachments(MessageText, fAttachments);
   fContextText := '';
   memoInput.Clear;
-  fAttachments.Clear;
-  lbAttachments.Items.Clear;
+  ClearAttachments;
   SetStatus(asThinking);
   BeginResponseWait;
 end;
@@ -645,8 +699,12 @@ begin
     AppendSystemMessage('The clipboard does not contain a supported image.');
     Exit;
   end;
-  if not AddAttachment(FileName) then
+  if AddAttachment(FileName) then
+    fTemporaryAttachments.Add(ExpandFileName(FileName))
+  else begin
+    DeleteFile(FileName);
     AppendSystemMessage('Could not add the clipboard image: ' + FileName);
+  end;
 end;
 
 procedure TAgentPanelFrame.btnRemoveAttachmentClick(Sender: TObject);
@@ -654,10 +712,8 @@ var
   I: Integer;
 begin
   for I := lbAttachments.Items.Count - 1 downto 0 do
-    if lbAttachments.Selected[I] then begin
-      fAttachments.Delete(I);
-      lbAttachments.Items.Delete(I);
-    end;
+    if lbAttachments.Selected[I] then
+      RemoveAttachmentAt(I);
 end;
 
 procedure TAgentPanelFrame.memoInputKeyDown(Sender: TObject; var Key: Word;
