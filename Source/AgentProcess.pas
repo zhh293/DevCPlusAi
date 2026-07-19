@@ -103,7 +103,7 @@ function BuildEnvironmentBlock(const WorkDir: String): PChar;
 implementation
 
 uses
-  Utils, devCFG;
+  Utils, devCFG, AgentPipeIO;
 
 type
   TCreateJobObjectFunc = function(lpJobAttributes: Pointer;
@@ -929,7 +929,7 @@ function TAgentProcess.SendMessageWithAttachments(const Text: String;
   Attachments: TStrings): Boolean;
 var
   Data: AnsiString;
-  BytesWritten, Offset, Remaining, ErrorCode: DWORD;
+  PipeError: String;
 begin
   Result := False;
   fLastError := '';
@@ -945,27 +945,12 @@ begin
   // attachments the content is an Anthropic-compatible content block array.
   Data := '{"type":"user","message":{"role":"user","content":' +
     BuildUserContentJson(Text, Attachments) + '}}' + #10;
-  Offset := 1;
-  Remaining := Length(Data);
-  while Remaining > 0 do begin
-    if not WriteFile(fInputWrite, Data[Offset], Remaining, BytesWritten, nil) then begin
-      ErrorCode := GetLastError;
-      fLastError := Format('Could not send the AI message: %s',
-        [SysErrorMessage(ErrorCode)]);
-      LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
-        fLastError);
-      Stop;
-      Exit;
-    end;
-    if BytesWritten = 0 then begin
-      fLastError := 'Could not send the AI message: the input pipe accepted no data.';
-      LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
-        fLastError);
-      Stop;
-      Exit;
-    end;
-    Inc(Offset, BytesWritten);
-    Dec(Remaining, BytesWritten);
+  if not WriteAgentPipeData(fInputWrite, Data, PipeError) then begin
+    fLastError := 'Could not send the AI message: ' + PipeError;
+    LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
+      fLastError);
+    Stop;
+    Exit;
   end;
   Result := True;
 end;

@@ -176,6 +176,13 @@ try {
         ('-U' + $SourceRoot)
     ) 'Compile AgentReader smoke test'
     Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentReaderSmoke.exe')
+    Invoke-NativeBuild $Dcc32Path @(
+        '-B',
+        'AgentPipeIOSmoke.dpr',
+        '-N.\dcu',
+        ('-U' + $SourceRoot)
+    ) 'Compile AgentPipeIO smoke test'
+    Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentPipeIOSmoke.exe')
 }
 finally {
     Pop-Location
