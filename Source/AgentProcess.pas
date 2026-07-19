@@ -70,14 +70,16 @@ type
     // restarting after an unexpected process exit.
     function Restart(const NewWorkDir: String): Boolean;
 
-  // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
-  procedure SendMessage(const Text: String);
+    // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
+    // Returns False and sets LastError if no complete JSONL record was sent.
+    function SendMessage(const Text: String): Boolean;
 
     // Send a user message whose content may contain local image resources.
     // Non-image attachments are sent as path references so Claude can read
     // them with its normal file tools instead of copying their contents into
     // the prompt.
-    procedure SendMessageWithAttachments(const Text: String; Attachments: TStrings);
+    function SendMessageWithAttachments(const Text: String;
+      Attachments: TStrings): Boolean;
 
     // Send an interrupt (Ctrl+C) to the child process group.
     procedure SendInterrupt;
@@ -918,20 +920,27 @@ begin
   Result := Start(NewWorkDir);
 end;
 
-procedure TAgentProcess.SendMessage(const Text: String);
+function TAgentProcess.SendMessage(const Text: String): Boolean;
 begin
-  SendMessageWithAttachments(Text, nil);
+  Result := SendMessageWithAttachments(Text, nil);
 end;
 
-procedure TAgentProcess.SendMessageWithAttachments(const Text: String;
-  Attachments: TStrings);
+function TAgentProcess.SendMessageWithAttachments(const Text: String;
+  Attachments: TStrings): Boolean;
 var
   Data: AnsiString;
-  BytesWritten, Offset, Remaining: DWORD;
+  BytesWritten, Offset, Remaining, ErrorCode: DWORD;
 begin
-  if not fRunning or (fInputWrite = 0) or
-     ((Text = '') and ((Attachments = nil) or (Attachments.Count = 0))) then
+  Result := False;
+  fLastError := '';
+  if not fRunning or (fInputWrite = 0) then begin
+    fLastError := 'The AI process is not ready to receive messages.';
     Exit;
+  end;
+  if (Text = '') and ((Attachments = nil) or (Attachments.Count = 0)) then begin
+    fLastError := 'Cannot send an empty AI message.';
+    Exit;
+  end;
   // Claude Code's headless streaming mode consumes JSONL user messages. With
   // attachments the content is an Anthropic-compatible content block array.
   Data := '{"type":"user","message":{"role":"user","content":' +
@@ -939,13 +948,26 @@ begin
   Offset := 1;
   Remaining := Length(Data);
   while Remaining > 0 do begin
-    if not WriteFile(fInputWrite, Data[Offset], Remaining, BytesWritten, nil) then
-      Break;
-    if BytesWritten = 0 then
-      Break;
+    if not WriteFile(fInputWrite, Data[Offset], Remaining, BytesWritten, nil) then begin
+      ErrorCode := GetLastError;
+      fLastError := Format('Could not send the AI message: %s',
+        [SysErrorMessage(ErrorCode)]);
+      LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
+        fLastError);
+      Stop;
+      Exit;
+    end;
+    if BytesWritten = 0 then begin
+      fLastError := 'Could not send the AI message: the input pipe accepted no data.';
+      LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
+        fLastError);
+      Stop;
+      Exit;
+    end;
     Inc(Offset, BytesWritten);
     Dec(Remaining, BytesWritten);
   end;
+  Result := True;
 end;
 
 procedure TAgentProcess.SendInterrupt;

@@ -91,7 +91,7 @@ AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
 | `PluginDirs` | 传给 `--plugin-dir` 的目录或 ZIP 路径，多个路径用 `;` 分隔 | 空 |
 | `SystemPrompt` | 追加系统提示词；以无 BOM UTF-8 临时文件传给 CLI，并在子进程结束后删除 | 空 |
 
-配置随 IDE 设置一并保存，下次启动自动加载。项目会话目录只保存 Claude 的 `session_id`，不保存完整聊天内容；API Key 写入配置前会通过 Windows DPAPI 加密。每次发送后由独立主线程定时器等待首个有效 assistant/tool/result 事件；60 秒内无响应时会中断本次请求并显示英文错误提示。
+配置随 IDE 设置一并保存，下次启动自动加载。项目会话目录只保存 Claude 的 `session_id`，不保存完整聊天内容；API Key 写入配置前会通过 Windows DPAPI 加密。消息只有在完整写入 CLI 的 JSONL 输入管道后才会显示为已发送；写入失败会立即显示英文错误并重启异常子进程。每次成功发送后由独立主线程定时器等待首个有效 assistant/tool/result 事件；60 秒内无响应时会中断本次请求并显示英文错误提示。
 
 ---
 

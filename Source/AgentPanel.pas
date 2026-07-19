@@ -646,8 +646,12 @@ begin
     DisplayText := '(attachment)';
   if AttachmentSummary <> '' then
     DisplayText := DisplayText + #13#10 + AttachmentSummary;
+  if not fAgentProcess.SendMessageWithAttachments(MessageText, fAttachments) then begin
+    AppendSystemMessage(fAgentProcess.LastError);
+    SetStatus(asError);
+    Exit;
+  end;
   AppendUserMessage(DisplayText);
-  fAgentProcess.SendMessageWithAttachments(MessageText, fAttachments);
   fContextText := '';
   memoInput.Clear;
   ClearAttachments;
