@@ -14,7 +14,7 @@ object AgentPanelFrame: TAgentPanelFrame
     Align = alBottom
     Panels = <
       item
-        Text = '[OFF] '#26410#36830#25509
+        Text = '[OFF] Disconnected'
         Width = 150
       end
       item
@@ -27,10 +27,10 @@ object AgentPanelFrame: TAgentPanelFrame
     Width = 400
     Height = 471
     Align = alClient
-    Font.Charset = GB2312_CHARSET
+    Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
     Font.Height = -13
-    Font.Name = 'Microsoft YaHei'
+    Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
     ReadOnly = True
@@ -69,7 +69,7 @@ object AgentPanelFrame: TAgentPanelFrame
           Width = 74
           Height = 28
           Align = alLeft
-          Caption = #28155#21152#25991#20214
+          Caption = 'Add file'
           TabOrder = 0
           OnClick = btnAttachClick
         end
@@ -79,7 +79,7 @@ object AgentPanelFrame: TAgentPanelFrame
           Width = 82
           Height = 28
           Align = alLeft
-          Caption = #31896#36148#22270#29255
+          Caption = 'Paste image'
           TabOrder = 1
           OnClick = btnPasteImageClick
         end
@@ -89,7 +89,7 @@ object AgentPanelFrame: TAgentPanelFrame
           Width = 70
           Height = 28
           Align = alRight
-          Caption = #31227#38500
+          Caption = 'Remove'
           TabOrder = 2
           OnClick = btnRemoveAttachmentClick
         end
@@ -111,7 +111,7 @@ object AgentPanelFrame: TAgentPanelFrame
       Width = 80
       Height = 150
       Align = alRight
-      Caption = #21457#36865
+      Caption = 'Send'
       Default = True
       TabOrder = 3
       OnClick = btnSendClick
@@ -122,7 +122,7 @@ object AgentPanelFrame: TAgentPanelFrame
       Width = 80
       Height = 150
       Align = alRight
-      Caption = #20013#26029
+      Caption = 'Stop'
       TabOrder = 4
       Visible = False
       OnClick = btnStopClick
@@ -133,10 +133,10 @@ object AgentPanelFrame: TAgentPanelFrame
       Width = 240
       Height = 110
       Align = alClient
-      Font.Charset = GB2312_CHARSET
+      Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
-      Font.Name = 'Microsoft YaHei'
+      Font.Name = 'Segoe UI'
       Font.Style = []
       ParentFont = False
       ScrollBars = ssVertical

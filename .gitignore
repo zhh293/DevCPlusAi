@@ -37,6 +37,7 @@
 *.tds
 *.dcu
 /Source/manifest.RES
+/Source/spin.RES
 /Source/Tests/AgentProtocolSmoke.exe
 *.lib
 *.ddp

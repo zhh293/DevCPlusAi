@@ -187,6 +187,9 @@ tools\build-windows.cmd
 
 如果 Delphi 的完整 `Lib` 不在默认安装目录，可通过
 `-DelphiLibPath <目录>` 指定包含 `Spin.dcu` 的目录。
+精简安装的 Delphi 7 可能只有 `Spin.dcu` 而缺少配套的 `SPIN.RES`；构建脚本
+会从仓库内的兼容位图资源自动生成该文件。仓库不分发 Delphi 自带的 DCU，
+因此全新构建环境仍需安装完整 Delphi 7 库，或显式指定合法的 `Spin.dcu` 来源。
 
 构建后可检查无编译器安装包所需资源及锁定的 Agent 运行时版本：
 

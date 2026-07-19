@@ -94,21 +94,23 @@ begin
   Font.Name := devData.InterfaceFont;
   Font.Size := devData.InterfaceFontSize;
 
-  Caption := 'AI 助手配置向导';
-  lblTitle.Caption := '欢迎使用 AI 助手！请先完成基础配置。';
-  rgProvider.Caption := '服务商';
-  lblApiKey.Caption := 'API Key：';
-  lblBaseUrl.Caption := '自定义端点（Base URL）：';
-  lblModel.Caption := '模型：';
-  lblPermissionMode.Caption := 'CLI 权限模式：';
-  lblMcpConfig.Caption := 'MCP 配置文件（多个路径用 ; 分隔）：';
-  lblPluginDirs.Caption := 'Plugin 目录或 ZIP（多个路径用 ; 分隔）：';
-  lblSkillInfo.Caption := 'Skill：Claude 会自动读取项目 .claude\skills，以及已加载插件中的 Skill。';
-  btnValidate.Caption := '验证';
-  lblHelp.Caption := '如何获取 API Key？';
+  // Delphi 7 treats source literals as the active ANSI code page. Keep all
+  // runtime UI text ASCII-only so the dialog renders consistently everywhere.
+  Caption := 'AI Assistant Setup';
+  lblTitle.Caption := 'Welcome! Complete the basic AI configuration.';
+  rgProvider.Caption := 'Provider';
+  lblApiKey.Caption := 'API Key:';
+  lblBaseUrl.Caption := 'Custom endpoint (Base URL):';
+  lblModel.Caption := 'Model:';
+  lblPermissionMode.Caption := 'CLI permission mode:';
+  lblMcpConfig.Caption := 'MCP config files (semicolon separated):';
+  lblPluginDirs.Caption := 'Plugin dirs or ZIP files (semicolon separated):';
+  lblSkillInfo.Caption := 'Skills are loaded from project .claude\skills and active plugins.';
+  btnValidate.Caption := 'Validate';
+  lblHelp.Caption := 'How to get an API key?';
   lblStatus.Caption := '';
-  btnOK.Caption := '确定';
-  btnSkip.Caption := '跳过';
+  btnOK.Caption := 'OK';
+  btnSkip.Caption := 'Skip';
 end;
 
 function TAgentSetupForm.ProviderId: String;
@@ -208,7 +210,7 @@ var
   OldMcpConfigFiles, OldPluginDirs: String;
 begin
   lblStatus.Font.Color := clNavy;
-  lblStatus.Caption := '正在检测 CLI...';
+  lblStatus.Caption := 'Checking the CLI...';
   Update;
 
   // Validate the values currently visible in the dialog, without mutating the
@@ -244,10 +246,10 @@ begin
     if proc.Start(ExtractFilePath(ParamStr(0))) then begin
       proc.Stop;
       lblStatus.Font.Color := clGreen;
-      lblStatus.Caption := '[OK] CLI 可启动（未验证网络）';
+      lblStatus.Caption := '[OK] CLI started (network not tested)';
     end else begin
       lblStatus.Font.Color := clRed;
-      lblStatus.Caption := '[ERR] 无法启动 CLI：' + proc.LastError;
+      lblStatus.Caption := '[ERR] Could not start CLI: ' + proc.LastError;
     end;
   finally
     proc.Free;
@@ -267,14 +269,14 @@ procedure TAgentSetupForm.btnOKClick(Sender: TObject);
 begin
   if Trim(edtApiKey.Text) = '' then begin
     lblStatus.Font.Color := clRed;
-    lblStatus.Caption := '请填写 API Key，或点击「跳过」。';
+    lblStatus.Caption := 'Enter an API Key, or click Skip.';
     edtApiKey.SetFocus;
     Exit;
   end;
   if (rgProvider.ItemIndex <> PROVIDER_ANTHROPIC) and
      (Trim(edtBaseUrl.Text) = '') then begin
     lblStatus.Font.Color := clRed;
-    lblStatus.Caption := '该服务商需要填写兼容 Anthropic API 的 Base URL。';
+    lblStatus.Caption := 'This provider requires an Anthropic-compatible Base URL.';
     edtBaseUrl.SetFocus;
     Exit;
   end;

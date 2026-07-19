@@ -1,0 +1,3 @@
+// Delphi 7 compact installs can provide Spin.dcu without SPIN.RES.
+SPINUP BITMAP DISCARDABLE "spinup.bmp"
+SPINDOWN BITMAP DISCARDABLE "spindown.bmp"

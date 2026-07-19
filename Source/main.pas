@@ -9156,7 +9156,7 @@ begin
   // Create the toggle action and add a View menu item for it.
   fActAIAssistant := TAction.Create(Self);
   fActAIAssistant.ActionList := ActionList;
-  fActAIAssistant.Caption := 'AI 助手';
+  fActAIAssistant.Caption := 'AI Assistant';
   fActAIAssistant.ShortCut := ShortCut(Word('A'), [ssCtrl, ssShift]);
   fActAIAssistant.OnExecute := ActAIAssistantExecute;
 
@@ -9166,7 +9166,7 @@ begin
 
   fActAIFocus := TAction.Create(Self);
   fActAIFocus.ActionList := ActionList;
-  fActAIFocus.Caption := '聚焦 AI 输入框';
+  fActAIFocus.Caption := 'Focus AI Input';
   fActAIFocus.ShortCut := ShortCut(Ord('L'), [ssCtrl]);
   fActAIFocus.OnExecute := AgentFocusExecute;
 
@@ -9174,7 +9174,7 @@ begin
   // provider, model, endpoint, or API key after initial setup.
   fActAISettings := TAction.Create(Self);
   fActAISettings.ActionList := ActionList;
-  fActAISettings.Caption := 'AI 设置...';
+  fActAISettings.Caption := 'AI Settings...';
   fActAISettings.OnExecute := AgentSettingsExecute;
   mi := TMenuItem.Create(Self);
   mi.Action := fActAISettings;
@@ -9190,10 +9190,10 @@ begin
     fAgentSelectionActions[I].Tag := I;
     fAgentSelectionActions[I].OnExecute := AgentSelectionActionExecute;
   end;
-  fAgentSelectionActions[0].Caption := 'AI：解释选中代码';
-  fAgentSelectionActions[1].Caption := 'AI：修复选中代码';
-  fAgentSelectionActions[2].Caption := 'AI：优化选中代码';
-  fAgentSelectionActions[3].Caption := 'AI：为选中代码添加注释';
+  fAgentSelectionActions[0].Caption := 'AI: Explain Selected Code';
+  fAgentSelectionActions[1].Caption := 'AI: Fix Selected Code';
+  fAgentSelectionActions[2].Caption := 'AI: Improve Selected Code';
+  fAgentSelectionActions[3].Caption := 'AI: Comment Selected Code';
   for I := 0 to 3 do begin
     mi := TMenuItem.Create(Self);
     mi.Action := fAgentSelectionActions[I];
@@ -9238,10 +9238,10 @@ end;
 procedure TMainForm.AgentSelectionActionExecute(Sender: TObject);
 const
   Prompts: array[0..3] of String = (
-    '请解释下面选中的 C/C++ 代码，说明它的作用、关键步骤和可能的问题。',
-    '请检查下面选中的 C/C++ 代码并修复问题，给出修改建议或直接修改项目文件。',
-    '请优化下面选中的 C/C++ 代码，重点关注可读性、正确性和初学者容易理解的写法。',
-    '请为下面选中的 C/C++ 代码添加清晰、适合初学者阅读的注释。');
+    'Explain the selected C/C++ code, including its purpose, key steps, and possible issues.',
+    'Review and fix the selected C/C++ code. Suggest changes or edit the project files directly.',
+    'Improve the selected C/C++ code for readability, correctness, and beginner-friendly style.',
+    'Add clear, beginner-friendly comments to the selected C/C++ code.');
 var
   E: TEditor;
   Selection, Prompt: AnsiString;
@@ -9249,17 +9249,17 @@ var
 begin
   E := fEditorList.GetEditor;
   if not Assigned(E) or not E.Text.SelAvail then begin
-    MessageDlg('请先在编辑器中选中一段代码。', mtInformation, [mbOK], 0);
+    MessageDlg('Select some code in the editor first.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
   Selection := E.Text.SelText;
   if Length(Selection) > 16000 then
-    Selection := Copy(Selection, 1, 16000) + #13#10 + '[选中内容过长，已截断]';
+    Selection := Copy(Selection, 1, 16000) + #13#10 + '[Selection truncated]';
   ActionIndex := TAction(Sender).Tag;
   Prompt := Prompts[ActionIndex] + #13#10#13#10 +
-    '文件：' + E.FileName + #13#10 +
-    '选中代码：' + #13#10 + Selection;
+    'File: ' + E.FileName + #13#10 +
+    'Selected code:' + #13#10 + Selection;
 
   fAgentPanel.Visible := True;
   fAgentSplitter.Visible := True;
@@ -9384,7 +9384,7 @@ begin
   if not Assigned(E) then
     Exit;
   if E.Text.Modified then begin
-    fAgentPanelFrame.AppendSystemMessage('文件有未保存的本地修改，已跳过自动刷新：' + Path);
+    fAgentPanelFrame.AppendSystemMessage('Skipped auto-refresh because the file has unsaved changes: ' + Path);
     Exit;
   end;
 
@@ -9419,13 +9419,13 @@ begin
         CompilerOutput.Items[I].Caption + ':' +
         CompilerOutput.Items[I].SubItems[0] + ' ' + MessageText + #13#10;
       if Length(Context) >= 12000 then begin
-        Context := Copy(Context, 1, 12000) + '[编译上下文过长，已截断]' + #13#10;
+        Context := Copy(Context, 1, 12000) + '[Build context truncated]' + #13#10;
         Break;
       end;
     end;
   end;
   if Context <> '' then
-    fAgentPanelFrame.SetContext('最近一次编译错误/警告：' + #13#10 + Context)
+    fAgentPanelFrame.SetContext('Latest build errors/warnings:' + #13#10 + Context)
   else
     fAgentPanelFrame.SetContext('');
 end;
@@ -9477,7 +9477,7 @@ begin
 
   if not fAgentProcess.Start(workDir) then begin
     fAgentPanelFrame.SetStatus(asError);
-    fAgentPanelFrame.AppendSystemMessage('启动 AI 失败：' + fAgentProcess.LastError);
+    fAgentPanelFrame.AppendSystemMessage('Could not start AI: ' + fAgentProcess.LastError);
     Exit;
   end;
 
@@ -9620,7 +9620,7 @@ begin
     // Synchronize callback because the reader thread is waiting for it.
     fAgentIgnoreSavedSession := True;
     if Assigned(fAgentPanelFrame) then
-      fAgentPanelFrame.AppendSystemMessage('Claude 会话已无法恢复，正在创建新会话。');
+      fAgentPanelFrame.AppendSystemMessage('The Claude session could not be resumed; starting a new session.');
   end;
   if Assigned(fAgentPanelFrame) then
     fAgentPanelFrame.SetStatus(asDisconnected);
@@ -9631,7 +9631,7 @@ begin
       fAgentRestartTimer.Enabled := True;
     end;
   end else if Assigned(fAgentPanelFrame) then
-    fAgentPanelFrame.AppendSystemMessage('AI 进程已退出，已停止自动重试，请检查 CLI、网络和 API Key。');
+    fAgentPanelFrame.AppendSystemMessage('The AI process exited. Automatic retries stopped; check the CLI, network, and API Key.');
 end;
 
 procedure TMainForm.AgentRestartTimerTick(Sender: TObject);
@@ -9649,7 +9649,7 @@ begin
       fAgentRestartTimer.Interval := 1000 * fAgentRestartAttempts;
       fAgentRestartTimer.Enabled := True
     end else if Assigned(fAgentPanelFrame) then
-      fAgentPanelFrame.AppendSystemMessage('AI 进程启动失败，已停止自动重试，请检查 CLI、网络和 API Key。');
+      fAgentPanelFrame.AppendSystemMessage('The AI process failed to start. Automatic retries stopped; check the CLI, network, and API Key.');
   end;
 end;
 

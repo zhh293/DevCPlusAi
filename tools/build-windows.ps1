@@ -103,12 +103,18 @@ if ($DelphiLibPath) {
     $libCandidates += $DelphiLibPath
 }
 $libCandidates += (Join-Path (Split-Path -Parent $DelphiBinPath) 'Lib')
+# Reuse a previously generated local DCU directory when a compact Delphi 7
+# installation omits optional units such as Spin.dcu.
+$libCandidates += (Join-Path $SourceRoot 'dcu')
 # Some Delphi 7 installations keep the complete library on mounted media.
 $libCandidates += 'F:\program files\Borland\Delphi7\Lib'
 
 $DelphiLibPath = $null
 foreach ($candidate in $libCandidates) {
-    if ($candidate -and (Test-Path -LiteralPath (Join-Path $candidate 'Spin.dcu') -PathType Leaf)) {
+    # Join-Path throws when an optional candidate points at an unmounted drive.
+    if ($candidate -and
+        (Test-Path -LiteralPath $candidate -PathType Container) -and
+        (Test-Path -LiteralPath (Join-Path $candidate 'Spin.dcu') -PathType Leaf)) {
         $DelphiLibPath = (Resolve-Path -LiteralPath $candidate).Path
         break
     }
@@ -128,10 +134,17 @@ $mainUnitPaths = @(
     $DelphiLibPath
 )
 
+$spinUpBmp = Join-Path $SourceRoot 'spinup.bmp'
+$spinDownBmp = Join-Path $SourceRoot 'spindown.bmp'
 Push-Location $SourceRoot
 try {
     New-Item -ItemType Directory -Force -Path 'dcu' | Out-Null
     Invoke-NativeBuild $Brcc32Path @('manifest.rc') 'Compile application manifest'
+    [IO.File]::WriteAllBytes($spinUpBmp,
+        [Convert]::FromBase64String((Get-Content -Raw -LiteralPath 'spinup.bmp.b64').Trim()))
+    [IO.File]::WriteAllBytes($spinDownBmp,
+        [Convert]::FromBase64String((Get-Content -Raw -LiteralPath 'spindown.bmp.b64').Trim()))
+    Invoke-NativeBuild $Brcc32Path @('spin.rc') 'Compile Spin resources'
     Invoke-NativeBuild $Dcc32Path @(
         '-B',
         'devcpp.dpr',
@@ -141,6 +154,7 @@ try {
     Copy-Item -LiteralPath 'devcpp.exe' -Destination (Join-Path $RepoRoot 'devcpp.exe') -Force
 }
 finally {
+    Remove-Item -LiteralPath $spinUpBmp, $spinDownBmp -Force -ErrorAction SilentlyContinue
     Pop-Location
 }
 

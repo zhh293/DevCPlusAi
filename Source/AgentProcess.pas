@@ -358,21 +358,21 @@ begin
   if Trim(Text) <> '' then
     AddBlock('{"type":"text","text":' + JsonQuoteUtf8(Text) + '}')
   else
-    AddBlock('{"type":"text","text":"请处理以下附件。"}');
+    AddBlock('{"type":"text","text":"Please process the following attachments."}');
 
   for I := 0 to Attachments.Count - 1 do begin
     Path := Attachments[I];
     if ReadImageBase64(Path, MimeType, ImageData) then begin
       AddBlock('{"type":"text","text":' +
-        JsonQuoteUtf8('[IDE 图片附件] ' + Path) + '}');
+        JsonQuoteUtf8('[IDE image attachment] ' + Path) + '}');
       AddBlock('{"type":"image","source":{"type":"base64","media_type":' +
         JsonQuoteUtf8(MimeType) + ',"data":' + JsonQuoteUtf8(ImageData) + '}}');
     end else begin
       // The path is intentionally kept as a normal text block. Claude can
       // decide whether to read it with Read/Glob/Bash under its permissions.
       AddBlock('{"type":"text","text":' + JsonQuoteUtf8(
-        '[IDE 文件附件]' + #13#10 + '路径：' + Path + #13#10 +
-        '请使用 Claude 的文件工具读取它。') + '}');
+        '[IDE file attachment]' + #13#10 + 'Path: ' + Path + #13#10 +
+        'Use Claude file tools to read it.') + '}');
     end;
   end;
   Result := Result + ']';

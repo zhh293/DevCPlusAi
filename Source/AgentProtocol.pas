@@ -551,9 +551,9 @@ begin
   TaskId := GetStr(Node, 'task_id');
 
   if SameText(Name, 'init') then begin
-    Result := 'Claude 会话已初始化';
+    Result := 'Claude session initialized';
     if Event.Model <> '' then
-      Result := Result + '（模型：' + Event.Model + '）';
+      Result := Result + ' (model: ' + Event.Model + ')';
   end
   else if Pos('hook_', LowerCase(Name)) = 1 then begin
     Result := 'Hook ' + Name;
@@ -563,21 +563,21 @@ begin
       Result := Result + ': ' + GetStr(Node, 'hook_name');
   end else if (Name = 'task_started') or (Name = 'task_progress') or
               (Name = 'task_notification') then begin
-    Result := '子任务 ' + Name;
+    Result := 'Task ' + Name;
     if TaskId <> '' then
       Result := Result + ': ' + TaskId;
   end else if Name = 'compact_boundary' then
-    Result := 'Claude 已压缩上下文'
+    Result := 'Claude compressed the context'
   else if Name = 'stop_hook_summary' then
-    Result := 'Hook 执行汇总'
+    Result := 'Hook execution summary'
   else if Name = 'status' then
-    Result := 'Claude 状态：' + GetStr(Node, 'status')
+    Result := 'Claude status: ' + GetStr(Node, 'status')
   else if Name <> '' then
     Result := Name
   else if ToolName <> '' then
     Result := ToolName
   else
-    Result := 'Claude 系统事件';
+    Result := 'Claude system event';
 end;
 
 procedure ParseStreamEvent(Node: TlkJSONbase; var Events: TAgentEventArray);
@@ -608,7 +608,7 @@ begin
     FillMessageMetadata(MessageNode, Base);
     GStreamMessageId := Base.MessageId;
     Event := Base;
-    Event.Summary := '消息开始';
+    Event.Summary := 'Message started';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
@@ -629,7 +629,7 @@ begin
     end else begin
       Event := Base;
       Event.ContentType := BlockType;
-      Event.Summary := '内容块开始：' + BlockType;
+      Event.Summary := 'Content block started: ' + BlockType;
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -673,7 +673,7 @@ begin
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end else begin
-      Event.Summary := '流式增量：' + DeltaType;
+      Event.Summary := 'Stream delta: ' + DeltaType;
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -696,7 +696,7 @@ begin
       RemoveToolInput(State);
     end else begin
       Event := Base;
-      Event.Summary := '内容块结束';
+      Event.Summary := 'Content block stopped';
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -711,7 +711,7 @@ begin
     if UsageNode = nil then
       UsageNode := GetObj(DeltaNode, 'usage');
     Event.Usage := GetJSONText(UsageNode);
-    Event.Summary := '消息增量结束';
+    Event.Summary := 'Message delta finished';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
@@ -719,14 +719,14 @@ begin
 
   if NestedType = 'message_stop' then begin
     Event := Base;
-    Event.Summary := '消息结束';
+    Event.Summary := 'Message stopped';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
   end;
 
   Event := Base;
-  Event.Summary := '未识别的流式事件：' + NestedType;
+  Event.Summary := 'Unknown stream event: ' + NestedType;
   Event.Content := GetJSONText(Nested);
   AppendEvent(Events, Event);
 end;
@@ -777,16 +777,16 @@ begin
   Event.Content := GetContentText(ResultNode);
   Event.IsError := Event.IsError or ((Event.Subtype <> '') and
     not SameText(Event.Subtype, 'success'));
-  Event.Summary := '本轮结束';
+  Event.Summary := 'Turn finished';
   if Event.Subtype <> '' then
-    Event.Summary := Event.Summary + '：' + Event.Subtype;
+    Event.Summary := Event.Summary + ': ' + Event.Subtype;
   if Event.DurationMs <> '' then
-    Event.Summary := Event.Summary + '，耗时 ' + Event.DurationMs + ' ms';
+    Event.Summary := Event.Summary + ', duration ' + Event.DurationMs + ' ms';
   if Event.CostUSD <> '' then
-    Event.Summary := Event.Summary + '，费用 $' + Event.CostUSD;
+    Event.Summary := Event.Summary + ', cost $' + Event.CostUSD;
   if (Event.PermissionDenials <> '') and
      (Event.PermissionDenials <> '[]') then
-    Event.Summary := Event.Summary + '，存在权限拒绝';
+    Event.Summary := Event.Summary + ', permission denied';
   AppendEvent(Events, Event);
 end;
 
@@ -932,18 +932,18 @@ begin
     else if LowerType = 'error' then
       ParseErrorEvent(JS, Events)
     else if LowerType = 'tool_progress' then
-      ParseGenericEvent(JS, aetProgress, '工具执行进度', Events)
+      ParseGenericEvent(JS, aetProgress, 'Tool progress', Events)
     else if LowerType = 'rate_limit_event' then
-      ParseGenericEvent(JS, aetRateLimit, 'Claude 限流状态', Events)
+      ParseGenericEvent(JS, aetRateLimit, 'Claude rate limit status', Events)
     else if LowerType = 'prompt_suggestion' then
-      ParseGenericEvent(JS, aetPromptSuggestion, 'Claude 建议', Events)
+      ParseGenericEvent(JS, aetPromptSuggestion, 'Claude suggestion', Events)
     else if IsSystemLikeType(TypeName) then
       ParseSystemEvent(JS, Events)
     else begin
       InitEvent(Event, Line);
       Event.TopLevelType := TypeName;
       Event.Content := Line;
-      Event.Summary := '未识别的 Claude 事件：' + TypeName;
+      Event.Summary := 'Unknown Claude event: ' + TypeName;
       AppendEvent(Events, Event);
     end;
 
