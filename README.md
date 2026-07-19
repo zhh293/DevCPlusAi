@@ -211,6 +211,8 @@ tools\package-self-extracting.cmd -Version dev
 
 双击生成的 `DevCPlusAi-<版本>-windows-no-compiler-self-extracting.exe` 后选择目录即可解压运行，不需要管理员权限。它是便携分发形式，不会创建开始菜单快捷方式或卸载项；需要这些系统集成功能时仍应使用 NSIS 安装包。构建脚本会附带并校验 `7-ZIP-LICENSE.txt`，同时对 SFX 内全部文件执行完整性测试。
 
+上述两个便携产物都是**无编译器版**：AI 助手和编辑器可以直接运行，但编译 C/C++ 前仍需另行安装并在 IDE 中配置兼容的 GCC/MinGW 工具链。本地 `dev` 构建没有商业代码签名证书，Windows 可能显示 SmartScreen 提示；正式公开分发应使用可信证书签名，并同时发布脚本输出的 SHA-256。不要为了运行未签名构建而全局关闭 Windows 安全功能。
+
 脚本会核对关键文件的 SHA-256；如果本机装有 7-Zip，还会对 ZIP 中的全部
 条目执行 CRC 完整性测试。包内的 `BUILD-INFO.txt` 会记录源码提交、工作区
 状态、运行时版本以及四个可执行文件的 SHA-256。
