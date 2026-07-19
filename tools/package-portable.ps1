@@ -51,6 +51,42 @@ foreach ($optionalDirectory in @('AStyle', 'ResEd')) {
     }
 }
 
+$gitCommand = Get-Command 'git.exe' -ErrorAction SilentlyContinue
+$sourceCommit = 'unknown'
+$sourceDirty = 'unknown'
+if ($gitCommand) {
+    $sourceCommitOutput = & $gitCommand.Source -C $RepoRoot rev-parse HEAD 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $sourceCommit = ($sourceCommitOutput | Out-String).Trim()
+        $dirtyOutput = & $gitCommand.Source -C $RepoRoot status --porcelain 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            if ($dirtyOutput) {
+                $sourceDirty = 'true'
+            } else {
+                $sourceDirty = 'false'
+            }
+        }
+    }
+}
+
+$buildInfo = New-Object System.Collections.Generic.List[string]
+$buildInfo.Add('DevCPlusAi portable build')
+$buildInfo.Add("Package-Version: $Version")
+$buildInfo.Add("Source-Commit: $sourceCommit")
+$buildInfo.Add("Source-Dirty: $sourceDirty")
+$buildInfo.Add("Generated-UTC: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
+$buildInfo.Add('')
+$buildInfo.Add('Component SHA256:')
+foreach ($component in @('devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe')) {
+    $componentPath = Join-Path $packageRoot $component
+    $componentHash = (Get-FileHash -LiteralPath $componentPath -Algorithm SHA256).Hash
+    $buildInfo.Add("$componentHash  $component")
+}
+$buildInfo.Add('')
+$buildInfo.Add('Runtime versions:')
+$buildInfo.AddRange([string[]](Get-Content -LiteralPath (Join-Path $packageRoot 'AGENT-RUNTIME-VERSIONS.txt')))
+$buildInfo | Set-Content -LiteralPath (Join-Path $packageRoot 'BUILD-INFO.txt') -Encoding UTF8
+
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
@@ -80,7 +116,8 @@ try {
         'ConsolePauser.exe',
         'nodejs/node.exe',
         'claude-cli/bin/claude.exe',
-        'AGENT-RUNTIME-VERSIONS.txt'
+        'AGENT-RUNTIME-VERSIONS.txt',
+        'BUILD-INFO.txt'
     )) {
         if (-not $archiveEntries.ContainsKey($requiredEntry)) {
             throw "Portable archive is missing: $requiredEntry"
