@@ -108,6 +108,31 @@ finally {
     $archive.Dispose()
 }
 
+$sevenZip = Get-Command '7z.exe' -ErrorAction SilentlyContinue
+if (-not $sevenZip) {
+    foreach ($candidate in @(
+        'C:\Program Files\7-Zip\7z.exe',
+        'C:\Program Files (x86)\7-Zip\7z.exe'
+    )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $sevenZip = Get-Item -LiteralPath $candidate
+            break
+        }
+    }
+}
+if ($sevenZip) {
+    Write-Host 'Testing every archive entry with 7-Zip...'
+    if ($sevenZip -is [System.IO.FileInfo]) {
+        $sevenZipPath = $sevenZip.FullName
+    } else {
+        $sevenZipPath = $sevenZip.Source
+    }
+    & $sevenZipPath 't' '-bso0' '-bsp0' $zipPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "7-Zip archive test failed with exit code $LASTEXITCODE"
+    }
+}
+
 $zip = Get-Item -LiteralPath $zipPath
 $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
 Write-Host ("Portable package: {0}" -f $zip.FullName)

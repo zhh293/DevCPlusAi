@@ -200,6 +200,9 @@ tools\verify-release.cmd -PackageType NoCompiler
 tools\package-portable.cmd -Version dev
 ```
 
+脚本会核对关键文件的 SHA-256；如果本机装有 7-Zip，还会对 ZIP 中的全部
+条目执行 CRC 完整性测试。
+
 一键脚本会同时生成 NSIS 依赖的 `Packman.exe`、`PackMaker.exe` 和
 `ConsolePauser.exe`；后者使用当前 `PATH` 中的 `g++.exe` 静态编译。
 
