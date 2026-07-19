@@ -90,6 +90,48 @@ function Invoke-VersionCheck {
     }
 }
 
+function Invoke-ClaudeArgumentSmoke {
+    param(
+        [string]$FileName,
+        [string]$Arguments,
+        [string]$Label
+    )
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $FileName
+    $startInfo.Arguments = $Arguments
+    $startInfo.WorkingDirectory = $RepoRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            $failures.Add("Claude CLI $Label smoke test did not start.")
+            return
+        }
+        $process.StandardInput.Close()
+        if (-not $process.WaitForExit(15000)) {
+            $process.Kill()
+            $process.WaitForExit()
+            $failures.Add("Claude CLI $Label smoke test timed out.")
+            return
+        }
+        $stderr = $process.StandardError.ReadToEnd().Trim()
+        if ($process.ExitCode -ne 0) {
+            $failures.Add("Claude CLI rejected $Label AgentProcess arguments: $stderr")
+        } else {
+            Write-Host "Claude CLI $Label arguments accepted."
+        }
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-ClaudeCompatibilityCheck {
     param([string]$RelativePath)
 
@@ -139,39 +181,27 @@ function Invoke-ClaudeCompatibilityCheck {
     # No user prompt is sent and therefore this does not make an API request.
     $promptFile = [System.IO.Path]::GetTempFileName()
     [System.IO.File]::WriteAllText($promptFile, 'verify')
-    $process = $null
+    $launcherFile = Join-Path ([System.IO.Path]::GetTempPath()) (
+        'devcpp-claude-launcher-' + [Guid]::NewGuid().ToString('N') + '.cmd'
+    )
     try {
-        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $startInfo.FileName = $path
-        $startInfo.Arguments = '--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions --permission-mode manual --append-system-prompt-file "' + $promptFile + '"'
-        $startInfo.WorkingDirectory = $RepoRoot
-        $startInfo.UseShellExecute = $false
-        $startInfo.CreateNoWindow = $true
-        $startInfo.RedirectStandardInput = $true
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-        $process = New-Object System.Diagnostics.Process
-        $process.StartInfo = $startInfo
-        if (-not $process.Start()) {
-            $failures.Add('Claude CLI argument smoke test did not start.')
-            return
+        $baseArguments = '--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions --permission-mode manual --append-system-prompt-file "' + $promptFile + '"'
+        Invoke-ClaudeArgumentSmoke $path $baseArguments 'native launcher'
+
+        $launcherText = "@echo off`r`n`"$path`" %*`r`n"
+        [System.IO.File]::WriteAllText($launcherFile, $launcherText,
+            [System.Text.Encoding]::ASCII)
+        $commandShell = $env:COMSPEC
+        if ([string]::IsNullOrWhiteSpace($commandShell)) {
+            $commandShell = 'cmd.exe'
         }
-        $process.StandardInput.Close()
-        if (-not $process.WaitForExit(15000)) {
-            $process.Kill()
-            $failures.Add('Claude CLI argument smoke test timed out.')
-            return
-        }
-        $stderr = $process.StandardError.ReadToEnd().Trim()
-        if ($process.ExitCode -ne 0) {
-            $failures.Add("Claude CLI rejected AgentProcess arguments: $stderr")
-        }
+        $shellArguments = '/d /s /c ""' + $launcherFile + '" ' +
+            $baseArguments + '"'
+        Invoke-ClaudeArgumentSmoke $commandShell $shellArguments 'CMD launcher'
     }
     finally {
-        if ($null -ne $process) {
-            $process.Dispose()
-        }
         Remove-Item -LiteralPath $promptFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $launcherFile -Force -ErrorAction SilentlyContinue
     }
 }
 
