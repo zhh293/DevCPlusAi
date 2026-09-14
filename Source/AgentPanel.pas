@@ -130,9 +130,18 @@ implementation
 
 {$R *.dfm}
 
+type
+  // Delphi 7 inherits Align on TButton without publishing it for DFM loading.
+  TAgentButtonAccess = class(TButton);
+
 constructor TAgentPanelFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  TAgentButtonAccess(btnAttach).Align := alLeft;
+  TAgentButtonAccess(btnPasteImage).Align := alLeft;
+  TAgentButtonAccess(btnRemoveAttachment).Align := alRight;
+  TAgentButtonAccess(btnSend).Align := alRight;
+  TAgentButtonAccess(btnStop).Align := alRight;
   fAgentProcess := nil;
   fStatus := asDisconnected;
   fModelName := '';

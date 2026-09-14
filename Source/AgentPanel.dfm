@@ -68,7 +68,6 @@ object AgentPanelFrame: TAgentPanelFrame
           Top = 0
           Width = 74
           Height = 28
-          Align = alLeft
           Caption = 'Add file'
           TabOrder = 0
           OnClick = btnAttachClick
@@ -78,7 +77,6 @@ object AgentPanelFrame: TAgentPanelFrame
           Top = 0
           Width = 82
           Height = 28
-          Align = alLeft
           Caption = 'Paste image'
           TabOrder = 1
           OnClick = btnPasteImageClick
@@ -88,7 +86,6 @@ object AgentPanelFrame: TAgentPanelFrame
           Top = 0
           Width = 70
           Height = 28
-          Align = alRight
           Caption = 'Remove'
           TabOrder = 2
           OnClick = btnRemoveAttachmentClick
@@ -110,7 +107,6 @@ object AgentPanelFrame: TAgentPanelFrame
       Top = 0
       Width = 80
       Height = 150
-      Align = alRight
       Caption = 'Send'
       Default = True
       TabOrder = 3
@@ -121,7 +117,6 @@ object AgentPanelFrame: TAgentPanelFrame
       Top = 0
       Width = 80
       Height = 150
-      Align = alRight
       Caption = 'Stop'
       TabOrder = 4
       Visible = False

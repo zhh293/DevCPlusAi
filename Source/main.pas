@@ -9169,7 +9169,8 @@ begin
   fActAIAssistant := TAction.Create(Self);
   fActAIAssistant.ActionList := ActionList;
   fActAIAssistant.Caption := 'AI Assistant';
-  fActAIAssistant.ShortCut := ShortCut(Word('A'), [ssCtrl, ssShift]);
+  // Ctrl+Shift+A belongs to the existing code formatter.
+  fActAIAssistant.ShortCut := ShortCut(Word('A'), [ssCtrl, ssAlt]);
   fActAIAssistant.OnExecute := ActAIAssistantExecute;
 
   mi := TMenuItem.Create(Self);
@@ -9190,7 +9191,10 @@ begin
   fActAISettings.OnExecute := AgentSettingsExecute;
   mi := TMenuItem.Create(Self);
   mi.Action := fActAISettings;
-  ToolsMenu.Add(mi);
+  // Custom tool rebuilding and validation own only the menu tail after
+  // PackageManagerItem. Keep the built-in AI action before that boundary.
+  ToolsMenu.Insert(ToolsMenu.IndexOf(PackageManagerItem), mi);
+  fTools.Offset := ToolsMenu.IndexOf(PackageManagerItem);
 
   // Add lightweight selection actions to the editor context menu. They are
   // created at runtime so the legacy DFM remains compatible with upstream.

@@ -24,7 +24,7 @@ DevCPlusAi 在保留一个轻量、纯 Windows 原生 C/C++ IDE 的基础上，�
 
 * **附件与扩展能力。** 输入区支持选择文件、从 Windows 资源管理器拖放文件、粘贴剪贴板图片和发送 PNG/JPEG/GIF/WebP 图片内容；普通文件以路径附件交给 Claude 的文件工具读取。剪贴板图片使用唯一临时文件名，发送、移除、切换项目或关闭 IDE 时自动清理；用户手动选择的原文件不会被删除。设置中可填写项目级 MCP 配置文件和 Plugin 目录，CLI 输出中的 system、hook、MCP、Plugin、Skill 相关事件会保留在面板中。
 
-* **中文优先的交互体验。** 配置向导、面板与提示信息均提供中文界面，降低初学者的使用门槛。
+* **稳定的英文 AI 界面。** AI 配置向导、面板与提示使用英文 ASCII，避免 Delphi 7 在不同系统代码页下出现乱码；对话内容仍可使用中文。
 
 ---
 
@@ -102,7 +102,7 @@ DevCPlusAi 是一个 **Windows + Delphi / Object Pascal** 工程，需要在 Win
 1. 在 Delphi / RAD Studio 中打开 `Source/devcpp.dpr`。
 2. 编译生成可执行文件。
 3. 发布包会内置 portable Node.js 和锁定版本的 AI CLI（默认路径为程序目录下的 `claude-cli\bin\claude.exe`，也兼容 `claude.cmd`）；开发环境也可以在配置向导中指定外部 CLI。
-4. 首次运行 IDE 时会弹出配置向导，填写服务商、API Key、Base URL 与模型后即可开始使用 AI 对话面板。后续可通过 `工具 → AI 设置...` 修改配置。
+4. 首次运行 IDE 时会弹出配置向导，填写服务商、API Key、Base URL 与模型后即可开始使用 AI 对话面板。后续可通过 `工具 → AI Settings...` 修改配置。使用 `视图 → AI Assistant` 或 `Ctrl+Alt+A` 切换 AI 面板，`Ctrl+L` 聚焦输入框；`Ctrl+Shift+A` 保留给原有代码格式化功能。
 
 API Key 只在进程内以明文使用，写入 IDE 配置时会通过 Windows DPAPI 加密；旧版本留下的明文配置会兼容读取，并在下次保存时迁移为密文。发布包必须包含 `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt`，不能只发布主程序。Provider 配置只注入 Agent 子进程，不调用 cc-switch，也不修改全局 Claude settings。
 
@@ -263,4 +263,4 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 
 ## 开发状态
 
-基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、输入管道完整写入/断管失败、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。仍需完成真实 API 对话和安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、输入管道完整写入/断管失败、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。新增的 `AgentUISmoke` 会实际加载 AI 面板和设置窗体，并检查三种宽度下的按钮布局及 Send/Stop 状态；原有 `btnAttach.Align` 故障已验证会使测试以非零状态退出。仍需完成真实 API 对话和完整安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。

@@ -186,7 +186,7 @@ end;
 
 **验收**
 
-- `Ctrl+Shift+A` 切换面板，`Ctrl+L` 聚焦输入框，右键四种代码操作可以发送请求。
+- `Ctrl+Alt+A` 切换面板（避开格式化的 `Ctrl+Shift+A`），`Ctrl+L` 聚焦输入框，右键四种代码操作可以发送请求。
 - 关闭 IDE 后没有残留 Claude/Node 子进程。
 
 ### P1.6 配置与密钥
@@ -366,7 +366,7 @@ end;
 
 **验收**
 
-- Ctrl+L、Ctrl+Shift+A、Escape 和发送键行为与配置一致。
+- Ctrl+L、Ctrl+Alt+A、Escape 和发送键行为与配置一致。
 - Ready、Thinking、Executing、Error、Disconnected 状态互斥且可见。
 - 中文/英文切换后新增 UI 无未翻译的关键文案。
 
