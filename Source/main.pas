@@ -1117,6 +1117,7 @@ type
     fAgentPendingFiles : TStringList; // tool_use_id -> file path
     fAgentSessionFile : String;
     fAgentSessionId : String;
+    fAgentChatKey: String;
     fAgentWorkDir : String;
     fAgentResumeAttempted : Boolean;
     fAgentIgnoreSavedSession : Boolean;
@@ -1137,6 +1138,11 @@ type
     procedure RefreshAgentFile(const FileName: String);
     procedure UpdateAgentCompileContext;
     procedure AgentPrepareContext(Sender: TObject);
+    procedure AgentSessionChange(Sender: TObject);
+    procedure RefreshAgentSessions;
+    function AgentCliHistoryDir: String;
+    function AgentHistoryPath(const SessionFile: String): String;
+    procedure LoadAgentConversation(const Key: String);
     procedure AgentQuickAction(Sender: TObject);
     procedure AgentOpenCode(Sender: TObject);
     procedure AgentRestartTimerTick(Sender: TObject);
@@ -1189,6 +1195,10 @@ type
     procedure CppParserStartParsing(var message:TMessage); message WM_PARSER_BEGIN_PARSE;
     procedure CppParserEndParsing(var message:TMessage); message WM_PARSER_END_PARSE;
   public
+    function IsShortCut(var Message: TWMKey): Boolean; override;
+{$IFDEF AGENT_TESTS}
+    procedure RunAgentInteractionChecks(const Root, Cli: String);
+{$ENDIF}
     function GetCppParser:TCppParser;
     procedure CheckSyntaxInBack(e:TEditor);
     procedure UpdateClassBrowserForEditor(e:TEditor);
@@ -3592,11 +3602,27 @@ begin
     e.Text.Redo;
 end;
 
+{$IFDEF AGENT_TESTS}
+{$I Tests\AgentMainChecks.inc}
+{$ENDIF}
+
+function TMainForm.IsShortCut(var Message: TWMKey): Boolean;
+begin
+  Result := Assigned(fAgentPanelFrame) and
+    fAgentPanelFrame.HandleEditShortcut(Message.CharCode, KeyDataToShiftState(Message.KeyData));
+  if not Result then Result := inherited IsShortCut(Message);
+end;
 procedure TMainForm.actCutExecute(Sender: TObject);
 var
   e: TEditor;
   oldbottomline: integer;
 begin
+  if Assigned(fAgentPanelFrame) then begin
+    if fAgentPanelFrame.memoInput.Focused then begin
+      fAgentPanelFrame.memoInput.CutToClipboard;
+      Exit;
+    end;
+  end;
   e := fEditorList.GetEditor;
   if Assigned(e) and e.Text.Focused then begin
     oldbottomline := e.Text.TopLine + e.Text.LinesInWindow;
@@ -3610,6 +3636,16 @@ procedure TMainForm.actCopyExecute(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) then begin
+    if fAgentPanelFrame.memoInput.Focused then begin
+      fAgentPanelFrame.memoInput.CopyToClipboard;
+      Exit;
+    end;
+    if fAgentPanelFrame.reChat.Focused then begin
+      fAgentPanelFrame.reChat.CopyToClipboard;
+      Exit;
+    end;
+  end;
   e := fEditorList.GetEditor;
   if Assigned(e) and e.Text.Focused then
     e.Text.CopyToClipboard;
@@ -3620,6 +3656,12 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
+  if Assigned(fAgentPanelFrame) then begin
+    if fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused then begin
+      fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.memoInput);
+      Exit;
+    end;
+  end;
   e := fEditorList.GetEditor;
   if Assigned(e) and e.Text.Focused then begin
     oldbottomline := e.Text.TopLine + e.Text.LinesInWindow;
@@ -3633,6 +3675,16 @@ procedure TMainForm.actSelectAllExecute(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) then begin
+    if fAgentPanelFrame.memoInput.Focused then begin
+      fAgentPanelFrame.memoInput.SelectAll;
+      Exit;
+    end;
+    if fAgentPanelFrame.reChat.Focused then begin
+      fAgentPanelFrame.reChat.SelectAll;
+      Exit;
+    end;
+  end;
   e := fEditorList.GetEditor;
   if assigned(e) and e.Text.Focused then
     e.Text.SelectAll;
@@ -4851,6 +4903,11 @@ procedure TMainForm.actUpdateEmptyEditor(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and
+     (fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused) then begin
+    TAction(Sender).Enabled := Sender = actSelectAll;
+    Exit;
+  end;
   e := fEditorList.GetEditor;
   TCustomAction(Sender).Enabled := Assigned(e) and e.Text.Focused and not e.Text.IsEmpty;
 end;
@@ -5394,6 +5451,11 @@ procedure TMainForm.actCutUpdate(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and
+     (fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused) then begin
+    TAction(Sender).Enabled := fAgentPanelFrame.memoInput.Focused and (fAgentPanelFrame.memoInput.SelLength > 0);
+    Exit;
+  end;
   e := fEditorList.GetEditor;
   actCut.Enabled := assigned(e) and e.Text.SelAvail;
 end;
@@ -5402,6 +5464,11 @@ procedure TMainForm.actCopyUpdate(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and
+     (fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused) then begin
+    TAction(Sender).Enabled := True;
+    Exit;
+  end;
   e := fEditorList.GetEditor;
   TAction(Sender).Enabled := Assigned(e) and e.Text.Focused and e.Text.SelAvail;
 end;
@@ -5410,6 +5477,11 @@ procedure TMainForm.actPasteUpdate(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and
+     (fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused) then begin
+    TAction(Sender).Enabled := Clipboard.HasFormat(CF_TEXT) or Clipboard.HasFormat(CF_UNICODETEXT);
+    Exit;
+  end;
   e := fEditorList.GetEditor;
   actPaste.Enabled := Assigned(e) and e.Text.Focused and e.Text.CanPaste;
 end;
@@ -9170,6 +9242,7 @@ begin
   fAgentPanelFrame.OnPrepareContext := AgentPrepareContext;
   fAgentPanelFrame.OnQuickAction := AgentQuickAction;
   fAgentPanelFrame.OnOpenCode := AgentOpenCode;
+  fAgentPanelFrame.OnSessionChange := AgentSessionChange;
   fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
   fAgentPanelFrame.OnSettings := AgentSettingsExecute;
   fAgentPanelFrame.ApplyAppearance(Color, Font.Color,
@@ -9366,7 +9439,7 @@ var
   TempFile: String;
   I: Integer;
 begin
-  if (FileName = '') or (SessionId = '') then
+  if FileName = '' then
     Exit;
   if Length(SessionId) > 128 then
     Exit;
@@ -9379,8 +9452,8 @@ begin
     TempFile := FileName + '.tmp';
     try
       List.SaveToFile(TempFile);
-      DeleteFile(FileName);
-      RenameFile(TempFile, FileName);
+      if not MoveFileEx(PChar(TempFile), PChar(FileName), MOVEFILE_REPLACE_EXISTING or MOVEFILE_WRITE_THROUGH) then
+        RaiseLastOSError;
     except
       DeleteFile(TempFile);
       // Session metadata is a convenience. A read-only config directory must
@@ -9456,6 +9529,135 @@ begin
   AgentSelectionActionExecute(fAgentSelectionActions[TComponent(Sender).Tag]);
 end;
 
+function TMainForm.AgentHistoryPath(const SessionFile: String): String;
+var Key: String;
+begin
+  Key := ChangeFileExt(ExtractFileName(SessionFile), '');
+  Result := IncludeTrailingPathDelimiter(ExtractFilePath(SessionFile)) +
+    'History\' + Copy(Key, Length(Key) - 7, 8);
+end;
+function TMainForm.AgentCliHistoryDir: String;
+var
+  I: Integer;
+  Key, HomeDir: String;
+begin
+  Key := ExcludeTrailingPathDelimiter(fAgentWorkDir);
+  for I := 1 to Length(Key) do
+    if not (Key[I] in ['a'..'z', 'A'..'Z', '0'..'9']) then Key[I] := '-';
+  HomeDir := GetEnvironmentVariable('CLAUDE_CONFIG_DIR');
+  if HomeDir = '' then HomeDir := IncludeTrailingPathDelimiter(GetEnvironmentVariable('USERPROFILE')) + '.claude';
+  Result := IncludeTrailingPathDelimiter(HomeDir) + 'projects\' + Key + '\';
+end;
+
+procedure TMainForm.LoadAgentConversation(const Key: String);
+var
+  Path, Id: String;
+begin
+  Path := IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + Key;
+  if FileExists(Path + '.rtf') then
+    fAgentPanelFrame.LoadConversation(Path)
+  else begin
+    fAgentPanelFrame.ClearChat;
+    Id := LoadAgentSession(Path + '.session');
+    if Id <> '' then begin
+      fAgentPanelFrame.ImportConversation(AgentCliHistoryDir + Id + '.jsonl');
+      fAgentPanelFrame.SaveConversation(Path);
+    end;
+  end;
+end;
+procedure TMainForm.RefreshAgentSessions;
+var
+  Items, KnownIds, Title: TStringList;
+  Search: TSearchRec;
+  Dir, Key, Id, LabelText: String;
+  I: Integer;
+begin
+  Dir := IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile));
+  ForceDirectories(Dir);
+  Items := TStringList.Create;
+  KnownIds := TStringList.Create;
+  Title := TStringList.Create;
+  try
+    if FindFirst(Dir + '*.session', faAnyFile, Search) = 0 then begin
+      repeat
+        Key := ChangeFileExt(Search.Name, '');
+        if (Search.Attr and faDirectory) = 0 then begin
+          Items.Add(Key);
+          KnownIds.Add(LoadAgentSession(Dir + Search.Name));
+        end;
+      until FindNext(Search) <> 0;
+      FindClose(Search);
+    end;
+    // Also expose sessions made before the IDE had its own history picker.
+    if FindFirst(AgentCliHistoryDir + '*.jsonl', faAnyFile, Search) = 0 then begin
+      repeat
+        Id := ChangeFileExt(Search.Name, '');
+        if (Search.Attr and faDirectory = 0) and (KnownIds.IndexOf(Id) < 0) and
+           (Items.IndexOf(Id) < 0) then begin
+          SaveAgentSession(Dir + Id + '.session', Id);
+          if FileExists(Dir + Id + '.session') then Items.Add(Id);
+        end;
+      until FindNext(Search) <> 0;
+      FindClose(Search);
+    end;
+    if (fAgentChatKey <> '') and (Items.IndexOf(fAgentChatKey) < 0) then Items.Add(fAgentChatKey);
+    Items.Sort;
+    for I := 0 to Items.Count - 1 do begin
+      Key := Items[I];
+      LabelText := Key;
+      if FileExists(Dir + Key + '.title') then begin
+        Title.LoadFromFile(Dir + Key + '.title');
+        if Trim(Title.Text) <> '' then LabelText := Trim(Title.Text) + ' (' + Copy(Key, 1, 19) + ')';
+      end;
+      Items[I] := Key + '=' + LabelText;
+    end;
+    fAgentPanelFrame.SetSessions(Items, fAgentChatKey);
+  finally
+    Title.Free;
+    KnownIds.Free;
+    Items.Free;
+  end;
+end;
+procedure TMainForm.AgentSessionChange(Sender: TObject);
+var
+  Key, Dir, Path: String;
+  SessionGuid: TGUID;
+begin
+  if fAgentSessionFile = '' then begin
+    if Assigned(fProject) then fAgentWorkDir := ExtractFilePath(fProject.FileName)
+    else fAgentWorkDir := devDirs.Exec;
+    fAgentSessionFile := AgentSessionFileName(fAgentWorkDir);
+  end;  Key := fAgentPanelFrame.SelectedSession;
+  if (Key <> '') and (Key = fAgentChatKey) then Exit;
+  StopAgent;
+  Dir := IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile));
+  ForceDirectories(Dir);
+  if fAgentChatKey <> '' then begin
+    Path := Dir + fAgentChatKey;
+    fAgentPanelFrame.SaveConversation(Path);
+    SaveAgentSession(Path + '.session', fAgentSessionId);
+  end;
+  if Key = '' then begin
+    CreateGUID(SessionGuid);
+    Key := FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now) + '_' + Copy(GUIDToString(SessionGuid), 2, 8);
+    fAgentSessionId := '';
+    fAgentIgnoreSavedSession := True;
+    fAgentPanelFrame.ClearChat;
+  end else begin
+    fAgentSessionId := LoadAgentSession(Dir + Key + '.session');
+    fAgentIgnoreSavedSession := fAgentSessionId = '';
+    if not fAgentIgnoreSavedSession then SaveAgentSession(fAgentSessionFile, fAgentSessionId);
+    LoadAgentConversation(Key);
+  end;
+  fAgentChatKey := Key;
+  SaveAgentSession(fAgentSessionFile + '.active', Key);
+  SaveAgentSession(Dir + Key + '.session', fAgentSessionId);
+  SaveAgentSession(fAgentSessionFile, fAgentSessionId);
+  if Assigned(devAgentConfig) and devAgentConfig.Enabled and (Trim(devAgentConfig.ApiKey) <> '') then
+    StartAgent
+  else fAgentPanelFrame.SetStatus(asDisconnected);
+  RefreshAgentSessions;
+end;
 procedure TMainForm.AgentPrepareContext(Sender: TObject);
 begin
   UpdateAgentCompileContext;
@@ -9520,13 +9722,26 @@ begin
     // The panel is a runtime view only. Switching projects must not display
     // the previous project's messages while the CLI uses a new session.
     fAgentPanelFrame.ClearChat;
+    fAgentChatKey := '';
     fAgentIgnoreSavedSession := False;
   end;
-  if fAgentIgnoreSavedSession then
-    sessionId := ''
-  else
-    sessionId := LoadAgentSession(sessionFile);
-
+  fAgentSessionFile := sessionFile;
+  fAgentWorkDir := workDir;
+  ForceDirectories(AgentHistoryPath(sessionFile));
+  if fAgentChatKey = '' then begin
+    fAgentChatKey := LoadAgentSession(sessionFile + '.active');
+    if fAgentChatKey = '' then begin
+      sessionId := LoadAgentSession(sessionFile);
+      if sessionId <> '' then fAgentChatKey := sessionId
+      else fAgentChatKey := FormatDateTime('yyyy-mm-dd_hh-nn-ss-zzz', Now);
+      SaveAgentSession(IncludeTrailingPathDelimiter(AgentHistoryPath(sessionFile)) + fAgentChatKey + '.session', sessionId);
+    end;
+    LoadAgentConversation(fAgentChatKey);
+  end;
+  SaveAgentSession(sessionFile + '.active', fAgentChatKey);
+  if fAgentIgnoreSavedSession then sessionId := ''
+  else sessionId := LoadAgentSession(IncludeTrailingPathDelimiter(AgentHistoryPath(sessionFile)) + fAgentChatKey + '.session');
+  RefreshAgentSessions;
   if not Assigned(fAgentProcess) then
     fAgentProcess := TAgentProcess.Create;
   if Assigned(devAgentConfig) then
@@ -9592,6 +9807,8 @@ end;
 
 procedure TMainForm.StopAgent;
 begin
+
+
   if Assigned(fAgentRestartTimer) then
     fAgentRestartTimer.Enabled := False;
   if Assigned(fAgentResponseTimer) then
@@ -9606,6 +9823,12 @@ begin
     fAgentReader.WaitFor;
     FreeAndNil(fAgentReader);
   end;
+  if Assigned(fAgentPanelFrame) and (fAgentChatKey <> '') and (fAgentSessionFile <> '') then
+    try
+      fAgentPanelFrame.SaveConversation(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + fAgentChatKey);
+    except
+      on E: Exception do fAgentPanelFrame.AppendSystemMessage('Could not save conversation: ' + E.Message);
+    end;
   if Assigned(fAgentProcess) then
     fAgentProcess.CloseOutputRead;
   FreeAndNil(fAgentProcess);
@@ -9632,8 +9855,12 @@ begin
     for I := 0 to Length(Events) - 1 do begin
       ev := Events[I];
       if ev.SessionId <> '' then begin
-        fAgentSessionId := ev.SessionId;
-        SaveAgentSession(fAgentSessionFile, fAgentSessionId);
+        if fAgentSessionId <> ev.SessionId then begin
+          fAgentSessionId := ev.SessionId;
+          SaveAgentSession(fAgentSessionFile, fAgentSessionId);
+          SaveAgentSession(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + fAgentChatKey + '.session', fAgentSessionId);
+          RefreshAgentSessions;
+        end;
         // A successful system.init/result event proves that the selected
         // session is valid. Future restarts can resume it normally.
         fAgentIgnoreSavedSession := False;
@@ -9680,7 +9907,13 @@ begin
       end;
       if Assigned(fAgentPanelFrame) then
         fAgentPanelFrame.HandleAgentEvent(ev);
-    end;
+      if (ev.EventType = aetResult) and (fAgentChatKey <> '') then
+        try
+          fAgentPanelFrame.SaveConversation(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + fAgentChatKey);
+          RefreshAgentSessions;
+        except
+          on E: Exception do fAgentPanelFrame.AppendSystemMessage('Could not save conversation: ' + E.Message);
+        end;    end;
   finally
     SetLength(Events, 0);
   end;

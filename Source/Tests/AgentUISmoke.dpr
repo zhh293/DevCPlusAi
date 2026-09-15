@@ -36,7 +36,8 @@ var
   Setup: TAgentSetupForm;
   I: Integer;
   Events: TAgentEventArray;
-  ReplyText: String;
+  ReplyText, Snapshot, BeforeTools: String;
+  Histories: TStringList;
 begin
   try
     Application.Initialize;
@@ -103,6 +104,47 @@ begin
       Require(Panel.AnswerCode = 'int main() {}' + #10, 'code extraction lost content');
       Panel.ClearChat;
       Require(Panel.AnswerCode = '', 'clear retained stale code');
+      Writeln('Agent UI smoke test: collapsed tool activity and persistence');
+      Panel.AppendAIText('Visible answer');
+      BeforeTools := Panel.reChat.Text;
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"read-1","name":"Read","input":{"file_path":"main.cpp"}}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Panel.reChat.Text = BeforeTools, 'tool call polluted answer');
+      Require(not Panel.ToolTree.Visible, 'tool area opened automatically');
+      Require(not Panel.ToolTree.Items.GetFirstNode.Expanded, 'tool node opened automatically');
+      ParseLineEvents('{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"read-1","content":"line one\nline two"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Panel.reChat.Text = BeforeTools, 'tool result polluted answer');
+      Require(Panel.ToolTree.Items.GetFirstNode.GetNextSibling = nil, 'result was not grouped with its call');
+      Require(Pos('[Done]', Panel.ToolTree.Items.GetFirstNode.Text) > 0, 'tool completion absent');
+      Panel.ToolToggle.Click;
+      Require(Panel.ToolTree.Visible, 'tool toggle did not expand');
+      Panel.ToolTree.Items.GetFirstNode.Expand(False);
+      Require(Panel.ToolTree.Items.GetFirstNode.Expanded, 'individual tool did not expand');
+      Panel.ToolToggle.Click;
+      Require(not Panel.ToolTree.Visible, 'tool toggle did not collapse');
+      Panel.memoInput.Text := 'unsent draft';
+      Snapshot := ExtractFilePath(ParamStr(0)) + '..\..\.tools\ui-history-' + IntToStr(GetCurrentProcessId) + '\chat';
+      Panel.SaveConversation(Snapshot);
+      Panel.ClearChat;
+      Panel.LoadConversation(Snapshot);
+      Require(Panel.reChat.Text = BeforeTools, 'snapshot changed transcript');
+      Require(Trim(Panel.memoInput.Text) = 'unsent draft', 'snapshot lost draft');
+      Require(Panel.ToolTree.Items.GetFirstNode <> nil, 'snapshot lost tools');
+      Require(not Panel.ToolTree.Visible and not Panel.ToolTree.Items.GetFirstNode.Expanded,
+        'restored tool activity should start collapsed');
+      Histories := TStringList.Create;
+      try
+        Histories.Add('id-one=First question');
+        Histories.Add('id-two=Second question');
+        Panel.SetSessions(Histories, 'id-two');
+        Require(Panel.SelectedSession = 'id-two', 'history selection lost ID');
+        Require(Panel.SessionPicker.Text = 'Second question', 'history title missing');
+        Require(Panel.memoInput.PopupMenu <> nil, 'input context menu missing');
+        Require(Panel.reChat.PopupMenu <> nil, 'reply context menu missing');
+      finally
+        Histories.Free;
+      end;
       Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
       Setup := TAgentSetupForm.Create(Host);
       Require(Setup.Caption = 'AI Assistant Setup', 'settings caption missing');

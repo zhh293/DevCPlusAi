@@ -43,6 +43,8 @@
 /Source/Tests/AgentPipeIOSmoke.exe
 /Source/Tests/AgentUISmoke.exe
 /Source/Tests/AgentProviderSmoke.exe
+/Source/Tests/AgentFixtureCli.exe
+/Source/Tests/AgentMainSmoke.exe
 *.lib
 *.ddp
 

@@ -56,12 +56,14 @@ function Invoke-NativeBuild {
 function Invoke-SmokeTest {
     param(
         [string]$Executable,
-        [int]$TimeoutMilliseconds = 15000
+        [int]$TimeoutMilliseconds = 15000,
+        [string]$Arguments = ''
     )
 
     Write-Host "==> Run $(Split-Path -Leaf $Executable)"
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = $Executable
+    $startInfo.Arguments = $Arguments
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -199,6 +201,17 @@ try {
         ('-U' + $SourceRoot + ';' + ($mainUnitPaths -join ';'))
     ) 'Compile Agent provider smoke test'
     Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentProviderSmoke.exe')
+    New-Item -ItemType Directory -Force -Path 'dcu-agent-main' | Out-Null
+    Invoke-NativeBuild $Dcc32Path @('-B', 'AgentFixtureCli.dpr', '-N.\dcu-agent-main') 'Compile local Agent CLI fixture'
+    Invoke-NativeBuild $Dcc32Path @(
+        '-B', '-DAGENT_TESTS', 'AgentMainSmoke.dpr', '-N.\dcu-agent-main',
+        ('-R' + $SourceRoot),
+        ('-U' + $SourceRoot + ';' + ($mainUnitPaths -join ';'))
+    ) 'Compile Agent main integration tests'
+    $agentTestRoot = Join-Path $RepoRoot ('.tools\ai-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+    New-Item -ItemType Directory -Force -Path $agentTestRoot | Out-Null
+    $agentFixture = Join-Path $protocolTestRoot 'AgentFixtureCli.exe'
+    Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentMainSmoke.exe') -TimeoutMilliseconds 45000 -Arguments ('"' + $agentTestRoot + '" "' + $agentFixture + '"')
 }
 finally {
     Pop-Location

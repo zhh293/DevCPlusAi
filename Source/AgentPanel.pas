@@ -27,7 +27,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG,
+  StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG, Menus,
   AgentProcess, AgentProtocol;
 
 type
@@ -74,6 +74,15 @@ type
     fQuickActions: TComboBox;
     fDetails: TCheckBox;
     fLastAnswer: String;
+    fConversationTitle: String;
+    fSessions: TComboBox;
+    fSessionKeys: TStringList;
+    fEditPopup: TPopupMenu;
+    fPopupTarget: TWinControl;
+    fOnSessionChange: TNotifyEvent;
+    fTools: TTreeView;
+    fToolPanel: TPanel;
+    fToolToggle: TButton;
     fTextColor: TColor;
     fMutedColor: TColor;
     fErrorColor: TColor;
@@ -90,6 +99,12 @@ type
     fWaitingForResponse: Boolean;
     fOnRequestStarted: TNotifyEvent;
     fOnRequestEnded: TNotifyEvent;
+    procedure EditPopupOpen(Sender: TObject);
+    procedure EditPopupClick(Sender: TObject);
+    procedure SessionChange(Sender: TObject);
+    procedure NewSessionClick(Sender: TObject);
+    procedure ToggleTools(Sender: TObject);
+    procedure AddToolEvent(const Event: TAgentEvent);
     procedure QuickActionClick(Sender: TObject);
     procedure CopyAnswerClick(Sender: TObject);
     procedure OpenCodeClick(Sender: TObject);
@@ -144,6 +159,17 @@ type
     // over this frame. The list remains pending until the next send.
     procedure AddDroppedFiles(Files: TStrings);
 
+    function HandleEditShortcut(Key: Word; Shift: TShiftState): Boolean;
+    function ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
+    property ToolTree: TTreeView read fTools;
+    property ToolToggle: TButton read fToolToggle;
+    property SessionPicker: TComboBox read fSessions;
+    procedure ImportConversation(const FileName: String);
+    procedure SaveConversation(const Path: String);
+    procedure LoadConversation(const Path: String);
+    procedure SetSessions(Items: TStrings; const Selected: String);
+    function SelectedSession: String;
+    property OnSessionChange: TNotifyEvent read fOnSessionChange write fOnSessionChange;
     function AnswerCode: String;
     property OnOpenCode: TNotifyEvent read fOnOpenCode write fOnOpenCode;
     property OnPrepareContext: TNotifyEvent read fOnPrepareContext write fOnPrepareContext;
@@ -162,9 +188,12 @@ constructor TAgentPanelFrame.Create(AOwner: TComponent);
 var
   Toolbar: TPanel;
   Button: TButton;
+  MenuItem: TMenuItem;
+  I: Integer;
 begin
   inherited Create(AOwner);
   fAgentProcess := nil;
+  fSessionKeys := TStringList.Create;
   fStatus := asDisconnected;
   fModelName := '';
   fContextText := '';
@@ -184,7 +213,7 @@ begin
   Toolbar.Parent := Self;
   Toolbar.Align := alTop;
   Toolbar.Top := pnlHeader.Height;
-  Toolbar.Height := 62;
+  Toolbar.Height := 94;
   Toolbar.BevelOuter := bvNone;
   Toolbar.ParentColor := True;
   fQuickActions := TComboBox.Create(Self);
@@ -218,6 +247,52 @@ begin
   fDetails.Parent := Toolbar;
   fDetails.SetBounds(192, 34, 72, 20);
   fDetails.Caption := 'Logs';
+  fSessions := TComboBox.Create(Self);
+  fSessions.Parent := Toolbar;
+  fSessions.SetBounds(8, 64, Width - 96, 24);
+  fSessions.Anchors := [akLeft, akTop, akRight];
+  fSessions.Style := csDropDownList;
+  fSessions.OnChange := SessionChange;
+  Button := TButton.Create(Self);
+  Button.Parent := Toolbar;
+  Button.SetBounds(Width - 80, 64, 72, 24);
+  Button.Anchors := [akTop, akRight];
+  Button.Caption := 'New chat';
+  Button.OnClick := NewSessionClick;
+  fToolPanel := TPanel.Create(Self);
+  fToolPanel.Parent := pnlChat;
+  fToolPanel.Align := alBottom;
+  fToolPanel.Height := 28;
+  fToolPanel.BevelOuter := bvNone;
+  fToolToggle := TButton.Create(Self);
+  fToolToggle.Parent := fToolPanel;
+  fToolToggle.SetBounds(0, 0, 200, 26);
+  fToolToggle.Caption := '> Tool activity';
+  fToolToggle.OnClick := ToggleTools;
+  fTools := TTreeView.Create(Self);
+  fTools.Parent := fToolPanel;
+  fTools.SetBounds(0, 30, pnlChat.ClientWidth - 16, 140);
+  fTools.Anchors := [akLeft, akTop, akRight, akBottom];
+  fTools.ReadOnly := True;
+  fTools.Visible := False;
+  fEditPopup := TPopupMenu.Create(Self);
+  fEditPopup.OnPopup := EditPopupOpen;
+  for I := 0 to 4 do begin
+    MenuItem := TMenuItem.Create(fEditPopup);
+    case I of
+      0: MenuItem.Caption := 'Copy';
+      1: MenuItem.Caption := 'Paste';
+      2: MenuItem.Caption := 'Cut';
+      3: MenuItem.Caption := 'Select all';
+      4: MenuItem.Caption := 'Undo';
+    end;
+    MenuItem.Tag := I;
+    MenuItem.OnClick := EditPopupClick;
+    fEditPopup.Items.Add(MenuItem);
+  end;
+  reChat.PopupMenu := fEditPopup;
+  memoInput.PopupMenu := fEditPopup;
+  fTools.PopupMenu := fEditPopup;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
 end;
@@ -231,6 +306,7 @@ begin
     for I := 0 to fTemporaryAttachments.Count - 1 do
       DeleteFile(fTemporaryAttachments[I]);
   fTemporaryAttachments.Free;
+  fSessionKeys.Free;
   fAttachments.Free;
   inherited Destroy;
 end;
@@ -240,7 +316,11 @@ end;
 { ------------------------------------------------------------------ }
 
 procedure TAgentPanelFrame.AppendText(const Text: String; Color: TColor; Bold: Boolean);
+var
+  OldStart, OldLength: Integer;
 begin
+  OldStart := reChat.SelStart;
+  OldLength := reChat.SelLength;
   SendMessage(reChat.Handle, EM_SETSEL, WPARAM(-1), LPARAM(-1));
   reChat.SelLength := 0;
   reChat.SelAttributes.Color := Color;
@@ -251,11 +331,16 @@ begin
   reChat.SelText := StringReplace(StringReplace(Text, #13#10, #10, [rfReplaceAll]),
     #10, #13#10, [rfReplaceAll]);
   // Scroll the caret into view.
-  SendMessage(reChat.Handle, EM_SCROLLCARET, 0, 0);
+  if OldLength > 0 then begin
+    reChat.SelStart := OldStart;
+    reChat.SelLength := OldLength;
+  end else SendMessage(reChat.Handle, EM_SCROLLCARET, 0, 0);
 end;
 
 procedure TAgentPanelFrame.AppendUserMessageInternal(const Text: String);
 begin
+  if fConversationTitle = '' then
+    fConversationTitle := Copy(StringReplace(StringReplace(Text, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), 1, 64);
   AppendText(#13#10 + 'You:' + #13#10, fTextColor, True);
   AppendText(Text + #13#10, fTextColor, False);
 end;
@@ -304,6 +389,10 @@ procedure TAgentPanelFrame.ClearChat;
 begin
   EndResponseWait;
   reChat.Clear;
+  fConversationTitle := '';
+  fTools.Items.Clear;
+  fTools.Visible := False;
+  fToolPanel.Height := 28;
   fLastAnswer := '';
   memoInput.Clear;
   ClearAttachments;
@@ -601,6 +690,15 @@ begin
     reChat.SelLength := SelectionLength;
   end;
   fTextColor := ATextColor;
+  if Assigned(fTools) then begin
+    fTools.Color := AEditorColor;
+    fTools.Font.Color := ATextColor;
+    fTools.Font.Name := AFontName;
+  end;
+  if Assigned(fSessions) then begin
+    fSessions.Color := AEditorColor;
+    fSessions.Font.Color := ATextColor;
+  end;
   SetFontSize(TextSize);
 end;
 
@@ -633,8 +731,14 @@ end;
 
 procedure TAgentPanelFrame.HandleAgentEvent(const Event: TAgentEvent);
 var
-  Text, ToolDetails: String;
+  Text: String;
 begin
+  if Event.EventType in [aetToolUse, aetToolResult, aetProgress] then begin
+    if Event.EventType in [aetToolUse, aetToolResult] then EndResponseWait;
+    AddToolEvent(Event);
+    if Event.EventType = aetToolUse then SetStatus(asExecuting);
+    Exit;
+  end;
   if Event.EventType in [aetAssistant, aetToolUse, aetToolResult,
       aetResult, aetError] then
     EndResponseWait;
@@ -643,34 +747,6 @@ begin
       begin
         SetStatus(asThinking);
         HandleAssistantEvent(Event);
-      end;
-
-    aetToolUse:
-      begin
-        SetStatus(asExecuting);
-        if Event.IsUpdate then
-          Exit;
-        ToolDetails := '';
-        if Event.FilePath <> '' then
-          ToolDetails := Event.FilePath
-        else if Event.Command <> '' then
-          ToolDetails := Event.Command
-        else if Event.ToolInput <> '' then
-          ToolDetails := Copy(Event.ToolInput, 1, 300);
-        if ToolDetails <> '' then
-          AppendText(#13#10 + '[Tool ' + Event.ToolName + '] ' + ToolDetails + #13#10,
-            fTextColor, True)
-        else
-          AppendText(#13#10 + '[Tool ' + Event.ToolName + ']' + #13#10,
-            fTextColor, True);
-      end;
-
-    aetToolResult:
-      begin
-        if Event.IsError then
-          AppendText('  -> [Failed] ' + Event.Content + #13#10, fErrorColor, False)
-        else if Event.Content <> '' then
-          AppendText('  -> ' + Event.Content + #13#10, fMutedColor, False);
       end;
 
     aetResult:
@@ -713,14 +789,6 @@ begin
       begin
         if Event.IsReplay and (Event.Content <> '') then
           AppendSystemMessage('[Claude replay] ' + Event.Content);
-      end;
-
-    aetProgress:
-      begin
-        SetStatus(asExecuting);
-        Text := EventSummaryText(Event);
-        if Text <> '' then
-          AppendSystemMessage('[Progress] ' + Text);
       end;
 
     aetRateLimit:
@@ -828,6 +896,246 @@ begin
   SendCurrentInput;
 end;
 
+procedure TAgentPanelFrame.EditPopupOpen(Sender: TObject);
+begin
+  fPopupTarget := TWinControl(fEditPopup.PopupComponent);
+  fEditPopup.Items[1].Enabled := Clipboard.HasFormat(CF_TEXT) or Clipboard.HasFormat(CF_UNICODETEXT);
+  fEditPopup.Items[2].Enabled := fPopupTarget = memoInput;
+  fEditPopup.Items[4].Enabled := (fPopupTarget = memoInput) and memoInput.CanUndo;
+end;
+
+procedure TAgentPanelFrame.EditPopupClick(Sender: TObject);
+begin
+  ExecuteEditCommand(TMenuItem(Sender).Tag, fPopupTarget);
+end;
+
+function TAgentPanelFrame.ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
+begin
+  Result := (Target = memoInput) or (Target = reChat) or (Target = fTools);
+  if not Result then Exit;
+  if Target = fTools then begin
+    if (Command = 0) and (fTools.Selected <> nil) then
+      Clipboard.AsText := fTools.Selected.Text;
+    if Command <> 1 then Exit;
+  end;
+  case Command of
+    0: TCustomEdit(Target).CopyToClipboard;
+    1: begin
+      memoInput.PasteFromClipboard;
+      if memoInput.CanFocus then memoInput.SetFocus;
+    end;
+    2: if Target = memoInput then memoInput.CutToClipboard;
+    3: TCustomEdit(Target).SelectAll;
+    4: if Target = memoInput then memoInput.Undo;
+  end;
+end;
+
+function TAgentPanelFrame.HandleEditShortcut(Key: Word; Shift: TShiftState): Boolean;
+var
+  Target: TWinControl;
+  Command: Integer;
+begin
+  Result := False;
+  Target := nil;
+  if memoInput.Focused then Target := memoInput
+  else if reChat.Focused then Target := reChat
+  else if fTools.Focused then Target := fTools;
+  if Target = nil then Exit;
+  Command := -1;
+  if Shift = [ssCtrl] then
+    case Key of
+      Ord('C'), VK_INSERT: Command := 0;
+      Ord('V'): Command := 1;
+      Ord('X'): Command := 2;
+      Ord('A'): Command := 3;
+      Ord('Z'): Command := 4;
+    end;
+  if Shift = [ssShift] then
+    case Key of
+      VK_INSERT: Command := 1;
+      VK_DELETE: Command := 2;
+    end;
+  if Command >= 0 then Result := ExecuteEditCommand(Command, Target);
+end;
+procedure TAgentPanelFrame.SetSessions(Items: TStrings; const Selected: String);
+var
+  I: Integer;
+begin
+  fSessionKeys.Clear;
+  fSessions.Items.BeginUpdate;
+  try
+    fSessions.Items.Clear;
+    for I := 0 to Items.Count - 1 do begin
+      if Items.Names[I] <> '' then begin
+        fSessionKeys.Add(Items.Names[I]);
+        fSessions.Items.Add(Items.ValueFromIndex[I]);
+      end else begin
+        fSessionKeys.Add(Items[I]);
+        fSessions.Items.Add(Items[I]);
+      end;
+    end;
+    fSessions.ItemIndex := fSessionKeys.IndexOf(Selected);
+  finally
+    fSessions.Items.EndUpdate;
+  end;
+end;
+
+function TAgentPanelFrame.SelectedSession: String;
+begin
+  Result := '';
+  if fSessions.ItemIndex >= 0 then Result := fSessionKeys[fSessions.ItemIndex];
+end;
+
+procedure TAgentPanelFrame.SessionChange(Sender: TObject);
+begin
+  if Assigned(fOnSessionChange) then fOnSessionChange(Self);
+end;
+
+procedure TAgentPanelFrame.NewSessionClick(Sender: TObject);
+begin
+  fSessions.ItemIndex := -1;
+  SessionChange(Self);
+end;
+
+procedure TAgentPanelFrame.ImportConversation(const FileName: String);
+var
+  Lines, Seen: TStringList;
+  Events: TAgentEventArray;
+  I, J, P: Integer;
+  Text, Identity: String;
+begin
+  if not FileExists(FileName) then Exit;
+  ClearChat;
+  Lines := TStringList.Create;
+  Seen := TStringList.Create;
+  try
+    Lines.LoadFromFile(FileName);
+    for I := 0 to Lines.Count - 1 do begin
+      ParseLineEvents(Lines[I], Events);
+      for J := 0 to Length(Events) - 1 do begin
+        Identity := Events[J].EventId + ':' + IntToStr(J);
+        if (Events[J].EventId <> '') and (Seen.IndexOf(Identity) >= 0) then Continue;
+        Seen.Add(Identity);
+        if Events[J].EventType = aetUser then begin
+          Text := Events[J].Content;
+          P := Pos('The following context was attached automatically by the IDE.', Text);
+          if P > 0 then Text := Trim(Copy(Text, 1, P - 1));
+          if Text <> '' then begin
+            ResetStreamingDisplay;
+            fLastAnswer := '';
+            AppendUserMessage(Text);
+          end;
+        end else if Events[J].EventType in [aetAssistant, aetToolUse, aetToolResult] then
+          HandleAgentEvent(Events[J]);
+      end;
+    end;
+    ResetStreamingDisplay;
+    SetStatus(asReady);
+  finally
+    Seen.Free;
+    Lines.Free;
+  end;
+end;
+procedure TAgentPanelFrame.SaveConversation(const Path: String);
+var
+  Text: TStringList;
+begin
+  ForceDirectories(ExtractFilePath(Path));
+  reChat.Lines.SaveToFile(Path + '.rtf');
+  fTools.SaveToFile(Path + '.tools');
+  Text := TStringList.Create;
+  try
+    Text.Text := fConversationTitle;
+    Text.SaveToFile(Path + '.title');
+    Text.Text := fLastAnswer;
+    Text.SaveToFile(Path + '.answer');
+    Text.Text := memoInput.Text;
+    Text.SaveToFile(Path + '.draft');
+  finally
+    Text.Free;
+  end;
+end;
+
+procedure TAgentPanelFrame.LoadConversation(const Path: String);
+var
+  Text: TStringList;
+begin
+  ClearChat;
+  if FileExists(Path + '.rtf') then reChat.Lines.LoadFromFile(Path + '.rtf');
+  if FileExists(Path + '.tools') then fTools.LoadFromFile(Path + '.tools');
+  fTools.FullCollapse;
+  Text := TStringList.Create;
+  try
+    if FileExists(Path + '.title') then begin
+      Text.LoadFromFile(Path + '.title');
+      fConversationTitle := Trim(Text.Text);
+    end;
+    if FileExists(Path + '.answer') then begin
+      Text.LoadFromFile(Path + '.answer');
+      fLastAnswer := Text.Text;
+    end;
+    if FileExists(Path + '.draft') then begin
+      Text.LoadFromFile(Path + '.draft');
+      memoInput.Text := Text.Text;
+    end;
+  finally
+    Text.Free;
+  end;
+end;
+procedure TAgentPanelFrame.ToggleTools(Sender: TObject);
+begin
+  fTools.Visible := not fTools.Visible;
+  if fTools.Visible then begin
+    fToolPanel.Height := pnlChat.ClientHeight div 2;
+    if fToolPanel.Height > 170 then fToolPanel.Height := 170;
+    if fToolPanel.Height < 56 then fToolPanel.Height := 56;
+    fToolToggle.Caption := 'v Tool activity';
+  end else begin
+    fToolPanel.Height := 28;
+    fToolToggle.Caption := '> Tool activity';
+  end;
+end;
+
+procedure TAgentPanelFrame.AddToolEvent(const Event: TAgentEvent);
+var
+  Node: TTreeNode;
+  I: Integer;
+  Key, Summary: String;
+  Lines: TStringList;
+begin
+  if Event.IsUpdate then Exit;
+  Key := Event.ToolId;
+  if Key = '' then Key := Event.EventId;
+  if Key = '' then Key := 'activity-' + IntToStr(fTools.Items.Count);
+  Node := fTools.Items.GetFirstNode;
+  while Node <> nil do begin
+    if (Node.Count > 0) and (Node.Item[0].Text = 'ID: ' + Key) then Break;
+    Node := Node.GetNextSibling;
+  end;
+  if Node = nil then begin
+    Summary := Event.ToolName;
+    if Summary = '' then Summary := 'Activity';
+    Node := fTools.Items.Add(nil, Summary);
+    fTools.Items.AddChild(Node, 'ID: ' + Key);
+  end;
+  Summary := Event.FilePath;
+  if Summary = '' then Summary := Event.Command;
+  if Summary = '' then Summary := Event.ToolInput;
+  if Event.Content <> '' then Summary := Event.Content;
+  if Summary = '' then Summary := Event.Summary;
+  if Event.IsError then begin
+    Node.Text := Node.Text + ' [Failed]';
+    fToolToggle.Caption := '> Tool activity - failure';
+  end
+  else if Event.EventType = aetToolResult then Node.Text := Node.Text + ' [Done]';
+  Lines := TStringList.Create;
+  try
+    Lines.Text := Summary;
+    for I := 0 to Lines.Count - 1 do fTools.Items.AddChild(Node, Lines[I]);
+  finally
+    Lines.Free;
+  end;
+end;
 procedure TAgentPanelFrame.QuickActionClick(Sender: TObject);
 begin
   if fStatus in [asThinking, asExecuting] then Exit;

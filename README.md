@@ -82,6 +82,12 @@ AI 面板沿用 IDE 字体与编辑器主题颜色，支持亮色和暗色切换
 
 面板顶部选择 Explain code、Fix code、Improve code、Add comments 或 Diagnose build errors，再点 Run。优先使用编辑器选区，没有选区则使用当前文件；普通聊天也会附带当前编辑内容（包括未保存内容，最多 24,000 字节）和最近的编译错误。Copy answer 复制当前回答，Open code 将回答的第一个完整 Markdown 代码块打开为新编辑标签页，便于检查、修改和编译。Logs 控制后续诊断日志显示，API 重试和错误仍会显示；思考块不再混入正文。
 
+输入框和回答区支持 Ctrl+C、Ctrl+V、Ctrl+A，以及右键菜单；输入框还支持剪切、撤销和 Shift+Insert 粘贴。在回答区粘贴会把文字放进输入框。流式回复到来时会保留已选中的文字，便于复制。Tool activity 默认折叠，调用参数与执行结果按工具分组，点击展开后可逐项查看和复制，普通回答保持在正文区域。
+
+点击 New chat 新建会话，通过旁边的历史下拉框选择旧会话继续。每个工作目录分别保存会话 ID、正文、工具记录和输入草稿；关闭程序后会恢复最后选中的会话。历史记录存放在本机配置目录的 AgentSessions/History 下，不进入发布包。旧版本在当前工作目录留下的 Claude CLI 历史也会进入列表，首次选择时导入正文；恢复上下文仍需要对应 CLI 会话文件存在。新会话不会继承旧会话 ID。
+
+Windows 构建中的 AgentMainSmoke 使用本地模拟 CLI 检查真实的 `--resume` 参数、会话切换和重启恢复，不使用 API Key 或网络；AgentUISmoke 覆盖工具折叠、正文隔离、历史快照与输入草稿。
+
 接口参考：[DeepSeek Claude Code 接入](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)。
 
 ## 配置项说明
