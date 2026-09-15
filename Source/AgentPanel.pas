@@ -68,6 +68,12 @@ type
     procedure reChatKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     fAgentProcess: TAgentProcess;
+    fOnPrepareContext: TNotifyEvent;
+    fOnQuickAction: TNotifyEvent;
+    fOnOpenCode: TNotifyEvent;
+    fQuickActions: TComboBox;
+    fDetails: TCheckBox;
+    fLastAnswer: String;
     fTextColor: TColor;
     fMutedColor: TColor;
     fErrorColor: TColor;
@@ -84,6 +90,9 @@ type
     fWaitingForResponse: Boolean;
     fOnRequestStarted: TNotifyEvent;
     fOnRequestEnded: TNotifyEvent;
+    procedure QuickActionClick(Sender: TObject);
+    procedure CopyAnswerClick(Sender: TObject);
+    procedure OpenCodeClick(Sender: TObject);
     procedure UpdateAttachmentLayout;
     procedure AppendText(const Text: String; Color: TColor; Bold: Boolean);
     procedure AppendUserMessageInternal(const Text: String);
@@ -135,6 +144,10 @@ type
     // over this frame. The list remains pending until the next send.
     procedure AddDroppedFiles(Files: TStrings);
 
+    function AnswerCode: String;
+    property OnOpenCode: TNotifyEvent read fOnOpenCode write fOnOpenCode;
+    property OnPrepareContext: TNotifyEvent read fOnPrepareContext write fOnPrepareContext;
+    property OnQuickAction: TNotifyEvent read fOnQuickAction write fOnQuickAction;
     property OnSettings: TNotifyEvent read fOnSettings write fOnSettings;
     property Status: TAgentStatus read fStatus;
     property OnRequestStarted: TNotifyEvent read fOnRequestStarted write fOnRequestStarted;
@@ -146,6 +159,9 @@ implementation
 {$R *.dfm}
 
 constructor TAgentPanelFrame.Create(AOwner: TComponent);
+var
+  Toolbar: TPanel;
+  Button: TButton;
 begin
   inherited Create(AOwner);
   fAgentProcess := nil;
@@ -164,6 +180,44 @@ begin
   fOnSettings := nil;
   ApplyAppearance(clBtnFace, clWindowText, clWindow, clWindowText,
     Font.Name, Font.Size);
+  Toolbar := TPanel.Create(Self);
+  Toolbar.Parent := Self;
+  Toolbar.Align := alTop;
+  Toolbar.Top := pnlHeader.Height;
+  Toolbar.Height := 62;
+  Toolbar.BevelOuter := bvNone;
+  Toolbar.ParentColor := True;
+  fQuickActions := TComboBox.Create(Self);
+  fQuickActions.Parent := Toolbar;
+  fQuickActions.SetBounds(8, 2, Width - 96, 24);
+  fQuickActions.Anchors := [akLeft, akTop, akRight];
+  fQuickActions.Style := csDropDownList;
+  fQuickActions.Items.Add('Explain code');
+  fQuickActions.Items.Add('Fix code');
+  fQuickActions.Items.Add('Improve code');
+  fQuickActions.Items.Add('Add comments');
+  fQuickActions.Items.Add('Diagnose build errors');
+  fQuickActions.ItemIndex := 0;
+  Button := TButton.Create(Self);
+  Button.Parent := Toolbar;
+  Button.SetBounds(Width - 80, 2, 72, 24);
+  Button.Anchors := [akTop, akRight];
+  Button.Caption := 'Run';
+  Button.OnClick := QuickActionClick;
+  Button := TButton.Create(Self);
+  Button.Parent := Toolbar;
+  Button.SetBounds(8, 32, 88, 24);
+  Button.Caption := 'Copy answer';
+  Button.OnClick := CopyAnswerClick;
+  Button := TButton.Create(Self);
+  Button.Parent := Toolbar;
+  Button.SetBounds(102, 32, 80, 24);
+  Button.Caption := 'Open code';
+  Button.OnClick := OpenCodeClick;
+  fDetails := TCheckBox.Create(Self);
+  fDetails.Parent := Toolbar;
+  fDetails.SetBounds(192, 34, 72, 20);
+  fDetails.Caption := 'Logs';
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
 end;
@@ -187,14 +241,15 @@ end;
 
 procedure TAgentPanelFrame.AppendText(const Text: String; Color: TColor; Bold: Boolean);
 begin
-  reChat.SelStart := reChat.GetTextLen;
+  SendMessage(reChat.Handle, EM_SETSEL, WPARAM(-1), LPARAM(-1));
   reChat.SelLength := 0;
   reChat.SelAttributes.Color := Color;
   if Bold then
     reChat.SelAttributes.Style := [fsBold]
   else
     reChat.SelAttributes.Style := [];
-  reChat.SelText := Text;
+  reChat.SelText := StringReplace(StringReplace(Text, #13#10, #10, [rfReplaceAll]),
+    #10, #13#10, [rfReplaceAll]);
   // Scroll the caret into view.
   SendMessage(reChat.Handle, EM_SCROLLCARET, 0, 0);
 end;
@@ -249,6 +304,7 @@ procedure TAgentPanelFrame.ClearChat;
 begin
   EndResponseWait;
   reChat.Clear;
+  fLastAnswer := '';
   memoInput.Clear;
   ClearAttachments;
   fContextText := '';
@@ -292,7 +348,8 @@ var
   TextToAppend: String;
   SameMessage: Boolean;
 begin
-  if Event.Content = '' then
+  if (Event.Content = '') or SameText(Event.ContentType, 'thinking') or
+     SameText(Event.ContentType, 'redacted_thinking') then
     Exit;
 
   SameMessage := (Event.MessageId = '') or
@@ -320,6 +377,9 @@ begin
   end;
 
   if TextToAppend <> '' then begin
+    if fLastAnswer = '' then
+      AppendText(#13#10 + 'AI:' + #13#10, fTextColor, True);
+    fLastAnswer := fLastAnswer + TextToAppend;
     if SameText(Event.ContentType, 'thinking') or
        SameText(Event.ContentType, 'redacted_thinking') then
       AppendText(TextToAppend, fMutedColor, False)
@@ -617,7 +677,7 @@ begin
       begin
         if Event.Content <> '' then
           HandleAssistantEvent(Event);
-        if Event.Summary <> '' then
+        if (Event.Summary <> '') and (Event.IsError or fDetails.Checked) then
           AppendSystemMessage('[Claude] ' + Event.Summary);
         if Event.IsError then
           SetStatus(asError)
@@ -636,6 +696,9 @@ begin
     aetSystem:
       begin
         if Event.IsProtocolOnly then
+          Exit;
+        if not fDetails.Checked and not Event.IsError and
+           (Event.Subtype <> 'api_retry') then
           Exit;
         Text := EventSummaryText(Event);
         if Text <> '' then begin
@@ -736,6 +799,8 @@ begin
   if fStatus in [asThinking, asExecuting] then
     Exit;
 
+  if Assigned(fOnPrepareContext) then
+    fOnPrepareContext(Self);
   MessageText := BuildMessage(Text);
   DisplayText := Text;
   if DisplayText = '' then
@@ -747,6 +812,8 @@ begin
     SetStatus(asError);
     Exit;
   end;
+  ResetStreamingDisplay;
+  fLastAnswer := '';
   AppendUserMessage(DisplayText);
   fContextText := '';
   memoInput.Clear;
@@ -759,6 +826,45 @@ procedure TAgentPanelFrame.SendPrompt(const Text: String);
 begin
   memoInput.Text := Text;
   SendCurrentInput;
+end;
+
+procedure TAgentPanelFrame.QuickActionClick(Sender: TObject);
+begin
+  if fStatus in [asThinking, asExecuting] then Exit;
+  Tag := fQuickActions.ItemIndex;
+  if Assigned(fOnQuickAction) then fOnQuickAction(Self);
+end;
+
+function TAgentPanelFrame.AnswerCode: String;
+var
+  StartPos, EndPos: Integer;
+  Tail: String;
+begin
+  Result := '';
+  StartPos := Pos('```', fLastAnswer);
+  if StartPos = 0 then Exit;
+  Tail := Copy(fLastAnswer, StartPos + 3, MaxInt);
+  StartPos := Pos(#10, Tail);
+  if StartPos = 0 then Exit;
+  Tail := Copy(Tail, StartPos + 1, MaxInt);
+  EndPos := Pos('```', Tail);
+  if EndPos = 0 then Exit;
+  Result := Copy(Tail, 1, EndPos - 1);
+end;
+
+procedure TAgentPanelFrame.OpenCodeClick(Sender: TObject);
+begin
+  if fStatus in [asThinking, asExecuting] then Exit;
+  if AnswerCode = '' then begin
+    MessageDlg('No complete fenced code block in the latest answer.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+  if Assigned(fOnOpenCode) then fOnOpenCode(Self);
+end;
+
+procedure TAgentPanelFrame.CopyAnswerClick(Sender: TObject);
+begin
+  if fLastAnswer <> '' then Clipboard.AsText := fLastAnswer;
 end;
 
 procedure TAgentPanelFrame.btnSendClick(Sender: TObject);

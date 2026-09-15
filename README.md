@@ -80,6 +80,8 @@ V4 的 CLI 参数带 `[1m]` 上下文标记；主模型、默认角色模型和�
 
 AI 面板沿用 IDE 字体与编辑器主题颜色，支持亮色和暗色切换。顶部 Settings 直接打开配置；底部 Send/Stop 共用紧凑位置，附件列表仅在有附件时显示。回归测试覆盖模型迁移、子进程环境隔离、原生窗体加载、窄宽布局和主题颜色。真实 API 对话仍需使用有效凭据验收。
 
+面板顶部选择 Explain code、Fix code、Improve code、Add comments 或 Diagnose build errors，再点 Run。优先使用编辑器选区，没有选区则使用当前文件；普通聊天也会附带当前编辑内容（包括未保存内容，最多 24,000 字节）和最近的编译错误。Copy answer 复制当前回答，Open code 将回答的第一个完整 Markdown 代码块打开为新编辑标签页，便于检查、修改和编译。Logs 控制后续诊断日志显示，API 重试和错误仍会显示；思考块不再混入正文。
+
 接口参考：[DeepSeek Claude Code 接入](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)。
 
 ## 配置项说明

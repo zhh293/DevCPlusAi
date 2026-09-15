@@ -106,7 +106,7 @@ begin
     SetLength(ExpectedWide, 2);
     ExpectedWide[1] := WideChar($4F60);
     ExpectedWide[2] := WideChar($597D);
-    ExpectedAnsi := WideToAnsi(ExpectedWide);
+    ExpectedAnsi := UTF8Encode(ExpectedWide);
     WriteAll(WritePipe, #$E4#$BD#$A0#$E5#$A5#$BD#10);
 
     Writeln('AgentReader smoke test: 1000 lines');

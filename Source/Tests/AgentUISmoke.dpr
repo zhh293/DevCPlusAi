@@ -3,7 +3,7 @@ program AgentUISmoke;
 {$APPTYPE CONSOLE}
 
 uses
-  Windows, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel, AgentSetupFrm;
+  Windows, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel, AgentSetupFrm, AgentProtocol;
 
 procedure Require(Condition: Boolean; const Message: String);
 begin
@@ -35,6 +35,8 @@ var
   Panel: TAgentPanelFrame;
   Setup: TAgentSetupForm;
   I: Integer;
+  Events: TAgentEventArray;
+  ReplyText: String;
 begin
   try
     Application.Initialize;
@@ -76,6 +78,31 @@ begin
       Require(Panel.memoInput.Color = RGB(30,30,30), 'input ignores dark theme');
       Require(Panel.reChat.Color = RGB(30,30,30), 'chat ignores dark theme');
 
+      Writeln('Agent UI smoke test: UTF-8 streaming, thinking and final deduplication');
+      Panel.ClearChat;
+      ParseLineEvents('{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hidden\n\n\n\n\n\n\n\n\n\n"}}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Panel.reChat.GetTextLen = 0, 'thinking polluted the answer');
+      ParseLineEvents('{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"' + #$E4#$BD#$A0#$E5#$A5#$BD + '\ncode"}}}', Events);
+      ReplyText := Events[0].Content;
+      Require(ReplyText = String(UTF8Decode(#$E4#$BD#$A0#$E5#$A5#$BD)) + #10 + 'code',
+        'UTF-8 response decoded incorrectly');
+      Require(Copy(ReplyText, 1, 2) <> '??', 'Chinese reply lost during parsing');
+      Panel.HandleAgentEvent(Events[0]);
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"text","text":"' + #$E4#$BD#$A0#$E5#$A5#$BD + '\ncode"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Pos('code', Panel.reChat.Text) > 0, 'reply missing from RichEdit');
+      Require(Pos(String(UTF8Decode(#$E4#$BD#$A0#$E5#$A5#$BD)), Panel.reChat.Text) > 0,
+        'Chinese missing from rendered response');
+      Require(Panel.reChat.Lines.Count < 8, 'unexpected blank lines');
+      Require(Pos('code', Copy(Panel.reChat.Text, Pos('code', Panel.reChat.Text) + 4, MaxInt)) = 0,
+        'completed response duplicated streamed text');
+      Panel.ClearChat;
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"text","text":"Example:\n```cpp\nint main() {}\n```"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Panel.AnswerCode = 'int main() {}' + #10, 'code extraction lost content');
+      Panel.ClearChat;
+      Require(Panel.AnswerCode = '', 'clear retained stale code');
       Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
       Setup := TAgentSetupForm.Create(Host);
       Require(Setup.Caption = 'AI Assistant Setup', 'settings caption missing');

@@ -1136,6 +1136,9 @@ type
     procedure AgentProcessExit;
     procedure RefreshAgentFile(const FileName: String);
     procedure UpdateAgentCompileContext;
+    procedure AgentPrepareContext(Sender: TObject);
+    procedure AgentQuickAction(Sender: TObject);
+    procedure AgentOpenCode(Sender: TObject);
     procedure AgentRestartTimerTick(Sender: TObject);
     procedure AgentRequestStarted(Sender: TObject);
     procedure AgentRequestEnded(Sender: TObject);
@@ -9164,6 +9167,9 @@ begin
   fAgentPanelFrame.Parent := fAgentPanel;
   fAgentPanelFrame.Align := alClient;
   fAgentPanelFrame.OnRequestStarted := AgentRequestStarted;
+  fAgentPanelFrame.OnPrepareContext := AgentPrepareContext;
+  fAgentPanelFrame.OnQuickAction := AgentQuickAction;
+  fAgentPanelFrame.OnOpenCode := AgentOpenCode;
   fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
   fAgentPanelFrame.OnSettings := AgentSettingsExecute;
   fAgentPanelFrame.ApplyAppearance(Color, Font.Color,
@@ -9274,12 +9280,13 @@ var
   ActionIndex: Integer;
 begin
   E := fEditorList.GetEditor;
-  if not Assigned(E) or not E.Text.SelAvail then begin
-    MessageDlg('Select some code in the editor first.', mtInformation, [mbOK], 0);
+  if not Assigned(E) then begin
+    MessageDlg('Open a source file in the editor first.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
-  Selection := E.Text.SelText;
+  if E.Text.SelAvail then Selection := E.Text.SelText
+  else Selection := E.Text.Lines.Text;
   if Length(Selection) > 16000 then
     Selection := Copy(Selection, 1, 16000) + #13#10 + '[Selection truncated]';
   ActionIndex := TAction(Sender).Tag;
@@ -9427,10 +9434,38 @@ begin
   E.UpdateCaption;
 end;
 
+procedure TMainForm.AgentOpenCode(Sender: TObject);
+var
+  E: TEditor;
+begin
+  if fAgentPanelFrame.AnswerCode = '' then Exit;
+  E := fEditorList.NewEditor('', etAuto, False, True);
+  if Assigned(E) then begin
+    E.Text.Lines.Text := fAgentPanelFrame.AnswerCode;
+    E.Text.Modified := True;
+    E.UpdateCaption;
+  end;
+end;
+
+procedure TMainForm.AgentQuickAction(Sender: TObject);
+begin
+  if TComponent(Sender).Tag = 4 then begin
+    fAgentPanelFrame.SendPrompt('Diagnose the attached build errors. Explain the root cause and provide a concrete fix. Respond in the language of the user.');
+    Exit;
+  end;
+  AgentSelectionActionExecute(fAgentSelectionActions[TComponent(Sender).Tag]);
+end;
+
+procedure TMainForm.AgentPrepareContext(Sender: TObject);
+begin
+  UpdateAgentCompileContext;
+end;
+
 procedure TMainForm.UpdateAgentCompileContext;
 var
   I: Integer;
-  Context, MessageText: AnsiString;
+  Context, MessageText, EditorContext: AnsiString;
+  E: TEditor;
 begin
   if not Assigned(fAgentPanelFrame) then
     Exit;
@@ -9451,9 +9486,17 @@ begin
     end;
   end;
   if Context <> '' then
-    fAgentPanelFrame.SetContext('Latest build errors/warnings:' + #13#10 + Context)
-  else
-    fAgentPanelFrame.SetContext('');
+    Context := 'Latest build errors/warnings:' + #13#10 + Context;
+  E := fEditorList.GetEditor;
+  if Assigned(E) then begin
+    if E.Text.SelAvail then EditorContext := E.Text.SelText
+    else EditorContext := E.Text.Lines.Text;
+    if Length(EditorContext) > 24000 then
+      EditorContext := Copy(EditorContext, 1, 24000) + #13#10 + '[Editor context truncated]';
+    Context := 'Current editor buffer (may contain unsaved changes): ' + E.FileName +
+      #13#10 + EditorContext + #13#10#13#10 + Context;
+  end;
+  fAgentPanelFrame.SetContext(Context);
 end;
 
 procedure TMainForm.StartAgent;
