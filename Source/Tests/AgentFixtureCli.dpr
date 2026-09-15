@@ -28,6 +28,11 @@ begin
     Flush(Output);
     while not Eof(Input) do begin
       Readln(Line);
+      if Pos('control_response', Line) > 0 then begin
+        Data.Text := Line;
+        Data.SaveToFile('fixture-decision.txt');
+        Continue;
+      end;
       if Line <> '' then begin
         Writeln('{"type":"assistant","session_id":"' + Id + '","message":{"id":"msg-' + Id + '","content":[{"type":"text","text":"Reply for ' + Id + '"}]}}');
         Writeln('{"type":"result","subtype":"success","session_id":"' + Id + '","result":"Reply for ' + Id + '","is_error":false}');

@@ -73,6 +73,7 @@ type
     // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
     // Returns False and sets LastError if no complete JSONL record was sent.
     function SendMessage(const Text: String): Boolean;
+    function SendPermissionResponse(const RequestId, InputJSON: String; Allow: Boolean): Boolean;
 
     // Send a user message whose content may contain local image resources.
     // Non-image attachments are sent as path references so Claude can read
@@ -798,7 +799,7 @@ begin
 
   PermissionArg := '';
   if Assigned(devAgentConfig) then begin
-    PermissionArg := ' --permission-mode ' +
+    PermissionArg := ' --permission-prompt-tool stdio --permission-mode ' +
       CanonicalPermissionMode(devAgentConfig.PermissionMode);
   end;
 
@@ -950,6 +951,24 @@ begin
   Result := Start(NewWorkDir);
 end;
 
+function TAgentProcess.SendPermissionResponse(const RequestId, InputJSON: String;
+  Allow: Boolean): Boolean;
+var
+  Data, Decision: AnsiString;
+  PipeError: String;
+begin
+  Result := False;
+  if not IsRunning or (fInputWrite = 0) or (RequestId = '') then Exit;
+  if Allow then begin
+    Decision := '{"behavior":"allow"';
+    if InputJSON <> '' then Decision := Decision + ',"updatedInput":' + InputJSON;
+    Decision := Decision + '}';
+  end else Decision := '{"behavior":"deny","message":"The user denied this tool operation."}';
+  Data := '{"type":"control_response","response":{"subtype":"success","request_id":' +
+    JsonQuoteUtf8(RequestId) + ',"response":' + Decision + '}}' + #10;
+  Result := WriteAgentPipeData(fInputWrite, Data, PipeError);
+  if not Result then fLastError := 'Could not send permission decision: ' + PipeError;
+end;
 function TAgentProcess.SendMessage(const Text: String): Boolean;
 begin
   Result := SendMessageWithAttachments(Text, nil);

@@ -145,7 +145,18 @@ begin
       finally
         Histories.Free;
       end;
-      Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
+      Panel.ClearChat;
+      Panel.AppendAIText('Before');
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"ordered-tool","name":"Read","input":{"file_path":"main.cpp"}}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Panel.AppendAIText('After');
+      Require(Panel.Timeline.BlockCount = 3, 'timeline must contain text/tool/text');
+      Require(Panel.Timeline.BlockAt(0).Top < Panel.Timeline.BlockAt(1).Top, 'tool precedes first text');
+      Require(Panel.Timeline.BlockAt(1).Top < Panel.Timeline.BlockAt(2).Top, 'tool follows last text');
+      Require(Panel.Timeline.BlockAt(1).Height = 32, 'inline tool not initially collapsed');
+      Panel.SaveConversation(Snapshot);
+      Panel.LoadConversation(Snapshot);
+      Require(Panel.Timeline.BlockCount = 3, 'history lost ordered blocks');      Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
       Setup := TAgentSetupForm.Create(Host);
       Require(Setup.Caption = 'AI Assistant Setup', 'settings caption missing');
       Require(Setup.edtApiKey.PasswordChar <> #0, 'API key field is not masked');

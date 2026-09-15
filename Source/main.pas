@@ -33,7 +33,7 @@ uses
   CBUtils, StatementList, FormatterOptionsFrm, RenameFrm, Refactorer, devConsole,
   Tabnine,devCaretList, devFindOutput, HeaderCompletion, VirtualTrees,
   devFileBrowser,
-  AgentPanel, AgentProcess, AgentReader, AgentProtocol;
+  AgentPanel, AgentProcess, AgentReader, AgentProtocol, AgentApprovalFrm;
 
 type
   TRunEndAction = (reaNone, reaProfile);
@@ -3617,6 +3617,10 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
+  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
+    fAgentPanelFrame.ExecuteEditCommand(2, fAgentPanelFrame.Timeline.FocusedEdit);
+    Exit;
+  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CutToClipboard;
@@ -3636,6 +3640,10 @@ procedure TMainForm.actCopyExecute(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
+    fAgentPanelFrame.ExecuteEditCommand(0, fAgentPanelFrame.Timeline.FocusedEdit);
+    Exit;
+  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CopyToClipboard;
@@ -3656,6 +3664,10 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
+  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
+    fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.Timeline.FocusedEdit);
+    Exit;
+  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused then begin
       fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.memoInput);
@@ -3675,6 +3687,10 @@ procedure TMainForm.actSelectAllExecute(Sender: TObject);
 var
   e: TEditor;
 begin
+  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
+    fAgentPanelFrame.ExecuteEditCommand(3, fAgentPanelFrame.Timeline.FocusedEdit);
+    Exit;
+  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.SelectAll;
@@ -9846,6 +9862,7 @@ var
   Events: TAgentEventArray;
   ev: TAgentEvent;
   I, MapIndex: Integer;
+  Allowed: Boolean;
   Path: String;
 begin
   if Line = '' then
@@ -9854,6 +9871,15 @@ begin
   try
     for I := 0 to Length(Events) - 1 do begin
       ev := Events[I];
+      if ev.EventType = aetPermission then begin
+        if Assigned(fAgentResponseTimer) then fAgentResponseTimer.Enabled := False;
+        Allowed := False;
+        if ev.Subtype = 'can_use_tool' then
+          Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
+        if Assigned(fAgentProcess) and not fAgentProcess.SendPermissionResponse(ev.EventId, ev.ToolInput, Allowed) then
+          fAgentPanelFrame.AppendSystemMessage('Failed to deliver approval decision. Stop and retry the request.');
+        Continue;
+      end;
       if ev.SessionId <> '' then begin
         if fAgentSessionId <> ev.SessionId then begin
           fAgentSessionId := ev.SessionId;

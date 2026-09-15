@@ -28,7 +28,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG, Menus,
-  AgentProcess, AgentProtocol;
+  AgentProcess, AgentProtocol, AgentTimeline;
 
 type
   TAgentStatus = (
@@ -81,6 +81,7 @@ type
     fPopupTarget: TWinControl;
     fOnSessionChange: TNotifyEvent;
     fTools: TTreeView;
+    fTimeline: TAgentTimeline;
     fToolPanel: TPanel;
     fToolToggle: TButton;
     fTextColor: TColor;
@@ -161,6 +162,7 @@ type
 
     function HandleEditShortcut(Key: Word; Shift: TShiftState): Boolean;
     function ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
+    property Timeline: TAgentTimeline read fTimeline;
     property ToolTree: TTreeView read fTools;
     property ToolToggle: TButton read fToolToggle;
     property SessionPicker: TComboBox read fSessions;
@@ -293,6 +295,14 @@ begin
   reChat.PopupMenu := fEditPopup;
   memoInput.PopupMenu := fEditPopup;
   fTools.PopupMenu := fEditPopup;
+  fTimeline := TAgentTimeline.Create(Self);
+  fTimeline.Parent := pnlChat;
+  fTimeline.Align := alClient;
+  fTimeline.PopupMenu := fEditPopup;
+  fTimeline.Color := reChat.Color;
+  fTimeline.Font.Assign(reChat.Font);
+  reChat.Visible := False;
+  fToolPanel.Visible := False;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
 end;
@@ -319,6 +329,7 @@ procedure TAgentPanelFrame.AppendText(const Text: String; Color: TColor; Bold: B
 var
   OldStart, OldLength: Integer;
 begin
+  if Assigned(fTimeline) then fTimeline.AppendText(Text, Color, Bold);
   OldStart := reChat.SelStart;
   OldLength := reChat.SelLength;
   SendMessage(reChat.Handle, EM_SETSEL, WPARAM(-1), LPARAM(-1));
@@ -389,6 +400,7 @@ procedure TAgentPanelFrame.ClearChat;
 begin
   EndResponseWait;
   reChat.Clear;
+  if Assigned(fTimeline) then fTimeline.Clear;
   fConversationTitle := '';
   fTools.Items.Clear;
   fTools.Visible := False;
@@ -699,6 +711,12 @@ begin
     fSessions.Color := AEditorColor;
     fSessions.Font.Color := ATextColor;
   end;
+  if Assigned(fTimeline) then begin
+    fTimeline.Color := AEditorColor;
+    fTimeline.Font.Name := AFontName;
+    fTimeline.Font.Color := ATextColor;
+    fTimeline.Font.Size := TextSize;
+  end;
   SetFontSize(TextSize);
 end;
 
@@ -911,7 +929,8 @@ end;
 
 function TAgentPanelFrame.ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
 begin
-  Result := (Target = memoInput) or (Target = reChat) or (Target = fTools);
+  Result := (Target = memoInput) or (Target = reChat) or (Target = fTools) or
+    (Assigned(fTimeline) and (Target <> nil) and (Target = fTimeline.FocusedEdit));
   if not Result then Exit;
   if Target = fTools then begin
     if (Command = 0) and (fTools.Selected <> nil) then
@@ -940,6 +959,7 @@ begin
   if memoInput.Focused then Target := memoInput
   else if reChat.Focused then Target := reChat
   else if fTools.Focused then Target := fTools;
+  if (Target = nil) and Assigned(fTimeline) then Target := fTimeline.FocusedEdit;
   if Target = nil then Exit;
   Command := -1;
   if Shift = [ssCtrl] then
@@ -1041,6 +1061,7 @@ var
   Text: TStringList;
 begin
   ForceDirectories(ExtractFilePath(Path));
+  fTimeline.SaveToFile(Path + '.timeline');
   reChat.Lines.SaveToFile(Path + '.rtf');
   fTools.SaveToFile(Path + '.tools');
   Text := TStringList.Create;
@@ -1062,6 +1083,8 @@ var
 begin
   ClearChat;
   if FileExists(Path + '.rtf') then reChat.Lines.LoadFromFile(Path + '.rtf');
+  if FileExists(Path + '.timeline') then fTimeline.LoadFromFile(Path + '.timeline')
+  else fTimeline.AppendText(reChat.Text, fTextColor, False);
   if FileExists(Path + '.tools') then fTools.LoadFromFile(Path + '.tools');
   fTools.FullCollapse;
   Text := TStringList.Create;
@@ -1128,6 +1151,7 @@ begin
     fToolToggle.Caption := '> Tool activity - failure';
   end
   else if Event.EventType = aetToolResult then Node.Text := Node.Text + ' [Done]';
+  fTimeline.AddTool(Key, Node.Text, Summary);
   Lines := TStringList.Create;
   try
     Lines.Text := Summary;

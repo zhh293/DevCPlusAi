@@ -82,7 +82,7 @@ AI 面板沿用 IDE 字体与编辑器主题颜色，支持亮色和暗色切换
 
 面板顶部选择 Explain code、Fix code、Improve code、Add comments 或 Diagnose build errors，再点 Run。优先使用编辑器选区，没有选区则使用当前文件；普通聊天也会附带当前编辑内容（包括未保存内容，最多 24,000 字节）和最近的编译错误。Copy answer 复制当前回答，Open code 将回答的第一个完整 Markdown 代码块打开为新编辑标签页，便于检查、修改和编译。Logs 控制后续诊断日志显示，API 重试和错误仍会显示；思考块不再混入正文。
 
-输入框和回答区支持 Ctrl+C、Ctrl+V、Ctrl+A，以及右键菜单；输入框还支持剪切、撤销和 Shift+Insert 粘贴。在回答区粘贴会把文字放进输入框。流式回复到来时会保留已选中的文字，便于复制。Tool activity 默认折叠，调用参数与执行结果按工具分组，点击展开后可逐项查看和复制，普通回答保持在正文区域。
+输入框和回答区支持 Ctrl+C、Ctrl+V、Ctrl+A，以及右键菜单；输入框还支持剪切、撤销和 Shift+Insert 粘贴。在回答区粘贴会把文字放进输入框。流式回复到来时会保留已选中的文字，便于复制。工具调用在发生时插入对话流，每个调用独立折叠；结果更新原位置，前后文字顺序不变。点击工具标题展开参数与结果，支持复制；历史恢复保留这些块的顺序。
 
 点击 New chat 新建会话，通过旁边的历史下拉框选择旧会话继续。每个工作目录分别保存会话 ID、正文、工具记录和输入草稿；关闭程序后会恢复最后选中的会话。历史记录存放在本机配置目录的 AgentSessions/History 下，不进入发布包。旧版本在当前工作目录留下的 Claude CLI 历史也会进入列表，首次选择时导入正文；恢复上下文仍需要对应 CLI 会话文件存在。新会话不会继承旧会话 ID。
 
@@ -284,3 +284,5 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 ## 开发状态
 
 基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、输入管道完整写入/断管失败、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。新增的 `AgentUISmoke` 会实际加载 AI 面板和设置窗体，并检查三种宽度下的按钮布局及 Send/Stop 状态；原有 `btnAttach.Align` 故障已验证会使测试以非零状态退出。仍需完成真实 API 对话和完整安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+
+普通权限模式通过 CLI 的 stdio 审批通道弹出工具审批窗口，显示工具、工作目录与完整参数。Allow once 只允许本次，Deny 或关闭窗口拒绝；不会自动修改权限模式。

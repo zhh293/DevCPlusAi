@@ -95,7 +95,7 @@ begin
     actPasteExecute(nil);
     Require(fAgentPanelFrame.memoInput.Text = 'clipboard sample', 'Edit menu paste failed');
     fAgentPanelFrame.AppendAIText('copy reply');
-    fAgentPanelFrame.reChat.SetFocus;
+    fAgentPanelFrame.Timeline.LastText.SetFocus;
     actSelectAllExecute(nil);
     actCopyExecute(nil);
     Require(Clipboard.AsText = 'copy reply', 'reply copy failed');
@@ -107,6 +107,17 @@ begin
 
     StartAgent;
     CheckResume('');
+    Require(fAgentProcess.SendPermissionResponse('allow-request', '{"command":"echo sample"}', True), 'approval write failed');
+    Sleep(100);
+    Data.LoadFromFile(IncludeTrailingPathDelimiter(devDirs.Exec) + 'fixture-decision.txt');
+    Require(Pos('"behavior":"allow"', Data.Text) > 0, 'allow response missing');
+    Require(Pos('echo sample', Data.Text) > 0, 'approved command changed');
+    Require(fAgentProcess.SendPermissionResponse('deny-request', '{}', False), 'deny write failed');
+    Sleep(100);
+    Data.LoadFromFile(IncludeTrailingPathDelimiter(devDirs.Exec) + 'fixture-decision.txt');
+    Require(Pos('"behavior":"deny"', Data.Text) > 0, 'deny response missing');
+    Require(Pos('deny-request', Data.Text) > 0, 'deny request mismatch');
+    Writeln('Agent integration: permission decisions delivered to CLI stdin');
     fAgentPanelFrame.SendPrompt('First conversation');
     WaitReady;
     Id1 := fAgentSessionId;

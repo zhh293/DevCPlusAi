@@ -16,7 +16,11 @@ var
   Events: TAgentEventArray;
   Count: Integer;
 begin
-  Writeln('AgentProtocol smoke test: reset state');
+  Count := ParseLineEvents('{"type":"control_request","request_id":"approve-1","request":{"subtype":"can_use_tool","tool_name":"Bash","tool_use_id":"tool-1","input":{"command":"echo test"}}}', Events);
+  Require((Count = 1) and (Events[0].EventType = aetPermission), 'approval not recognized');
+  Require(Events[0].EventId = 'approve-1', 'approval request id lost');
+  Require(Events[0].Command = 'echo test', 'approval command lost');
+  Require(Pos('echo test', Events[0].ToolInput) > 0, 'approval original input lost');  Writeln('AgentProtocol smoke test: reset state');
   ResetProtocolState;
 
   Writeln('AgentProtocol smoke test: assistant blocks');

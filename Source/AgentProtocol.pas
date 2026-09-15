@@ -25,6 +25,7 @@ uses
 
 type
   TAgentEventType = (
+    aetPermission,      // CLI requests explicit tool approval
     aetAssistant,       // assistant text or thinking content
     aetToolUse,         // tool call started or completed input
     aetToolResult,      // tool result returned by Claude/tool runtime
@@ -906,7 +907,25 @@ begin
 
     TypeName := GetStr(JS, 'type');
     LowerType := LowerCase(TypeName);
-    if LowerType = 'stream_event' then
+    if LowerType = 'control_request' then begin
+      InitEvent(Event, Line);
+      Event.EventType := aetPermission;
+      Event.EventId := GetStr(JS, 'request_id');
+      MessageNode := GetObj(JS, 'request');
+      Event.Subtype := GetStr(MessageNode, 'subtype');
+      Event.ToolName := GetStr(MessageNode, 'tool_name');
+      Event.ToolId := GetStr(MessageNode, 'tool_use_id');
+      ContentNode := GetObj(MessageNode, 'input');
+      Event.ToolInput := GetJSONText(ContentNode);
+      Event.Command := GetStr(ContentNode, 'command');
+      Event.FilePath := GetStr(ContentNode, 'file_path');
+      AppendEvent(Events, Event);
+    end else if LowerType = 'control_response' then begin
+      InitEvent(Event, Line);
+      Event.EventType := aetSystem;
+      Event.IsProtocolOnly := True;
+      AppendEvent(Events, Event);
+    end else if LowerType = 'stream_event' then
       ParseStreamEvent(JS, Events)
     else if LowerType = 'assistant' then begin
       MessageNode := GetObj(JS, 'message');
