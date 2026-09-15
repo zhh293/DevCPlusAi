@@ -77,6 +77,15 @@ type
     property SystemPrompt: String read fSystemPrompt write fSystemPrompt;
   end;
 
+const
+  DEEPSEEK_DEFAULT_MODEL = 'deepseek-v4-flash';
+  DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro';
+  DEEPSEEK_ANTHROPIC_URL = 'https://api.deepseek.com/anthropic';
+
+function NormalizeAgentModel(const Provider, Model: String): String;
+function NormalizeAgentBaseUrl(const Provider, BaseUrl: String): String;
+function AgentCliModel(const Provider, Model: String): String;
+
 implementation
 
 uses
@@ -102,6 +111,43 @@ function CryptUnprotectData(pDataIn: PAgentDataBlob; ppszDataDescr: PPWideChar;
 
 function AgentLocalFree(hMem: HLOCAL): HLOCAL; stdcall;
   external 'kernel32.dll' name 'LocalFree';
+
+function NormalizeAgentModel(const Provider, Model: String): String;
+begin
+  Result := Trim(Model);
+  if SameText(Trim(Provider), 'deepseek') and
+     ((Result = '') or SameText(Result, 'deepseek-chat') or
+      SameText(Result, 'deepseek-reasoner')) then
+    Result := DEEPSEEK_DEFAULT_MODEL;
+end;
+
+function NormalizeAgentBaseUrl(const Provider, BaseUrl: String): String;
+var
+  Candidate: String;
+begin
+  Result := Trim(BaseUrl);
+  if not SameText(Trim(Provider), 'deepseek') then
+    Exit;
+  Candidate := Result;
+  while (Length(Candidate) > 0) and
+      (Candidate[Length(Candidate)] = '/') do
+    Delete(Candidate, Length(Candidate), 1);
+  if (Candidate = '') or
+     SameText(Candidate, 'https://api.deepseek.com') or
+     SameText(Candidate, 'https://api.deepseek.com/v1') or
+     SameText(Candidate, DEEPSEEK_ANTHROPIC_URL) then
+    Result := DEEPSEEK_ANTHROPIC_URL;
+end;
+
+function AgentCliModel(const Provider, Model: String): String;
+begin
+  Result := NormalizeAgentModel(Provider, Model);
+  // The CLI consumes [1m] locally and sends the canonical API model name.
+  if SameText(Trim(Provider), 'deepseek') and
+     (SameText(Result, DEEPSEEK_DEFAULT_MODEL) or
+      SameText(Result, DEEPSEEK_PRO_MODEL)) then
+    Result := Result + '[1m]';
+end;
 
 const
   AGENT_KEY_PREFIX = 'dpapi:';
@@ -282,6 +328,8 @@ begin
     fSendKey := 'enter';
   if not SameText(fPanelPosition, 'right') then
     fPanelPosition := 'right';
+  fModel := NormalizeAgentModel(fProvider, fModel);
+  fBaseUrl := NormalizeAgentBaseUrl(fProvider, fBaseUrl);
   StoredApiKey := fApiKey;
   if Pos(AGENT_KEY_PREFIX, LowerCase(StoredApiKey)) = 1 then begin
     if UnprotectApiKey(StoredApiKey, PlainApiKey) then
@@ -295,6 +343,8 @@ procedure TdevAgentConfig.SaveSettings;
 var
   StoredApiKey, ProtectedApiKey: AnsiString;
 begin
+  fModel := NormalizeAgentModel(fProvider, fModel);
+  fBaseUrl := NormalizeAgentBaseUrl(fProvider, fBaseUrl);
   StoredApiKey := fApiKey;
   if (StoredApiKey <> '') and not ProtectApiKey(StoredApiKey, ProtectedApiKey) then
     Exit;

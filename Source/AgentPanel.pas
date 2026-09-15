@@ -41,6 +41,12 @@ type
 
   TAgentPanelFrame = class(TFrame)
     StatusBar: TStatusBar;
+    pnlHeader: TPanel;
+    pnlChat: TPanel;
+    pnlSendTools: TPanel;
+    lblTitle: TLabel;
+    lblSendHint: TLabel;
+    btnSettings: TButton;
     reChat: TRichEdit;
     pnlInput: TPanel;
     pnlAttachments: TPanel;
@@ -52,6 +58,7 @@ type
     btnAttach: TButton;
     btnPasteImage: TButton;
     btnRemoveAttachment: TButton;
+    procedure btnSettingsClick(Sender: TObject);
     procedure btnSendClick(Sender: TObject);
     procedure btnStopClick(Sender: TObject);
     procedure btnAttachClick(Sender: TObject);
@@ -61,6 +68,10 @@ type
     procedure reChatKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     fAgentProcess: TAgentProcess;
+    fTextColor: TColor;
+    fMutedColor: TColor;
+    fErrorColor: TColor;
+    fOnSettings: TNotifyEvent;
     fStatus: TAgentStatus;
     fModelName: String;
     fContextText: String;
@@ -73,6 +84,7 @@ type
     fWaitingForResponse: Boolean;
     fOnRequestStarted: TNotifyEvent;
     fOnRequestEnded: TNotifyEvent;
+    procedure UpdateAttachmentLayout;
     procedure AppendText(const Text: String; Color: TColor; Bold: Boolean);
     procedure AppendUserMessageInternal(const Text: String);
     procedure AppendAITextInternal(const Text: String);
@@ -106,6 +118,8 @@ type
     procedure SetContext(const Text: String);
     procedure SetSendKey(const Value: String);
     procedure SetFontSize(Value: Integer);
+    procedure ApplyAppearance(APanelColor, APanelTextColor, AEditorColor,
+      ATextColor: TColor; const AFontName: String; AFontSize: Integer);
 
     // Status / model display.
     procedure SetStatus(Status: TAgentStatus);
@@ -121,6 +135,7 @@ type
     // over this frame. The list remains pending until the next send.
     procedure AddDroppedFiles(Files: TStrings);
 
+    property OnSettings: TNotifyEvent read fOnSettings write fOnSettings;
     property Status: TAgentStatus read fStatus;
     property OnRequestStarted: TNotifyEvent read fOnRequestStarted write fOnRequestStarted;
     property OnRequestEnded: TNotifyEvent read fOnRequestEnded write fOnRequestEnded;
@@ -130,18 +145,9 @@ implementation
 
 {$R *.dfm}
 
-type
-  // Delphi 7 inherits Align on TButton without publishing it for DFM loading.
-  TAgentButtonAccess = class(TButton);
-
 constructor TAgentPanelFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  TAgentButtonAccess(btnAttach).Align := alLeft;
-  TAgentButtonAccess(btnPasteImage).Align := alLeft;
-  TAgentButtonAccess(btnRemoveAttachment).Align := alRight;
-  TAgentButtonAccess(btnSend).Align := alRight;
-  TAgentButtonAccess(btnStop).Align := alRight;
   fAgentProcess := nil;
   fStatus := asDisconnected;
   fModelName := '';
@@ -155,6 +161,10 @@ begin
   fWaitingForResponse := False;
   fOnRequestStarted := nil;
   fOnRequestEnded := nil;
+  fOnSettings := nil;
+  ApplyAppearance(clBtnFace, clWindowText, clWindow, clWindowText,
+    Font.Name, Font.Size);
+  UpdateAttachmentLayout;
   SetStatus(asDisconnected);
 end;
 
@@ -191,8 +201,8 @@ end;
 
 procedure TAgentPanelFrame.AppendUserMessageInternal(const Text: String);
 begin
-  AppendText(#13#10 + 'You:' + #13#10, clNavy, True);
-  AppendText(Text + #13#10, clWindowText, False);
+  AppendText(#13#10 + 'You:' + #13#10, fTextColor, True);
+  AppendText(Text + #13#10, fTextColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendUserMessage(const Text: String);
@@ -202,7 +212,7 @@ end;
 
 procedure TAgentPanelFrame.AppendAITextInternal(const Text: String);
 begin
-  AppendText(Text, clWindowText, False);
+  AppendText(Text, fTextColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendAIText(const Text: String);
@@ -212,7 +222,7 @@ end;
 
 procedure TAgentPanelFrame.AppendSystemMessageInternal(const Text: String);
 begin
-  AppendText(#13#10 + '[IDE] ' + Text + #13#10, clGray, False);
+  AppendText(#13#10 + '[IDE] ' + Text + #13#10, fMutedColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendSystemMessage(const Text: String);
@@ -312,7 +322,7 @@ begin
   if TextToAppend <> '' then begin
     if SameText(Event.ContentType, 'thinking') or
        SameText(Event.ContentType, 'redacted_thinking') then
-      AppendText(TextToAppend, clGray, False)
+      AppendText(TextToAppend, fMutedColor, False)
     else
       AppendAIText(TextToAppend);
   end;
@@ -363,6 +373,7 @@ begin
     Exit;
   fAttachments.Add(Path);
   lbAttachments.Items.Add(Path);
+  UpdateAttachmentLayout;
   Result := True;
 end;
 
@@ -400,6 +411,7 @@ begin
   end;
   fAttachments.Delete(Index);
   lbAttachments.Items.Delete(Index);
+  UpdateAttachmentLayout;
 end;
 
 procedure TAgentPanelFrame.ClearAttachments;
@@ -411,6 +423,7 @@ begin
   fTemporaryAttachments.Clear;
   fAttachments.Clear;
   lbAttachments.Items.Clear;
+  UpdateAttachmentLayout;
 end;
 
 function TAgentPanelFrame.SaveClipboardImage: String;
@@ -464,10 +477,81 @@ begin
   end;
 end;
 
+procedure TAgentPanelFrame.btnSettingsClick(Sender: TObject);
+begin
+  if Assigned(fOnSettings) then
+    fOnSettings(Self);
+end;
+
+procedure TAgentPanelFrame.UpdateAttachmentLayout;
+var
+  InputHeight: Integer;
+begin
+  if fAttachments = nil then
+    Exit;
+  pnlAttachments.Visible := fAttachments.Count > 0;
+  btnRemoveAttachment.Enabled := fAttachments.Count > 0;
+  InputHeight := 152;
+  if memoInput.Font.Size > 10 then
+    Inc(InputHeight, (memoInput.Font.Size - 10) * 3);
+  if pnlAttachments.Visible then
+    Inc(InputHeight, pnlAttachments.Height);
+  pnlInput.Height := InputHeight;
+end;
+
+procedure TAgentPanelFrame.ApplyAppearance(APanelColor, APanelTextColor,
+  AEditorColor, ATextColor: TColor; const AFontName: String; AFontSize: Integer);
+var
+  Bg, Fg: Longint;
+  TextSize, SelectionStart, SelectionLength: Integer;
+begin
+  TextSize := memoInput.Font.Size;
+  Color := APanelColor;
+  Font.Name := AFontName;
+  Font.Size := AFontSize;
+  Font.Color := APanelTextColor;
+  lblTitle.Font.Assign(Font);
+  lblTitle.Font.Style := [fsBold];
+  pnlChat.Color := AEditorColor;
+  reChat.Color := AEditorColor;
+  memoInput.Color := AEditorColor;
+  lbAttachments.Color := AEditorColor;
+  reChat.Font.Name := AFontName;
+  memoInput.Font.Name := AFontName;
+  lbAttachments.Font.Name := AFontName;
+  reChat.Font.Color := ATextColor;
+  memoInput.Font.Color := ATextColor;
+  lbAttachments.Font.Color := ATextColor;
+  Bg := ColorToRGB(AEditorColor);
+  Fg := ColorToRGB(ATextColor);
+  fMutedColor := RGB((2 * GetRValue(Fg) + GetRValue(Bg)) div 3,
+    (2 * GetGValue(Fg) + GetGValue(Bg)) div 3,
+    (2 * GetBValue(Fg) + GetBValue(Bg)) div 3);
+  if GetRValue(Bg) + GetGValue(Bg) + GetBValue(Bg) < 384 then
+    fErrorColor := RGB(255, 150, 150)
+  else
+    fErrorColor := clMaroon;
+  if (fTextColor <> ATextColor) and (reChat.GetTextLen > 0) then begin
+    // Existing transcript text must remain readable after changing theme.
+    SelectionStart := reChat.SelStart;
+    SelectionLength := reChat.SelLength;
+    reChat.SelectAll;
+    reChat.SelAttributes.Color := ATextColor;
+    reChat.SelStart := SelectionStart;
+    reChat.SelLength := SelectionLength;
+  end;
+  fTextColor := ATextColor;
+  SetFontSize(TextSize);
+end;
+
 procedure TAgentPanelFrame.SetSendKey(const Value: String);
 begin
   fSendOnCtrlEnter := SameText(Value, 'ctrl+enter');
   memoInput.WantReturns := True;
+  if fSendOnCtrlEnter then
+    lblSendHint.Caption := 'Ctrl+Enter to send'
+  else
+    lblSendHint.Caption := 'Enter to send';
 end;
 
 procedure TAgentPanelFrame.SetFontSize(Value: Integer);
@@ -480,6 +564,7 @@ begin
   memoInput.Font.Size := Value;
   lbAttachments.Font.Size := Value;
   lbAttachments.ItemHeight := Value + 6;
+  UpdateAttachmentLayout;
 end;
 
 { ------------------------------------------------------------------ }
@@ -514,18 +599,18 @@ begin
           ToolDetails := Copy(Event.ToolInput, 1, 300);
         if ToolDetails <> '' then
           AppendText(#13#10 + '[Tool ' + Event.ToolName + '] ' + ToolDetails + #13#10,
-            clGreen, True)
+            fTextColor, True)
         else
           AppendText(#13#10 + '[Tool ' + Event.ToolName + ']' + #13#10,
-            clGreen, True);
+            fTextColor, True);
       end;
 
     aetToolResult:
       begin
         if Event.IsError then
-          AppendText('  -> [Failed] ' + Event.Content + #13#10, clRed, False)
+          AppendText('  -> [Failed] ' + Event.Content + #13#10, fErrorColor, False)
         else if Event.Content <> '' then
-          AppendText('  -> ' + Event.Content + #13#10, clGray, False);
+          AppendText('  -> ' + Event.Content + #13#10, fMutedColor, False);
       end;
 
     aetResult:
@@ -538,13 +623,13 @@ begin
           SetStatus(asError)
         else
           SetStatus(asReady);
-        AppendText(#13#10, clWindowText, False);
+        AppendText(#13#10, fTextColor, False);
         ResetStreamingDisplay;
       end;
 
     aetError:
       begin
-        AppendText(#13#10 + '[Error] ' + Event.Content + #13#10, clRed, True);
+        AppendText(#13#10 + '[Error] ' + Event.Content + #13#10, fErrorColor, True);
         SetStatus(asError);
       end;
 
@@ -591,7 +676,7 @@ begin
 
   else
     // aetUnknown: append raw text greyed out.
-    AppendText(Event.Content + #13#10, clGray, False);
+    AppendText(Event.Content + #13#10, fMutedColor, False);
   end;
 end;
 
@@ -607,11 +692,11 @@ begin
     EndResponseWait;
   fStatus := Status;
   case Status of
-    asReady:        s := '[OK] Ready';
-    asThinking:     s := '[...] Thinking';
-    asExecuting:    s := '[RUN] Working';
-    asError:        s := '[ERR] Error';
-    asDisconnected: s := '[OFF] Disconnected';
+    asReady:        s := 'Ready';
+    asThinking:     s := 'Thinking...';
+    asExecuting:    s := 'Working...';
+    asError:        s := 'Error';
+    asDisconnected: s := 'Disconnected';
   else
     s := '';
   end;
@@ -621,11 +706,13 @@ begin
   // While thinking/executing, swap Send for Stop.
   btnStop.Visible := Status in [asThinking, asExecuting];
   btnSend.Enabled := not (Status in [asThinking, asExecuting]);
+  btnSend.Visible := btnSend.Enabled;
 end;
 
 procedure TAgentPanelFrame.SetModelName(const Name: String);
 begin
   fModelName := Name;
+  StatusBar.Hint := Name;
   if StatusBar.Panels.Count > 1 then
     StatusBar.Panels[1].Text := Name;
 end;
@@ -643,7 +730,7 @@ begin
     Exit;
   if (fAgentProcess = nil) or not fAgentProcess.IsRunning then begin
     AppendText(#13#10 + '[Notice] AI is not connected. Configure an API Key in Settings.' + #13#10,
-      clRed, False);
+      fErrorColor, False);
     Exit;
   end;
   if fStatus in [asThinking, asExecuting] then

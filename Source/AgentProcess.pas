@@ -103,7 +103,7 @@ function BuildEnvironmentBlock(const WorkDir: String): PChar;
 implementation
 
 uses
-  Utils, devCFG, AgentPipeIO;
+  Utils, devCFG, AgentPipeIO, AgentConfig;
 
 type
   TCreateJobObjectFunc = function(lpJobAttributes: Pointer;
@@ -477,7 +477,7 @@ var
   EnvList: TStringList;
   InstallDir, OldPath, NewPath, CompilerBinDir: String;
   i, Total, Pos: Integer;
-  Provider, ApiKey, BaseUrl: String;
+  Provider, ApiKey, BaseUrl, Model: String;
 
   procedure SetVar(const Name, Value: String);
   var
@@ -495,6 +495,17 @@ var
       EnvList[idx] := Name + '=' + Value
     else
       EnvList.Add(Name + '=' + Value);
+  end;
+
+  procedure RemoveVar(const Name: String);
+  var
+    j: Integer;
+    Prefix: String;
+  begin
+    Prefix := Name + '=';
+    for j := EnvList.Count - 1 downto 0 do
+      if SameText(Copy(EnvList[j], 1, Length(Prefix)), Prefix) then
+        EnvList.Delete(j);
   end;
 
   function GetVar(const Name: String): String;
@@ -534,9 +545,21 @@ begin
 
     // Inject the API key according to the configured provider.
     if Assigned(devAgentConfig) then begin
-      Provider := LowerCase(devAgentConfig.Provider);
+      Provider := LowerCase(Trim(devAgentConfig.Provider));
       ApiKey := devAgentConfig.ApiKey;
-      BaseUrl := devAgentConfig.BaseUrl;
+      BaseUrl := NormalizeAgentBaseUrl(Provider, devAgentConfig.BaseUrl);
+      if Provider = 'deepseek' then begin
+        Model := NormalizeAgentModel(Provider, devAgentConfig.Model);
+        SetVar('ANTHROPIC_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_OPUS_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_SONNET_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_HAIKU_MODEL', Model);
+        SetVar('ANTHROPIC_SMALL_FAST_MODEL', Model);
+        SetVar('CLAUDE_CODE_SUBAGENT_MODEL', Model);
+        if AgentCliModel(Provider, Model) <> Model then
+          SetVar('CLAUDE_CODE_AUTO_COMPACT_WINDOW', '786432');
+        SetVar('ANTHROPIC_BASE_URL', BaseUrl);
+      end;
 
       if ApiKey <> '' then begin
         // Claude Code authenticates through the Anthropic-compatible channel.
@@ -550,6 +573,10 @@ begin
           SetVar('ANTHROPIC_API_KEY', ApiKey);
           SetVar('ANTHROPIC_AUTH_TOKEN', ApiKey);
         end;
+        // DeepSeek's documented Claude Code path uses bearer authentication.
+        // Do not inherit a competing Anthropic API key from the parent shell.
+        if Provider = 'deepseek' then
+          RemoveVar('ANTHROPIC_API_KEY');
         if BaseUrl <> '' then
           SetVar('ANTHROPIC_BASE_URL', BaseUrl);
       end;
@@ -661,7 +688,7 @@ var
   sa: TSecurityAttributes;
   si: TStartupInfo;
   pi: TProcessInformation;
-  CmdLine, CommandShell, ModelArg, PermissionArg, ResumeArg: String;
+  CmdLine, CommandShell, Model, ModelArg, PermissionArg, ResumeArg: String;
   SystemPromptArg: String;
   McpArg, PluginArg: String;
   EnvBlock: PChar;
@@ -752,11 +779,11 @@ begin
   si.wShowWindow := SW_HIDE;
 
   ModelArg := '';
-  if Assigned(devAgentConfig) and (Trim(devAgentConfig.Model) <> '') then begin
-    if (Pos('"', devAgentConfig.Model) = 0) and
-       (Pos(#13, devAgentConfig.Model) = 0) and
-       (Pos(#10, devAgentConfig.Model) = 0) then
-      ModelArg := ' --model "' + Trim(devAgentConfig.Model) + '"';
+  if Assigned(devAgentConfig) then begin
+    Model := AgentCliModel(devAgentConfig.Provider, devAgentConfig.Model);
+    if (Model <> '') and (Pos('"', Model) = 0) and
+       (Pos(#13, Model) = 0) and (Pos(#10, Model) = 0) then
+      ModelArg := ' --model "' + Model + '"';
   end;
 
   ResumeArg := '';

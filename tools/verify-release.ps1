@@ -214,6 +214,10 @@ function Invoke-ClaudeCompatibilityCheck {
     try {
         $baseArguments = '--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions --permission-mode manual --append-system-prompt-file "' + $promptFile + '"'
         Invoke-ClaudeArgumentSmoke $path $baseArguments 'native launcher'
+        foreach ($model in @('deepseek-v4-flash', 'deepseek-v4-pro')) {
+            Invoke-ClaudeArgumentSmoke $path ($baseArguments + ' --model "' +
+                $model + '[1m]"') ("DeepSeek " + $model)
+        }
 
         $launcherText = "@echo off`r`n`"$path`" %*`r`n"
         [System.IO.File]::WriteAllText($launcherFile, $launcherText,

@@ -222,11 +222,12 @@ object AgentSetupForm: TAgentSetupForm
     Height = 23
     TabOrder = 3
   end
-  object edtModel: TEdit
+  object edtModel: TComboBox
     Left = 16
     Top = 262
     Width = 230
     Height = 23
+    ItemHeight = 15
     TabOrder = 4
   end
   object edtFontSize: TEdit

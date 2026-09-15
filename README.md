@@ -70,6 +70,18 @@ AI 集成相关的核心源码位于 `Source/` 目录：
 
 ---
 
+## DeepSeek V4
+
+在 AI Settings 中选择 DeepSeek，模型默认是 `deepseek-v4-flash`，也可选择 `deepseek-v4-pro` 或输入网关模型 ID。填写自己的 DeepSeek API Key；Base URL 为 `https://api.deepseek.com/anthropic`。Validate 只检查 CLI 启动，真实联网需发送一条消息确认。
+
+旧 DeepSeek 配置中的空模型、`deepseek-chat` 和 `deepseek-reasoner` 会迁移到 V4 Flash。显式选择的 Pro 和自定义模型不会被覆盖。官方根地址及 `/v1` 会转换为 Anthropic 兼容地址，自定义网关地址保留。
+
+V4 的 CLI 参数带 `[1m]` 上下文标记；主模型、默认角色模型和子任务模型都映射到所选 DeepSeek 模型。这些设置只写入 IDE 启动的子进程环境，不改全局 Claude 配置或系统环境。
+
+AI 面板沿用 IDE 字体与编辑器主题颜色，支持亮色和暗色切换。顶部 Settings 直接打开配置；底部 Send/Stop 共用紧凑位置，附件列表仅在有附件时显示。回归测试覆盖模型迁移、子进程环境隔离、原生窗体加载、窄宽布局和主题颜色。真实 API 对话仍需使用有效凭据验收。
+
+接口参考：[DeepSeek Claude Code 接入](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)。
+
 ## 配置项说明
 
 AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：

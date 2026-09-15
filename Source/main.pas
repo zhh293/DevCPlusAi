@@ -2090,6 +2090,10 @@ begin
   chkShortenPaths.Color := BackgroundColor;
   chkShortenPaths.Font := MainForm.Font;
   chkShortenPaths.Font.Color := ForegroundColor;
+  if Assigned(fAgentPanelFrame) then
+    fAgentPanelFrame.ApplyAppearance(panelTC.Background, panelTC.Foreground,
+      BackgroundColor, ForegroundColor, devData.InterfaceFont,
+      devData.InterfaceFontSize);
 end;
 
 procedure TMainForm.ReloadColor;
@@ -9149,6 +9153,7 @@ begin
   fAgentPanel.Parent := Self;
   fAgentPanel.Align := alRight;
   fAgentPanel.BevelOuter := bvNone;
+  fAgentPanel.Constraints.MinWidth := 280;
   w := 400;
   if Assigned(devAgentConfig) and (devAgentConfig.PanelWidth > 100) then
     w := devAgentConfig.PanelWidth;
@@ -9160,6 +9165,11 @@ begin
   fAgentPanelFrame.Align := alClient;
   fAgentPanelFrame.OnRequestStarted := AgentRequestStarted;
   fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
+  fAgentPanelFrame.OnSettings := AgentSettingsExecute;
+  fAgentPanelFrame.ApplyAppearance(Color, Font.Color,
+    dmMain.Cpp.WhitespaceAttribute.Background,
+    dmMain.Cpp.IdentifierAttri.Foreground, devData.InterfaceFont,
+    devData.InterfaceFontSize);
   if Assigned(devAgentConfig) then begin
     fAgentPanelFrame.SetSendKey(devAgentConfig.SendKey);
     fAgentPanelFrame.SetFontSize(devAgentConfig.FontSize);

@@ -37,7 +37,7 @@ type
     lblBaseUrl: TLabel;
     edtBaseUrl: TEdit;
     lblModel: TLabel;
-    edtModel: TEdit;
+    edtModel: TComboBox;
     lblFontSize: TLabel;
     edtFontSize: TEdit;
     lblCliPath: TLabel;
@@ -193,6 +193,7 @@ end;
 procedure TAgentSetupForm.ApplyProviderDefaults;
 var
   custom: Boolean;
+  Model: String;
 begin
   // All non-Anthropic providers need an endpoint understood by the Claude
   // CLI. Native OpenAI endpoints are not interchangeable with Anthropic ones,
@@ -201,20 +202,34 @@ begin
   lblBaseUrl.Visible := custom;
   edtBaseUrl.Visible := custom;
 
-  // Suggest a sensible default model / endpoint per provider when empty.
-  if (edtModel.Text = '') or
-     SameText(edtModel.Text, 'sonnet') or
-     SameText(edtModel.Text, 'claude-3-5-sonnet-latest') or
-     SameText(edtModel.Text, 'gpt-4o') or
-     SameText(edtModel.Text, 'deepseek-chat') then
-    case rgProvider.ItemIndex of
-      PROVIDER_ANTHROPIC: edtModel.Text := 'sonnet';
-      PROVIDER_OPENAI:    edtModel.Text := 'gpt-4o';
-      PROVIDER_DEEPSEEK:  edtModel.Text := 'deepseek-chat';
-    end;
-
-  if (rgProvider.ItemIndex = PROVIDER_DEEPSEEK) and (edtBaseUrl.Text = '') then
-    edtBaseUrl.Text := 'https://api.deepseek.com/anthropic';
+  Model := Trim(edtModel.Text);
+  edtModel.Items.Clear;
+  if rgProvider.ItemIndex = PROVIDER_DEEPSEEK then begin
+    edtModel.Items.Add(DEEPSEEK_DEFAULT_MODEL);
+    edtModel.Items.Add(DEEPSEEK_PRO_MODEL);
+    if SameText(Model, 'sonnet') or
+       SameText(Model, 'claude-3-5-sonnet-latest') or
+       SameText(Model, 'gpt-4o') then
+      Model := '';
+    Model := NormalizeAgentModel('deepseek', Model);
+    edtBaseUrl.Text := NormalizeAgentBaseUrl('deepseek', edtBaseUrl.Text);
+  end else begin
+    if (Model = '') or SameText(Model, 'sonnet') or
+       SameText(Model, 'claude-3-5-sonnet-latest') or
+       SameText(Model, 'gpt-4o') or
+       SameText(Model, 'deepseek-chat') or
+       SameText(Model, 'deepseek-reasoner') or
+       SameText(Model, DEEPSEEK_DEFAULT_MODEL) or
+       SameText(Model, DEEPSEEK_PRO_MODEL) then
+      case rgProvider.ItemIndex of
+        PROVIDER_ANTHROPIC: Model := 'sonnet';
+        PROVIDER_OPENAI: Model := 'gpt-4o';
+      end;
+    if rgProvider.ItemIndex = PROVIDER_ANTHROPIC then
+      edtModel.Items.Add('sonnet');
+  end;
+  // Keep the combo editable for gateways and explicitly chosen model IDs.
+  edtModel.Text := Model;
 end;
 
 procedure TAgentSetupForm.rgProviderClick(Sender: TObject);

@@ -42,6 +42,7 @@
 /Source/Tests/AgentReaderSmoke.exe
 /Source/Tests/AgentPipeIOSmoke.exe
 /Source/Tests/AgentUISmoke.exe
+/Source/Tests/AgentProviderSmoke.exe
 *.lib
 *.ddp
 
