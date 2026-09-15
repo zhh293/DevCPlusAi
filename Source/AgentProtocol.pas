@@ -572,6 +572,19 @@ begin
     Result := 'Hook execution summary'
   else if Name = 'status' then
     Result := 'Claude status: ' + GetStr(Node, 'status')
+  else if Name = 'api_retry' then begin
+    Result := 'API retry';
+    if GetStr(Node, 'attempt') <> '' then
+      Result := Result + ' #' + GetStr(Node, 'attempt');
+    if GetStr(Node, 'max_retries') <> '' then
+      Result := Result + '/' + GetStr(Node, 'max_retries');
+    if GetStr(Node, 'error_status') <> '' then
+      Result := Result + ', HTTP ' + GetStr(Node, 'error_status');
+    if GetStr(Node, 'error') <> '' then
+      Result := Result + ': ' + GetStr(Node, 'error');
+    if GetStr(Node, 'retry_delay_ms') <> '' then
+      Result := Result + ' (retry in ' + GetStr(Node, 'retry_delay_ms') + ' ms)';
+  end
   else if Name <> '' then
     Result := Name
   else if ToolName <> '' then

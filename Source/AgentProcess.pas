@@ -784,6 +784,9 @@ begin
     if (Model <> '') and (Pos('"', Model) = 0) and
        (Pos(#13, Model) = 0) and (Pos(#10, Model) = 0) then
       ModelArg := ' --model "' + Model + '"';
+    // Keep external Claude settings from overriding the IDE provider credentials.
+    if SameText(devAgentConfig.Provider, 'deepseek') then
+      ModelArg := ModelArg + ' --setting-sources ""';
   end;
 
   ResumeArg := '';

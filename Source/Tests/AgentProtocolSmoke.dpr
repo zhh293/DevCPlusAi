@@ -90,6 +90,15 @@ begin
   Count := ParseLineEvents('{"type":"rate_limit_event","status":"limited"}', Events);
   Require((Count = 1) and (Events[0].EventType = aetRateLimit), 'rate limit event');
 
+  Writeln('AgentProtocol smoke test: API retry diagnostics');
+  Count := ParseLineEvents('{"type":"system","subtype":"api_retry",' +
+    '"attempt":2,"max_retries":10,"retry_delay_ms":1000,' +
+    '"error_status":503,"error":"server_error"}', Events);
+  Require((Count = 1) and (Events[0].EventType = aetSystem), 'retry event');
+  Require(Pos('HTTP 503', Events[0].Summary) > 0, 'retry status missing');
+  Require(Pos('server_error', Events[0].Summary) > 0, 'retry cause missing');
+  Require(Pos('#2/10', Events[0].Summary) > 0, 'retry count missing');
+
   Writeln('AgentProtocol smoke test: malformed JSON');
   Count := ParseLineEvents('{not-json', Events);
   Require((Count = 1) and (Events[0].EventType = aetUnknown) and
