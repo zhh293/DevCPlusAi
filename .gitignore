@@ -98,3 +98,6 @@ package-lock.json
 /dist/
 /DevCPlusAi-*-windows-no-compiler.zip
 /DevCPlusAi-*-windows-no-compiler-self-extracting.exe
+
+# Local sample build output
+/test1.exe
