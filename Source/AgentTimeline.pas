@@ -158,10 +158,12 @@ end;
 
 procedure TAgentTimeline.SaveToFile(const Path: String);
 var Ini: TMemIniFile; I: Integer; Section: String; Block: TObject;
+    Lines: TStringList;
 begin
   Ini := TMemIniFile.Create(Path);
   try
     Ini.Clear;
+    Ini.WriteInteger('timeline', 'version', 2);
     Ini.WriteInteger('timeline', 'count', fBlocks.Count);
     for I := 0 to fBlocks.Count - 1 do begin
       Section := IntToStr(I);
@@ -177,8 +179,19 @@ begin
           Ini.WriteString(Section, 'role', 'user')
         else
           Ini.WriteString(Section, 'role', 'assistant');
-        TRichEdit(Block).PlainText := True;
-        TRichEdit(Block).Lines.SaveToFile(Path + '.' + Section);
+        if (Block is TTimelineRichEdit) and (TTimelineRichEdit(Block).RawText <> '') then begin
+          Ini.WriteString(Section, 'markdown', '1');
+          Lines := TStringList.Create;
+          try
+            Lines.Text := TTimelineRichEdit(Block).RawText;
+            Lines.SaveToFile(Path + '.' + Section);
+          finally
+            Lines.Free;
+          end;
+        end else begin
+          TRichEdit(Block).PlainText := True;
+          TRichEdit(Block).Lines.SaveToFile(Path + '.' + Section);
+        end;
       end;
     end;
     Ini.UpdateFile;
@@ -200,6 +213,8 @@ begin
       if FileExists(Path + '.' + Section) then Lines.LoadFromFile(Path + '.' + Section);
       if Ini.ReadString(Section, 'kind', '') = 'tool' then
         AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text)
+      else if SameText(Ini.ReadString(Section, 'markdown', ''), '1') then
+        AppendMarkdown(Lines.Text, Font.Color)
       else if SameText(Ini.ReadString(Section, 'role', ''), 'user') then
         AppendMessage(Lines.Text, Font.Color, True)
       else AppendText(Lines.Text, Font.Color, False);
