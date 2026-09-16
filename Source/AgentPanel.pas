@@ -90,6 +90,8 @@ type
     fOnSettings: TNotifyEvent;
     fModelBadge: TLabel;
     fScrollBottom: TButton;
+    fClearButton: TButton;
+    fContextButton: TButton;
     fStatus: TAgentStatus;
     fModelName: String;
     fContextText: String;
@@ -130,6 +132,8 @@ type
     procedure BeginResponseWait;
     procedure EndResponseWait;
     procedure ScrollToBottomClick(Sender: TObject);
+    procedure ClearChatClick(Sender: TObject);
+    procedure PrepareContextClick(Sender: TObject);
   protected
     procedure Resize; override;
   public
@@ -262,6 +266,16 @@ begin
   fDetails.Parent := Toolbar;
   fDetails.SetBounds(192, 34, 72, 20);
   fDetails.Caption := 'Logs';
+  fClearButton := TButton.Create(Self);
+  fClearButton.Parent := Toolbar;
+  fClearButton.SetBounds(270, 32, 64, 24);
+  fClearButton.Caption := 'Clear';
+  fClearButton.OnClick := ClearChatClick;
+  fContextButton := TButton.Create(Self);
+  fContextButton.Parent := Toolbar;
+  fContextButton.SetBounds(338, 32, 62, 24);
+  fContextButton.Caption := 'Context';
+  fContextButton.OnClick := PrepareContextClick;
   fSessions := TComboBox.Create(Self);
   fSessions.Parent := Toolbar;
   fSessions.SetBounds(8, 64, Width - 96, 24);
@@ -329,6 +343,7 @@ begin
   fToolPanel.Visible := False;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
+  Resize;
 end;
 
 destructor TAgentPanelFrame.Destroy;
@@ -358,6 +373,10 @@ begin
       fModelBadge.Width := BadgeWidth;
     end;
   end;
+  if Assigned(fClearButton) then
+    fClearButton.Visible := ClientWidth >= 340;
+  if Assigned(fContextButton) then
+    fContextButton.Visible := ClientWidth >= 390;
 end;
 
 { ------------------------------------------------------------------ }
@@ -1010,6 +1029,19 @@ begin
     else
       fTimeline.VertScrollBar.Position := 0;
   end;
+end;
+
+procedure TAgentPanelFrame.ClearChatClick(Sender: TObject);
+begin
+  if fStatus in [asThinking, asExecuting] then
+    Exit;
+  ClearChat;
+end;
+
+procedure TAgentPanelFrame.PrepareContextClick(Sender: TObject);
+begin
+  if Assigned(fOnPrepareContext) then
+    fOnPrepareContext(Self);
 end;
 
 procedure TAgentPanelFrame.EditPopupClick(Sender: TObject);
