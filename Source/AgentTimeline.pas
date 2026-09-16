@@ -9,10 +9,13 @@ type
     fLastText: TRichEdit;
     fLastIsMarkdown: Boolean;
     fWheelRemainder: Integer;
+    fPalette: TAgentUiPalette;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
     procedure RenderMarkdown(Edit: TRichEdit; const RawText: String);
+    procedure ApplyBlockAppearance(Block: TControl; const FontName: String;
+      FontSize: Integer);
     function NewTextBlock: TRichEdit;
   protected
     procedure Resize; override;
@@ -31,6 +34,8 @@ type
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
     procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
     procedure AddTool(const Id, Caption, Details: String);
+    procedure ApplyAppearance(AEditorColor, ATextColor: TColor;
+      const FontName: String; FontSize: Integer);
   end;
 implementation
 type
@@ -46,14 +51,14 @@ type
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
-  TTimelineButton = class(TButton)
+  TTimelineButton = class(TPanel)
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
   TTimelineTool = class(TPanel)
   public
     ToolId: String;
-    Header: TButton;
+    Header: TTimelineButton;
     Body: TMemo;
   end;
 function ForwardWheel(Control: TControl; var Message: TMessage): Boolean;
@@ -108,11 +113,64 @@ begin
   fBlocks := TList.Create;
   fLastIsMarkdown := False;
   fWheelRemainder := 0;
+  AgentBuildPalette(clWindow, clWindowText, fPalette);
   BorderStyle := bsNone;
   AutoScroll := True;
   HorzScrollBar.Visible := False;
   VertScrollBar.Tracking := True;
   OnMouseWheel := TimelineMouseWheel;
+end;
+
+procedure TAgentTimeline.ApplyBlockAppearance(Block: TControl;
+  const FontName: String; FontSize: Integer);
+var R: TTimelineRichEdit; Tool: TTimelineTool;
+begin
+  if Block is TTimelineRichEdit then begin
+    R := TTimelineRichEdit(Block);
+    R.Font.Name := FontName;
+    R.Font.Size := FontSize;
+    R.Font.Color := fPalette.Text;
+    R.Color := fPalette.Panel;
+    if R.IsUserMessage then begin
+      if AgentUiIsDark(fPalette.Panel) then
+        R.Color := RGB(48, 51, 56)
+      else
+        R.Color := RGB(237, 242, 248);
+    end;
+  end else if Block is TTimelineTool then begin
+    Tool := TTimelineTool(Block);
+    Tool.Color := fPalette.Panel;
+    Tool.Font.Name := FontName;
+    Tool.Font.Size := FontSize;
+    Tool.Font.Color := fPalette.Text;
+    if Assigned(Tool.Header) then begin
+      Tool.Header.ParentColor := False;
+      Tool.Header.Color := fPalette.Elevated;
+      Tool.Header.Font.Name := FontName;
+      Tool.Header.Font.Size := FontSize;
+      Tool.Header.Font.Color := fPalette.Text;
+    end;
+    if Assigned(Tool.Body) then begin
+      Tool.Body.ParentColor := False;
+      Tool.Body.Color := fPalette.Panel;
+      Tool.Body.Font.Name := FontName;
+      Tool.Body.Font.Size := FontSize;
+      Tool.Body.Font.Color := fPalette.Text;
+    end;
+  end;
+end;
+
+procedure TAgentTimeline.ApplyAppearance(AEditorColor, ATextColor: TColor;
+  const FontName: String; FontSize: Integer);
+var I: Integer;
+begin
+  Color := AEditorColor;
+  Font.Name := FontName;
+  Font.Size := FontSize;
+  Font.Color := ATextColor;
+  AgentBuildPalette(AEditorColor, ATextColor, fPalette);
+  for I := 0 to fBlocks.Count - 1 do
+    ApplyBlockAppearance(TControl(fBlocks[I]), FontName, FontSize);
 end;
 procedure TAgentTimeline.ScrollWheel(Delta: Integer);
 var Steps, Distance: Integer; Lines: UINT;
@@ -515,6 +573,7 @@ begin
   Result.BorderStyle := bsNone;
   Result.Color := Color;
   Result.Font.Assign(Font);
+  Result.Font.Color := fPalette.Text;
   Result.ScrollBars := ssNone;
   Result.WordWrap := True;
   Result.Width := ClientWidth - 24;
@@ -711,10 +770,16 @@ begin
     Block.Height := 32;
     Block.Header := TTimelineButton.Create(Block);
     Block.Header.Parent := Block;
+    Block.Header.BevelOuter := bvNone;
+    Block.Header.Alignment := taLeftJustify;
     TWheelControl(Block.Header).OnMouseWheel := TimelineMouseWheel;
     Block.Header.SetBounds(0, 0, ClientWidth - 24, 32);
     Block.Header.Anchors := [akLeft, akTop, akRight];
     Block.Header.OnClick := ToggleBlock;
+    Block.Header.ParentColor := False;
+    Block.Header.Color := fPalette.Elevated;
+    Block.Header.Font.Assign(Font);
+    Block.Header.Font.Color := fPalette.Text;
     Block.Body := TTimelineMemo.Create(Block);
     Block.Body.Parent := Block;
     TWheelControl(Block.Body).OnMouseWheel := TimelineMouseWheel;
@@ -724,10 +789,14 @@ begin
     Block.Body.PopupMenu := PopupMenu;
     Block.Body.Color := Color;
     Block.Body.Font.Assign(Font);
+    Block.Body.ParentColor := False;
+    Block.Body.Color := fPalette.Panel;
+    Block.Body.Font.Color := fPalette.Text;
     Block.Body.ScrollBars := ssBoth;
     Block.Body.Visible := False;
     fBlocks.Add(Block);
   end;
+  ApplyBlockAppearance(Block, Font.Name, Font.Size);
   Block.Header.Hint := Caption;
   Block.Header.Caption := '>  ' + Caption;
   if Details <> '' then Block.Body.Lines.Add(Details);

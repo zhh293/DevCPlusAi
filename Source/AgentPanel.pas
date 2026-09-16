@@ -798,10 +798,7 @@ begin
     fDetails.Font.Name := UiFontName;
   end;
   if Assigned(fTimeline) then begin
-    fTimeline.Color := AEditorColor;
-    fTimeline.Font.Name := UiFontName;
-    fTimeline.Font.Color := ATextColor;
-    fTimeline.Font.Size := TextSize;
+    fTimeline.ApplyAppearance(AEditorColor, ATextColor, UiFontName, TextSize);
   end;
   if Assigned(fScrollBottom) then begin
     fScrollBottom.Font.Name := UiFontName;
