@@ -28,7 +28,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG, Menus,
-  AgentProcess, AgentProtocol, AgentTimeline;
+  AgentProcess, AgentProtocol, AgentTimeline, AgentUITheme;
 
 type
   TAgentStatus = (
@@ -675,14 +675,13 @@ end;
 procedure TAgentPanelFrame.ApplyAppearance(APanelColor, APanelTextColor,
   AEditorColor, ATextColor: TColor; const AFontName: String; AFontSize: Integer);
 var
-  Bg, Fg: Longint;
   TextSize, SelectionStart, SelectionLength: Integer;
   UiFontName: String;
+  Palette: TAgentUiPalette;
 begin
   TextSize := memoInput.Font.Size;
-  UiFontName := AFontName;
-  if SameText(UiFontName, 'MS Sans Serif') then
-    UiFontName := 'Segoe UI';
+  UiFontName := AgentUiFontName(AFontName);
+  AgentBuildPalette(AEditorColor, ATextColor, Palette);
   Color := APanelColor;
   Font.Name := UiFontName;
   Font.Size := AFontSize;
@@ -699,15 +698,8 @@ begin
   reChat.Font.Color := ATextColor;
   memoInput.Font.Color := ATextColor;
   lbAttachments.Font.Color := ATextColor;
-  Bg := ColorToRGB(AEditorColor);
-  Fg := ColorToRGB(ATextColor);
-  fMutedColor := RGB((2 * GetRValue(Fg) + GetRValue(Bg)) div 3,
-    (2 * GetGValue(Fg) + GetGValue(Bg)) div 3,
-    (2 * GetBValue(Fg) + GetBValue(Bg)) div 3);
-  if GetRValue(Bg) + GetGValue(Bg) + GetBValue(Bg) < 384 then
-    fErrorColor := RGB(255, 150, 150)
-  else
-    fErrorColor := clMaroon;
+  fMutedColor := Palette.Muted;
+  fErrorColor := Palette.Error;
   if (fTextColor <> ATextColor) and (reChat.GetTextLen > 0) then begin
     // Existing transcript text must remain readable after changing theme.
     SelectionStart := reChat.SelStart;
