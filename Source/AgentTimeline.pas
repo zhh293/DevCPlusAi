@@ -49,16 +49,35 @@ type
     Body: TMemo;
   end;
 function ForwardWheel(Control: TControl; var Message: TMessage): Boolean;
-var ParentControl: TControl;
+var ParentControl: TControl; Info: TScrollInfo; Delta: Integer; AtEdge: Boolean;
 begin
   Result := Message.Msg = WM_MOUSEWHEEL;
   if not Result then Exit;
+  Delta := SmallInt(Message.WParam shr 16);
+  { Expanded tool output has its own scrollbar. Let the memo consume the
+    wheel while it can move, then continue scrolling the conversation when
+    the memo is already at the corresponding edge. }
+  if Control is TTimelineMemo then begin
+    FillChar(Info, SizeOf(Info), 0);
+    Info.cbSize := SizeOf(Info);
+    Info.fMask := SIF_RANGE or SIF_PAGE or SIF_POS;
+    if GetScrollInfo(TTimelineMemo(Control).Handle, SB_VERT, Info) then begin
+      if Delta < 0 then
+        AtEdge := Info.nPos >= Info.nMax - Integer(Info.nPage) + 1
+      else
+        AtEdge := Info.nPos <= Info.nMin;
+      if not AtEdge then begin
+        Result := False;
+        Exit;
+      end;
+    end;
+  end;
   ParentControl := Control.Parent;
   while (ParentControl <> nil) and not (ParentControl is TAgentTimeline) do
     ParentControl := ParentControl.Parent;
   Result := ParentControl <> nil;
   if Result then begin
-    TAgentTimeline(ParentControl).ScrollWheel(SmallInt(Message.WParam shr 16));
+    TAgentTimeline(ParentControl).ScrollWheel(Delta);
     Message.Result := 1;
   end;
 end;
@@ -73,7 +92,9 @@ end;
 procedure TTimelineButton.WndProc(var Message: TMessage);
 begin
   if not ForwardWheel(Self, Message) then inherited WndProc(Message);
-end;constructor TAgentTimeline.Create(AOwner: TComponent);
+end;
+
+constructor TAgentTimeline.Create(AOwner: TComponent);
 begin
   inherited;
   fBlocks := TList.Create;
