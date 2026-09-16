@@ -9865,6 +9865,12 @@ var
   Allowed: Boolean;
   Path: String;
 begin
+  // TThread.WaitFor pumps synchronized callbacks while the IDE is closing.
+  // Ignore late pipe lines during teardown so no panel/control is touched
+  // after its parent window has started destroying child handles.
+  if fAgentExpectedStop or fQuitting or Application.Terminated or
+     not Assigned(fAgentPanelFrame) then
+    Exit;
   if Line = '' then
     Exit;
   ParseLineEvents(Line, Events);
