@@ -102,6 +102,11 @@ begin
       ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"text","text":"Example:\n```cpp\nint main() {}\n```"}]}}', Events);
       Panel.HandleAgentEvent(Events[0]);
       Require(Panel.AnswerCode = 'int main() {}' + #10, 'code extraction lost content');
+      Panel.Timeline.LastText.SelStart := Pos('int', Panel.Timeline.LastText.Text) - 1;
+      Panel.Timeline.LastText.SelLength := 3;
+      Require(Panel.Timeline.LastText.SelAttributes.Color <>
+        Panel.Timeline.LastText.Font.Color,
+        'C++ keyword was not syntax highlighted');
       Panel.ClearChat;
       Require(Panel.AnswerCode = '', 'clear retained stale code');
       Panel.AppendAIText('# Heading' + #13#10 + 'Use **bold** and `code`.' + #13#10 +

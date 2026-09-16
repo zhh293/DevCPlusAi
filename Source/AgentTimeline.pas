@@ -238,6 +238,9 @@ begin
   inherited;
   if fBlocks <> nil then LayoutBlocks;
 end;
+
+procedure HighlightCppLine(Edit: TRichEdit; Start, LineLength: Integer); forward;
+
 procedure TAgentTimeline.LayoutBlocks;
 var I, Y, OldPosition, BottomPosition: Integer; Block: TControl;
     KeepAtBottom: Boolean;
@@ -443,6 +446,8 @@ begin
         Edit.SelLength := LineLength;
         Edit.SelAttributes.Name := 'Courier New';
         Edit.SelAttributes.Size := BaseSize - 1;
+        Edit.SelAttributes.Color := Edit.Font.Color;
+        HighlightCppLine(Edit, Start, LineLength);
       end else if (I < Kinds.Count) and (Copy(Kinds[I], 1, 7) = 'heading') then begin
         Level := StrToIntDef(Copy(Kinds[I], 8, MaxInt), 2);
         Edit.SelStart := Start;
@@ -582,6 +587,96 @@ begin
   R.Height := (Lines + 1) * (Abs(Font.Height) + 8);
   LayoutBlocks;
 end;
+
+function IsCppKeyword(const Token: String): Boolean;
+begin
+  Result := SameText(Token, 'auto') or SameText(Token, 'bool') or
+    SameText(Token, 'break') or SameText(Token, 'case') or
+    SameText(Token, 'catch') or SameText(Token, 'char') or
+    SameText(Token, 'class') or SameText(Token, 'const') or
+    SameText(Token, 'continue') or SameText(Token, 'default') or
+    SameText(Token, 'delete') or SameText(Token, 'do') or
+    SameText(Token, 'double') or SameText(Token, 'else') or
+    SameText(Token, 'enum') or SameText(Token, 'explicit') or
+    SameText(Token, 'extern') or SameText(Token, 'false') or
+    SameText(Token, 'float') or SameText(Token, 'for') or
+    SameText(Token, 'friend') or SameText(Token, 'if') or
+    SameText(Token, 'inline') or SameText(Token, 'int') or
+    SameText(Token, 'long') or SameText(Token, 'namespace') or
+    SameText(Token, 'new') or SameText(Token, 'nullptr') or
+    SameText(Token, 'operator') or SameText(Token, 'private') or
+    SameText(Token, 'protected') or SameText(Token, 'public') or
+    SameText(Token, 'return') or SameText(Token, 'short') or
+    SameText(Token, 'signed') or SameText(Token, 'sizeof') or
+    SameText(Token, 'static') or SameText(Token, 'struct') or
+    SameText(Token, 'switch') or SameText(Token, 'template') or
+    SameText(Token, 'this') or SameText(Token, 'throw') or
+    SameText(Token, 'true') or SameText(Token, 'try') or
+    SameText(Token, 'typedef') or SameText(Token, 'typename') or
+    SameText(Token, 'union') or SameText(Token, 'unsigned') or
+    SameText(Token, 'using') or SameText(Token, 'virtual') or
+    SameText(Token, 'void') or SameText(Token, 'volatile') or
+    SameText(Token, 'while');
+end;
+
+procedure HighlightCppLine(Edit: TRichEdit; Start, LineLength: Integer);
+var
+  Line, Token: String;
+  I, TokenStart, QuoteEnd, CommentStart: Integer;
+  Dark: Boolean;
+  KeywordColor, StringColor, CommentColor: TColor;
+begin
+  if (Edit = nil) or (LineLength <= 0) then
+    Exit;
+  Line := Copy(Edit.Text, Start + 1, LineLength);
+  Dark := AgentUiIsDark(Edit.Color);
+  if Dark then begin
+    KeywordColor := RGB(86, 156, 214);
+    StringColor := RGB(206, 145, 120);
+    CommentColor := RGB(106, 153, 85);
+  end else begin
+    KeywordColor := RGB(0, 80, 160);
+    StringColor := RGB(128, 40, 0);
+    CommentColor := RGB(0, 110, 40);
+  end;
+  CommentStart := Pos('//', Line);
+  if CommentStart > 0 then begin
+    Edit.SelStart := Start + CommentStart - 1;
+    Edit.SelLength := LineLength - CommentStart + 1;
+    Edit.SelAttributes.Color := CommentColor;
+  end;
+  I := 1;
+  while I <= Length(Line) do begin
+    if (CommentStart > 0) and (I >= CommentStart) then
+      Break;
+    if Line[I] in ['"', ''''] then begin
+      QuoteEnd := I + 1;
+      while QuoteEnd <= Length(Line) do begin
+        if (Line[QuoteEnd] = Line[I]) and (Line[QuoteEnd - 1] <> '\') then
+          Break;
+        Inc(QuoteEnd);
+      end;
+      if QuoteEnd > Length(Line) then QuoteEnd := Length(Line);
+      Edit.SelStart := Start + I - 1;
+      Edit.SelLength := QuoteEnd - I + 1;
+      Edit.SelAttributes.Color := StringColor;
+      I := QuoteEnd + 1;
+    end else if (Line[I] in ['A'..'Z', 'a'..'z', '_']) then begin
+      TokenStart := I;
+      Inc(I);
+      while (I <= Length(Line)) and
+        (Line[I] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) do Inc(I);
+      Token := Copy(Line, TokenStart, I - TokenStart);
+      if IsCppKeyword(Token) then begin
+        Edit.SelStart := Start + TokenStart - 1;
+        Edit.SelLength := Length(Token);
+        Edit.SelAttributes.Color := KeywordColor;
+      end;
+    end else
+      Inc(I);
+  end;
+end;
+
 procedure TAgentTimeline.ToggleBlock(Sender: TObject);
 var Block: TTimelineTool;
 begin
