@@ -119,6 +119,16 @@ begin
       Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),
         'markdown inline code was not rendered with a code font');
       Panel.ClearChat;
+      Panel.AppendAIText('| Op | Avg | Worst |' + #13#10 +
+        '| --- | --- | --- |' + #13#10 + '| 查找 | O(1) | O(n) |' + #13#10 +
+        '---');
+      Require(Pos('| --- |', Panel.Timeline.LastText.Text) = 0,
+        'markdown table separator was left in display text');
+      Require((Pos('Op', Panel.Timeline.LastText.Text) > 0) and
+        (Pos('Avg', Panel.Timeline.LastText.Text) > 0) and
+        (Pos('Worst', Panel.Timeline.LastText.Text) > 0),
+        'markdown table columns were not rendered');
+      Panel.ClearChat;
       Panel.AppendUserMessage('User bubble');
       Require(Panel.Timeline.BlockCount = 1, 'user message did not become a card');
       Require(Panel.Timeline.BlockAt(0).Left > 12, 'user message is not right aligned');

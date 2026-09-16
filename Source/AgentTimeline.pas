@@ -274,9 +274,11 @@ var I, J, Start, LineLength, BaseSize, Level: Integer;
     S := Trim(Value);
     Result := Pos('|', S) > 0;
     if not Result then Exit;
+    Result := Pos('-', S) > 0;
+    if not Result then Exit;
     for I := Length(S) downto 1 do
-      if not (S[I] in ['|', '-', ':', ' ']) then Delete(S, I, 1);
-    Result := S <> '';
+      if S[I] in ['|', '-', ':', ' ', #9] then Delete(S, I, 1);
+    Result := S = '';
   end;
   function TableCellText(const Value: String): String;
   var S: String; Cells: TStringList; I: Integer;
