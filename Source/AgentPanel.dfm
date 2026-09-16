@@ -13,21 +13,21 @@ object AgentPanelFrame: TAgentPanelFrame
     Left = 0
     Top = 0
     Width = 400
-    Height = 34
+    Height = 40
     Align = alTop
     BevelOuter = bvNone
     ParentColor = True
     TabOrder = 0
     object lblTitle: TLabel
       Left = 8
-      Top = 9
+      Top = 11
       Width = 120
       Height = 17
       Caption = 'AI Assistant'
     end
     object btnSettings: TButton
       Left = 312
-      Top = 5
+      Top = 8
       Width = 80
       Height = 24
       Anchors = [akTop, akRight]
@@ -54,12 +54,12 @@ object AgentPanelFrame: TAgentPanelFrame
   end
   object pnlChat: TPanel
     Left = 0
-    Top = 34
+    Top = 40
     Width = 400
     Height = 395
     Align = alClient
     BevelOuter = bvNone
-    BorderWidth = 8
+    BorderWidth = 12
     Color = clWindow
     TabOrder = 1
     object reChat: TRichEdit
@@ -89,13 +89,13 @@ object AgentPanelFrame: TAgentPanelFrame
     Height = 152
     Align = alBottom
     BevelOuter = bvNone
-    BorderWidth = 8
+    BorderWidth = 12
     ParentColor = True
     TabOrder = 2
     object pnlAttachmentTools: TPanel
-      Left = 8
+      Left = 12
       Top = 8
-      Width = 384
+      Width = 376
       Height = 30
       Align = alTop
       BevelOuter = bvNone
@@ -120,7 +120,7 @@ object AgentPanelFrame: TAgentPanelFrame
         OnClick = btnPasteImageClick
       end
       object btnRemoveAttachment: TButton
-        Left = 312
+        Left = 304
         Top = 0
         Width = 72
         Height = 24
@@ -132,9 +132,9 @@ object AgentPanelFrame: TAgentPanelFrame
       end
     end
     object pnlAttachments: TPanel
-      Left = 8
+      Left = 12
       Top = 38
-      Width = 384
+      Width = 376
       Height = 44
       Align = alTop
       BevelOuter = bvNone
@@ -144,7 +144,7 @@ object AgentPanelFrame: TAgentPanelFrame
       object lbAttachments: TListBox
         Left = 0
         Top = 0
-        Width = 384
+        Width = 376
         Height = 44
         Align = alClient
         ItemHeight = 16
@@ -153,9 +153,9 @@ object AgentPanelFrame: TAgentPanelFrame
       end
     end
     object pnlSendTools: TPanel
-      Left = 8
+      Left = 12
       Top = 114
-      Width = 384
+      Width = 376
       Height = 30
       Align = alBottom
       BevelOuter = bvNone
@@ -170,7 +170,7 @@ object AgentPanelFrame: TAgentPanelFrame
         Caption = 'Enter to send'
       end
       object btnSend: TButton
-        Left = 304
+        Left = 296
         Top = 4
         Width = 80
         Height = 26
@@ -180,7 +180,7 @@ object AgentPanelFrame: TAgentPanelFrame
         OnClick = btnSendClick
       end
       object btnStop: TButton
-        Left = 304
+        Left = 296
         Top = 4
         Width = 80
         Height = 26
@@ -192,9 +192,9 @@ object AgentPanelFrame: TAgentPanelFrame
       end
     end
     object memoInput: TMemo
-      Left = 8
+      Left = 12
       Top = 38
-      Width = 384
+      Width = 376
       Height = 76
       Align = alClient
       Font.Charset = DEFAULT_CHARSET

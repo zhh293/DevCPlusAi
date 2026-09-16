@@ -88,6 +88,8 @@ type
     fMutedColor: TColor;
     fErrorColor: TColor;
     fOnSettings: TNotifyEvent;
+    fModelBadge: TLabel;
+    fScrollBottom: TButton;
     fStatus: TAgentStatus;
     fModelName: String;
     fContextText: String;
@@ -127,6 +129,9 @@ type
     function SaveClipboardImage: String;
     procedure BeginResponseWait;
     procedure EndResponseWait;
+    procedure ScrollToBottomClick(Sender: TObject);
+  protected
+    procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -210,6 +215,13 @@ begin
   fOnRequestStarted := nil;
   fOnRequestEnded := nil;
   fOnSettings := nil;
+  fModelBadge := TLabel.Create(Self);
+  fModelBadge.Parent := pnlHeader;
+  fModelBadge.SetBounds(136, 13, 164, 17);
+  fModelBadge.Anchors := [akLeft, akTop];
+  fModelBadge.AutoSize := False;
+  fModelBadge.Caption := 'No model selected';
+  fModelBadge.Font.Size := 9;
   ApplyAppearance(clBtnFace, clWindowText, clWindow, clWindowText,
     Font.Name, Font.Size);
   Toolbar := TPanel.Create(Self);
@@ -303,6 +315,17 @@ begin
   fTimeline.Color := reChat.Color;
   fTimeline.Font.Assign(reChat.Font);
   reChat.Visible := False;
+  fScrollBottom := TButton.Create(Self);
+  fScrollBottom.Parent := pnlChat;
+  fScrollBottom.SetBounds(pnlChat.ClientWidth - 44, pnlChat.ClientHeight - 42, 32, 28);
+  fScrollBottom.Anchors := [akRight, akBottom];
+  fScrollBottom.Caption := 'v';
+  fScrollBottom.Hint := 'Scroll to bottom';
+  fScrollBottom.ShowHint := True;
+  fScrollBottom.TabStop := False;
+  fScrollBottom.Font.Assign(Font);
+  fScrollBottom.Font.Color := fMutedColor;
+  fScrollBottom.OnClick := ScrollToBottomClick;
   fToolPanel.Visible := False;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
@@ -320,6 +343,21 @@ begin
   fSessionKeys.Free;
   fAttachments.Free;
   inherited Destroy;
+end;
+
+procedure TAgentPanelFrame.Resize;
+var BadgeWidth: Integer;
+begin
+  inherited Resize;
+  if Assigned(fModelBadge) then begin
+    BadgeWidth := btnSettings.Left - fModelBadge.Left - 8;
+    if BadgeWidth < 40 then begin
+      fModelBadge.Visible := False;
+    end else begin
+      fModelBadge.Visible := True;
+      fModelBadge.Width := BadgeWidth;
+    end;
+  end;
 end;
 
 { ------------------------------------------------------------------ }
@@ -692,6 +730,13 @@ begin
   Font.Color := APanelTextColor;
   lblTitle.Font.Assign(Font);
   lblTitle.Font.Style := [fsBold];
+  if Assigned(fModelBadge) then begin
+    fModelBadge.Font.Assign(Font);
+    fModelBadge.Font.Size := TextSize - 1;
+    if fModelBadge.Font.Size < 8 then fModelBadge.Font.Size := 8;
+    fModelBadge.Font.Color := Palette.Muted;
+    fModelBadge.Font.Style := [];
+  end;
   pnlChat.Color := AEditorColor;
   reChat.Color := AEditorColor;
   memoInput.Color := AEditorColor;
@@ -722,12 +767,26 @@ begin
   if Assigned(fSessions) then begin
     fSessions.Color := AEditorColor;
     fSessions.Font.Color := ATextColor;
+    fSessions.Font.Name := UiFontName;
+  end;
+  if Assigned(fQuickActions) then begin
+    fQuickActions.Color := AEditorColor;
+    fQuickActions.Font.Color := ATextColor;
+    fQuickActions.Font.Name := UiFontName;
+  end;
+  if Assigned(fDetails) then begin
+    fDetails.Font.Color := ATextColor;
+    fDetails.Font.Name := UiFontName;
   end;
   if Assigned(fTimeline) then begin
     fTimeline.Color := AEditorColor;
     fTimeline.Font.Name := UiFontName;
     fTimeline.Font.Color := ATextColor;
     fTimeline.Font.Size := TextSize;
+  end;
+  if Assigned(fScrollBottom) then begin
+    fScrollBottom.Font.Name := UiFontName;
+    fScrollBottom.Font.Color := Palette.Muted;
   end;
   SetFontSize(TextSize);
 end;
@@ -875,6 +934,12 @@ end;
 procedure TAgentPanelFrame.SetModelName(const Name: String);
 begin
   fModelName := Name;
+  if Assigned(fModelBadge) then begin
+    if Trim(Name) = '' then
+      fModelBadge.Caption := 'No model selected'
+    else
+      fModelBadge.Caption := Name;
+  end;
   StatusBar.Hint := Name;
   if StatusBar.Panels.Count > 1 then
     StatusBar.Panels[1].Text := Name;
@@ -934,6 +999,17 @@ begin
   fEditPopup.Items[1].Enabled := Clipboard.HasFormat(CF_TEXT) or Clipboard.HasFormat(CF_UNICODETEXT);
   fEditPopup.Items[2].Enabled := fPopupTarget = memoInput;
   fEditPopup.Items[4].Enabled := (fPopupTarget = memoInput) and memoInput.CanUndo;
+end;
+
+procedure TAgentPanelFrame.ScrollToBottomClick(Sender: TObject);
+begin
+  if Assigned(fTimeline) then begin
+    if fTimeline.VertScrollBar.Range > fTimeline.ClientHeight then
+      fTimeline.VertScrollBar.Position :=
+        fTimeline.VertScrollBar.Range - fTimeline.ClientHeight
+    else
+      fTimeline.VertScrollBar.Position := 0;
+  end;
 end;
 
 procedure TAgentPanelFrame.EditPopupClick(Sender: TObject);
