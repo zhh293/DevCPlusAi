@@ -665,10 +665,14 @@ procedure TAgentPanelFrame.ApplyAppearance(APanelColor, APanelTextColor,
 var
   Bg, Fg: Longint;
   TextSize, SelectionStart, SelectionLength: Integer;
+  UiFontName: String;
 begin
   TextSize := memoInput.Font.Size;
+  UiFontName := AFontName;
+  if SameText(UiFontName, 'MS Sans Serif') then
+    UiFontName := 'Segoe UI';
   Color := APanelColor;
-  Font.Name := AFontName;
+  Font.Name := UiFontName;
   Font.Size := AFontSize;
   Font.Color := APanelTextColor;
   lblTitle.Font.Assign(Font);
@@ -677,9 +681,9 @@ begin
   reChat.Color := AEditorColor;
   memoInput.Color := AEditorColor;
   lbAttachments.Color := AEditorColor;
-  reChat.Font.Name := AFontName;
-  memoInput.Font.Name := AFontName;
-  lbAttachments.Font.Name := AFontName;
+  reChat.Font.Name := UiFontName;
+  memoInput.Font.Name := UiFontName;
+  lbAttachments.Font.Name := UiFontName;
   reChat.Font.Color := ATextColor;
   memoInput.Font.Color := ATextColor;
   lbAttachments.Font.Color := ATextColor;
@@ -705,7 +709,7 @@ begin
   if Assigned(fTools) then begin
     fTools.Color := AEditorColor;
     fTools.Font.Color := ATextColor;
-    fTools.Font.Name := AFontName;
+    fTools.Font.Name := UiFontName;
   end;
   if Assigned(fSessions) then begin
     fSessions.Color := AEditorColor;
@@ -713,7 +717,7 @@ begin
   end;
   if Assigned(fTimeline) then begin
     fTimeline.Color := AEditorColor;
-    fTimeline.Font.Name := AFontName;
+    fTimeline.Font.Name := UiFontName;
     fTimeline.Font.Color := ATextColor;
     fTimeline.Font.Size := TextSize;
   end;
@@ -739,6 +743,8 @@ begin
   reChat.Font.Size := Value;
   memoInput.Font.Size := Value;
   lbAttachments.Font.Size := Value;
+  if Assigned(fTimeline) then
+    fTimeline.Font.Size := Value;
   lbAttachments.ItemHeight := Value + 6;
   UpdateAttachmentLayout;
 end;

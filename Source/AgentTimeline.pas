@@ -11,6 +11,7 @@ type
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
+    procedure RenderMarkdown(Edit: TRichEdit);
   protected
     procedure Resize; override;
   public
@@ -208,11 +209,16 @@ begin
   if fBlocks <> nil then LayoutBlocks;
 end;
 procedure TAgentTimeline.LayoutBlocks;
-var I, Y: Integer; Block: TControl;
+var I, Y, OldPosition, BottomPosition: Integer; Block: TControl;
+    KeepAtBottom: Boolean;
 begin
   // TScrollBox moves its child controls when the scrollbar position changes.
   // Do not subtract Position here, otherwise every wheel event moves the
   // content twice and the scrollbar range collapses back to zero.
+  OldPosition := VertScrollBar.Position;
+  BottomPosition := VertScrollBar.Range - ClientHeight;
+  if BottomPosition < 0 then BottomPosition := 0;
+  KeepAtBottom := OldPosition >= BottomPosition - 4;
   Y := 12;
   DisableAlign;
   try
@@ -226,6 +232,90 @@ begin
   finally
     EnableAlign;
   end;
+  BottomPosition := VertScrollBar.Range - ClientHeight;
+  if BottomPosition < 0 then BottomPosition := 0;
+  if KeepAtBottom then
+    VertScrollBar.Position := BottomPosition
+  else if OldPosition > BottomPosition then
+    VertScrollBar.Position := BottomPosition
+  else
+    VertScrollBar.Position := OldPosition;
+end;
+
+procedure TAgentTimeline.RenderMarkdown(Edit: TRichEdit);
+var I, J, K, Start, LineLength, BaseSize, Level: Integer;
+    InCode: Boolean; Line, Token: String;
+    SavedStart, SavedLength: Integer;
+begin
+  if (Edit = nil) or (Edit.GetTextLen = 0) then Exit;
+  SavedStart := Edit.SelStart;
+  SavedLength := Edit.SelLength;
+  BaseSize := Edit.Font.Size;
+  InCode := False;
+  for I := 0 to Edit.Lines.Count - 1 do begin
+    Line := Edit.Lines[I];
+    Start := SendMessage(Edit.Handle, EM_LINEINDEX, I, 0);
+    if Start < 0 then Continue;
+    LineLength := Length(Line);
+    Token := TrimLeft(Line);
+    if (Length(Token) >= 3) and (Copy(Token, 1, 3) = '```') then begin
+      Edit.SelStart := Start;
+      Edit.SelLength := LineLength;
+      Edit.SelAttributes.Name := 'Courier New';
+      Edit.SelAttributes.Size := BaseSize - 1;
+      Edit.SelAttributes.Style := [fsBold];
+      InCode := not InCode;
+      Continue;
+    end;
+    if InCode then begin
+      Edit.SelStart := Start;
+      Edit.SelLength := LineLength;
+      Edit.SelAttributes.Name := 'Courier New';
+      Edit.SelAttributes.Size := BaseSize - 1;
+      Continue;
+    end;
+    Level := 0;
+    while (Level < Length(Token)) and (Token[Level + 1] = '#') do Inc(Level);
+    if (Level > 0) and (Level <= 4) and (Length(Token) > Level) and
+      (Token[Level + 1] = ' ') then begin
+      Edit.SelStart := Start;
+      Edit.SelLength := LineLength;
+      Edit.SelAttributes.Style := [fsBold];
+      Edit.SelAttributes.Size := BaseSize + 4 - Level;
+    end;
+    { Apply inline code and emphasis without changing the transcript text. }
+    J := 1;
+    while J <= LineLength do begin
+      if (Line[J] = '`') then begin
+        K := J + 1;
+        while (K <= LineLength) and (Line[K] <> '`') do Inc(K);
+        if K <= LineLength then begin
+          Edit.SelStart := Start + J;
+          Edit.SelLength := K - J - 1;
+          Edit.SelAttributes.Name := 'Courier New';
+          Edit.SelAttributes.Size := BaseSize - 1;
+          J := K + 1;
+          Continue;
+        end;
+      end;
+      if ((Line[J] = '*') and (J < LineLength) and (Line[J + 1] = '*')) or
+        ((Line[J] = '_') and (J < LineLength) and (Line[J + 1] = '_')) then begin
+        Token := Copy(Line, J, 2);
+        K := J + 2;
+        while (K < LineLength) and (Copy(Line, K, 2) <> Token) do Inc(K);
+        if K < LineLength then begin
+          Edit.SelStart := Start + J + 1;
+          Edit.SelLength := K - J - 2;
+          Edit.SelAttributes.Style := [fsBold];
+          J := K + 2;
+          Continue;
+        end;
+      end;
+      Inc(J);
+    end;
+  end;
+  Edit.SelStart := SavedStart;
+  Edit.SelLength := SavedLength;
 end;
 procedure TAgentTimeline.AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
 var Lines, OldStart, OldLength: Integer;
@@ -257,6 +347,7 @@ begin
   end;
   Lines := SendMessage(fLastText.Handle, EM_GETLINECOUNT, 0, 0);
   fLastText.Height := (Lines + 1) * (Abs(Font.Height) + 6);
+  RenderMarkdown(fLastText);
   LayoutBlocks;
 end;
 procedure TAgentTimeline.ToggleBlock(Sender: TObject);

@@ -104,6 +104,16 @@ begin
       Require(Panel.AnswerCode = 'int main() {}' + #10, 'code extraction lost content');
       Panel.ClearChat;
       Require(Panel.AnswerCode = '', 'clear retained stale code');
+      Panel.AppendAIText('# Heading' + #13#10 + 'Use **bold** and `code`.' + #13#10 +
+        '- item');
+      Panel.Timeline.LastText.SelStart := 0;
+      Panel.Timeline.LastText.SelLength := Length('# Heading');
+      Require(Panel.Timeline.LastText.SelAttributes.Style = [fsBold],
+        'markdown heading was not rendered bold');
+      Panel.Timeline.LastText.SelStart := Pos('code', Panel.Timeline.LastText.Text) - 1;
+      Panel.Timeline.LastText.SelLength := 4;
+      Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),
+        'markdown inline code was not rendered with a code font');
       Writeln('Agent UI smoke test: collapsed tool activity and persistence');
       Panel.AppendAIText('Visible answer');
       BeforeTools := Panel.reChat.Text;
