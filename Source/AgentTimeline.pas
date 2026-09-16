@@ -1,7 +1,7 @@
 unit AgentTimeline;
 interface
 uses Windows, Messages, SysUtils, Classes, Controls, Forms, StdCtrls, ExtCtrls,
-  Graphics, ComCtrls, IniFiles;
+  Graphics, ComCtrls, IniFiles, AgentUITheme;
 type
   TAgentTimeline = class(TScrollBox)
   private
@@ -29,6 +29,7 @@ type
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
+    procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
     procedure AddTool(const Id, Caption, Details: String);
   end;
 implementation
@@ -37,6 +38,7 @@ type
   TTimelineRichEdit = class(TRichEdit)
   public
     RawText: String;
+    IsUserMessage: Boolean;
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
@@ -171,6 +173,10 @@ begin
         TTimelineTool(Block).Body.Lines.SaveToFile(Path + '.' + Section);
       end else begin
         Ini.WriteString(Section, 'kind', 'text');
+        if (Block is TTimelineRichEdit) and TTimelineRichEdit(Block).IsUserMessage then
+          Ini.WriteString(Section, 'role', 'user')
+        else
+          Ini.WriteString(Section, 'role', 'assistant');
         TRichEdit(Block).PlainText := True;
         TRichEdit(Block).Lines.SaveToFile(Path + '.' + Section);
       end;
@@ -194,6 +200,8 @@ begin
       if FileExists(Path + '.' + Section) then Lines.LoadFromFile(Path + '.' + Section);
       if Ini.ReadString(Section, 'kind', '') = 'tool' then
         AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text)
+      else if SameText(Ini.ReadString(Section, 'role', ''), 'user') then
+        AppendMessage(Lines.Text, Font.Color, True)
       else AppendText(Lines.Text, Font.Color, False);
     end;
   finally
@@ -231,7 +239,11 @@ begin
   try
     for I := 0 to fBlocks.Count - 1 do begin
       Block := TControl(fBlocks[I]);
-      Block.SetBounds(12, Y, ClientWidth - 24, Block.Height);
+      if (Block is TTimelineRichEdit) and TTimelineRichEdit(Block).IsUserMessage then
+        Block.SetBounds(ClientWidth - 12 - ((ClientWidth - 24) * 3 div 4), Y,
+          (ClientWidth - 24) * 3 div 4, Block.Height)
+      else
+        Block.SetBounds(12, Y, ClientWidth - 24, Block.Height);
       if Block is TRichEdit then
         Block.Height := (SendMessage(TRichEdit(Block).Handle, EM_GETLINECOUNT, 0, 0) + 1) * (Abs(Font.Height) + 6);
       Inc(Y, Block.Height + 12);
@@ -399,6 +411,9 @@ begin
   Result.ScrollBars := ssNone;
   Result.WordWrap := True;
   Result.Width := ClientWidth - 24;
+  SendMessage(Result.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN,
+    LPARAM(8 or (8 shl 16)));
+  TTimelineRichEdit(Result).IsUserMessage := False;
   fBlocks.Add(Result);
 end;
 procedure TAgentTimeline.AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
@@ -437,6 +452,32 @@ begin
   RenderMarkdown(R, R.RawText);
   Lines := SendMessage(R.Handle, EM_GETLINECOUNT, 0, 0);
   R.Height := (Lines + 1) * (Abs(Font.Height) + 6);
+  LayoutBlocks;
+end;
+
+procedure TAgentTimeline.AppendMessage(const Text: String; TextColor: TColor;
+  IsUser: Boolean);
+var R: TTimelineRichEdit; Lines: Integer;
+begin
+  fLastText := NewTextBlock;
+  fLastIsMarkdown := False;
+  R := TTimelineRichEdit(fLastText);
+  R.IsUserMessage := IsUser;
+  R.Font.Color := TextColor;
+  R.Color := Color;
+  if IsUser then begin
+    if AgentUiIsDark(Color) then
+      R.Color := RGB(48, 51, 56)
+    else
+      R.Color := RGB(237, 242, 248);
+    R.Paragraph.Alignment := taLeftJustify;
+  end else
+    R.Paragraph.Alignment := taLeftJustify;
+  R.SelStart := 0;
+  R.SelLength := 0;
+  R.SelText := Text;
+  Lines := SendMessage(R.Handle, EM_GETLINECOUNT, 0, 0);
+  R.Height := (Lines + 1) * (Abs(Font.Height) + 8);
   LayoutBlocks;
 end;
 procedure TAgentTimeline.ToggleBlock(Sender: TObject);

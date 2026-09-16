@@ -358,8 +358,12 @@ procedure TAgentPanelFrame.AppendUserMessageInternal(const Text: String);
 begin
   if fConversationTitle = '' then
     fConversationTitle := Copy(StringReplace(StringReplace(Text, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), 1, 64);
-  AppendText(#13#10 + 'You:' + #13#10, fTextColor, True);
-  AppendText(Text + #13#10, fTextColor, False);
+  AppendTranscript(#13#10 + 'You:' + #13#10, fTextColor, True);
+  if Assigned(fTimeline) then
+    fTimeline.AppendMessage(Text, fTextColor, True)
+  else
+    AppendText(Text, fTextColor, False);
+  AppendTranscript(Text + #13#10, fTextColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendUserMessage(const Text: String);
@@ -491,7 +495,7 @@ begin
 
   if TextToAppend <> '' then begin
     if fLastAnswer = '' then
-      AppendText(#13#10 + 'AI:' + #13#10, fTextColor, True);
+      AppendTranscript(#13#10 + 'AI:' + #13#10, fTextColor, True);
     fLastAnswer := fLastAnswer + TextToAppend;
     if SameText(Event.ContentType, 'thinking') or
        SameText(Event.ContentType, 'redacted_thinking') then

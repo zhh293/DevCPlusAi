@@ -118,6 +118,10 @@ begin
       Panel.Timeline.LastText.SelLength := 4;
       Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),
         'markdown inline code was not rendered with a code font');
+      Panel.ClearChat;
+      Panel.AppendUserMessage('User bubble');
+      Require(Panel.Timeline.BlockCount = 1, 'user message did not become a card');
+      Require(Panel.Timeline.BlockAt(0).Left > 12, 'user message is not right aligned');
       Writeln('Agent UI smoke test: collapsed tool activity and persistence');
       Panel.AppendAIText('Visible answer');
       BeforeTools := Panel.reChat.Text;
