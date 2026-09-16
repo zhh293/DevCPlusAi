@@ -268,6 +268,34 @@ var I, J, Start, LineLength, BaseSize, Level: Integer;
     InlineSpans, SpanParts: TStringList;
     CleanLine, SpanInfo: String; InlineStart, SpanEnd, P: Integer;
     InInline: Boolean;
+  function IsTableSeparator(const Value: String): Boolean;
+  var S: String; I: Integer;
+  begin
+    S := Trim(Value);
+    Result := Pos('|', S) > 0;
+    if not Result then Exit;
+    for I := Length(S) downto 1 do
+      if not (S[I] in ['|', '-', ':', ' ']) then Delete(S, I, 1);
+    Result := S <> '';
+  end;
+  function TableCellText(const Value: String): String;
+  var S: String; Cells: TStringList; I: Integer;
+  begin
+    S := Trim(Value);
+    if (S <> '') and (S[1] = '|') then Delete(S, 1, 1);
+    if (S <> '') and (S[Length(S)] = '|') then Delete(S, Length(S), 1);
+    Cells := TStringList.Create;
+    try
+      ExtractStrings(['|'], [], PChar(S), Cells);
+      Result := '';
+      for I := 0 to Cells.Count - 1 do begin
+        if I > 0 then Result := Result + '   ';
+        Result := Result + Trim(Cells[I]);
+      end;
+    finally
+      Cells.Free;
+    end;
+  end;
 begin
   if Edit = nil then Exit;
   SavedStart := Edit.SelStart;
@@ -294,6 +322,18 @@ begin
         Kinds.Add('code')
       else
         Kinds.Add('text');
+      if (not InCode) and IsTableSeparator(Line) then begin
+        Kinds[Kinds.Count - 1] := 'table-separator';
+        Line := '';
+      end;
+      if (not InCode) and (Pos('|', Line) > 0) and
+        (Pos('|', Copy(Line, Pos('|', Line) + 1, MaxInt)) > 0) then begin
+        Line := TableCellText(Line);
+        if (I + 1 < RawLines.Count) and IsTableSeparator(RawLines[I + 1]) then begin
+          Kinds[Kinds.Count - 1] := 'tablehead';
+        end else
+          Kinds[Kinds.Count - 1] := 'table';
+      end;
       if (not InCode) and (Length(Token) > 1) and (Token[1] = '#') then begin
         J := 1;
         while (J < Length(Token)) and (Token[J] = '#') do Inc(J);
@@ -308,6 +348,10 @@ begin
       else if (not InCode) and (Length(Token) >= 2) and (Copy(Token, 1, 2) = '> ') then
         Line := StringOfChar(' ', Length(Line) - Length(Token)) + '| ' +
           Copy(Token, 3, MaxInt);
+      if (not InCode) and ((Trim(Line) = '---') or (Trim(Line) = '***')) then begin
+        Line := StringOfChar('-', 32);
+        Kinds[Kinds.Count - 1] := 'divider';
+      end;
       CleanLine := '';
       SpanInfo := '';
       InlineStart := -1;
@@ -371,6 +415,14 @@ begin
         Edit.SelLength := LineLength;
         Edit.SelAttributes.Style := [fsBold];
         Edit.SelAttributes.Size := BaseSize + 4 - Level;
+      end else if (I < Kinds.Count) and (Kinds[I] = 'tablehead') then begin
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Style := [fsBold];
+      end else if (I < Kinds.Count) and (Kinds[I] = 'divider') then begin
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Color := RGB(128, 128, 128);
       end;
       if (I < InlineSpans.Count) and (InlineSpans[I] <> '') then begin
         SpanParts.Delimiter := ';';
