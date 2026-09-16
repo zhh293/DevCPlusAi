@@ -25,6 +25,7 @@ uses
 
 type
   TAgentEventType = (
+    aetPermission,      // CLI requests explicit tool approval
     aetAssistant,       // assistant text or thinking content
     aetToolUse,         // tool call started or completed input
     aetToolResult,      // tool result returned by Claude/tool runtime
@@ -84,8 +85,10 @@ procedure ResetProtocolState;
 // True when the event marks the end of a turn.
 function IsStreamComplete(const Event: TAgentEvent): Boolean;
 
-// Extract the file path referenced by a tool_use event (if any).
-function ExtractFilePath(const Event: TAgentEvent): String;
+// Extract the file path referenced by a tool_use event (if any).  Keep this
+// name distinct from SysUtils.ExtractFilePath because units importing both
+// APIs otherwise resolve ordinary string paths to the event overload.
+function ExtractEventFilePath(const Event: TAgentEvent): String;
 
 implementation
 
@@ -549,9 +552,9 @@ begin
   TaskId := GetStr(Node, 'task_id');
 
   if SameText(Name, 'init') then begin
-    Result := 'Claude 会话已初始化';
+    Result := 'Claude session initialized';
     if Event.Model <> '' then
-      Result := Result + '（模型：' + Event.Model + '）';
+      Result := Result + ' (model: ' + Event.Model + ')';
   end
   else if Pos('hook_', LowerCase(Name)) = 1 then begin
     Result := 'Hook ' + Name;
@@ -561,21 +564,34 @@ begin
       Result := Result + ': ' + GetStr(Node, 'hook_name');
   end else if (Name = 'task_started') or (Name = 'task_progress') or
               (Name = 'task_notification') then begin
-    Result := '子任务 ' + Name;
+    Result := 'Task ' + Name;
     if TaskId <> '' then
       Result := Result + ': ' + TaskId;
   end else if Name = 'compact_boundary' then
-    Result := 'Claude 已压缩上下文'
+    Result := 'Claude compressed the context'
   else if Name = 'stop_hook_summary' then
-    Result := 'Hook 执行汇总'
+    Result := 'Hook execution summary'
   else if Name = 'status' then
-    Result := 'Claude 状态：' + GetStr(Node, 'status')
+    Result := 'Claude status: ' + GetStr(Node, 'status')
+  else if Name = 'api_retry' then begin
+    Result := 'API retry';
+    if GetStr(Node, 'attempt') <> '' then
+      Result := Result + ' #' + GetStr(Node, 'attempt');
+    if GetStr(Node, 'max_retries') <> '' then
+      Result := Result + '/' + GetStr(Node, 'max_retries');
+    if GetStr(Node, 'error_status') <> '' then
+      Result := Result + ', HTTP ' + GetStr(Node, 'error_status');
+    if GetStr(Node, 'error') <> '' then
+      Result := Result + ': ' + GetStr(Node, 'error');
+    if GetStr(Node, 'retry_delay_ms') <> '' then
+      Result := Result + ' (retry in ' + GetStr(Node, 'retry_delay_ms') + ' ms)';
+  end
   else if Name <> '' then
     Result := Name
   else if ToolName <> '' then
     Result := ToolName
   else
-    Result := 'Claude 系统事件';
+    Result := 'Claude system event';
 end;
 
 procedure ParseStreamEvent(Node: TlkJSONbase; var Events: TAgentEventArray);
@@ -595,13 +611,18 @@ begin
   NestedType := LowerCase(GetStr(Nested, 'type'));
   Base.Subtype := NestedType;
   Base.BlockIndex := GetStr(Nested, 'index');
+  // uLkJSON represents a numeric zero with an empty Variant value in some
+  // Delphi 7 builds.  Its serialized form is still correct and keeps block
+  // correlation stable for the common index=0 stream.
+  if Base.BlockIndex = '' then
+    Base.BlockIndex := GetJSONText(GetObj(Nested, 'index'));
 
   if NestedType = 'message_start' then begin
     MessageNode := GetObj(Nested, 'message');
     FillMessageMetadata(MessageNode, Base);
     GStreamMessageId := Base.MessageId;
     Event := Base;
-    Event.Summary := '消息开始';
+    Event.Summary := 'Message started';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
@@ -622,7 +643,7 @@ begin
     end else begin
       Event := Base;
       Event.ContentType := BlockType;
-      Event.Summary := '内容块开始：' + BlockType;
+      Event.Summary := 'Content block started: ' + BlockType;
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -652,6 +673,11 @@ begin
       PartialJSON := GetStr(DeltaNode, 'partial_json');
       State := FindToolInput('', Base.BlockIndex);
       if State <> nil then begin
+        // content_block_start normally carries an empty input object.  The
+        // following deltas contain the actual JSON document, so keeping the
+        // serialized empty object would produce an invalid "{}{...}" stream.
+        if State.PartialJSON = '{}' then
+          State.PartialJSON := '';
         State.PartialJSON := State.PartialJSON + PartialJSON;
         Event.ToolId := State.ToolId;
         Event.ToolName := State.ToolName;
@@ -661,7 +687,7 @@ begin
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end else begin
-      Event.Summary := '流式增量：' + DeltaType;
+      Event.Summary := 'Stream delta: ' + DeltaType;
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -684,7 +710,7 @@ begin
       RemoveToolInput(State);
     end else begin
       Event := Base;
-      Event.Summary := '内容块结束';
+      Event.Summary := 'Content block stopped';
       Event.IsProtocolOnly := True;
       AppendEvent(Events, Event);
     end;
@@ -699,7 +725,7 @@ begin
     if UsageNode = nil then
       UsageNode := GetObj(DeltaNode, 'usage');
     Event.Usage := GetJSONText(UsageNode);
-    Event.Summary := '消息增量结束';
+    Event.Summary := 'Message delta finished';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
@@ -707,14 +733,14 @@ begin
 
   if NestedType = 'message_stop' then begin
     Event := Base;
-    Event.Summary := '消息结束';
+    Event.Summary := 'Message stopped';
     Event.IsProtocolOnly := True;
     AppendEvent(Events, Event);
     Exit;
   end;
 
   Event := Base;
-  Event.Summary := '未识别的流式事件：' + NestedType;
+  Event.Summary := 'Unknown stream event: ' + NestedType;
   Event.Content := GetJSONText(Nested);
   AppendEvent(Events, Event);
 end;
@@ -765,16 +791,16 @@ begin
   Event.Content := GetContentText(ResultNode);
   Event.IsError := Event.IsError or ((Event.Subtype <> '') and
     not SameText(Event.Subtype, 'success'));
-  Event.Summary := '本轮结束';
+  Event.Summary := 'Turn finished';
   if Event.Subtype <> '' then
-    Event.Summary := Event.Summary + '：' + Event.Subtype;
+    Event.Summary := Event.Summary + ': ' + Event.Subtype;
   if Event.DurationMs <> '' then
-    Event.Summary := Event.Summary + '，耗时 ' + Event.DurationMs + ' ms';
+    Event.Summary := Event.Summary + ', duration ' + Event.DurationMs + ' ms';
   if Event.CostUSD <> '' then
-    Event.Summary := Event.Summary + '，费用 $' + Event.CostUSD;
-  if Event.PermissionDenials <> '' and
+    Event.Summary := Event.Summary + ', cost $' + Event.CostUSD;
+  if (Event.PermissionDenials <> '') and
      (Event.PermissionDenials <> '[]') then
-    Event.Summary := Event.Summary + '，存在权限拒绝';
+    Event.Summary := Event.Summary + ', permission denied';
   AppendEvent(Events, Event);
 end;
 
@@ -881,7 +907,25 @@ begin
 
     TypeName := GetStr(JS, 'type');
     LowerType := LowerCase(TypeName);
-    if LowerType = 'stream_event' then
+    if LowerType = 'control_request' then begin
+      InitEvent(Event, Line);
+      Event.EventType := aetPermission;
+      Event.EventId := GetStr(JS, 'request_id');
+      MessageNode := GetObj(JS, 'request');
+      Event.Subtype := GetStr(MessageNode, 'subtype');
+      Event.ToolName := GetStr(MessageNode, 'tool_name');
+      Event.ToolId := GetStr(MessageNode, 'tool_use_id');
+      ContentNode := GetObj(MessageNode, 'input');
+      Event.ToolInput := GetJSONText(ContentNode);
+      Event.Command := GetStr(ContentNode, 'command');
+      Event.FilePath := GetStr(ContentNode, 'file_path');
+      AppendEvent(Events, Event);
+    end else if LowerType = 'control_response' then begin
+      InitEvent(Event, Line);
+      Event.EventType := aetSystem;
+      Event.IsProtocolOnly := True;
+      AppendEvent(Events, Event);
+    end else if LowerType = 'stream_event' then
       ParseStreamEvent(JS, Events)
     else if LowerType = 'assistant' then begin
       MessageNode := GetObj(JS, 'message');
@@ -920,18 +964,18 @@ begin
     else if LowerType = 'error' then
       ParseErrorEvent(JS, Events)
     else if LowerType = 'tool_progress' then
-      ParseGenericEvent(JS, aetProgress, '工具执行进度', Events)
+      ParseGenericEvent(JS, aetProgress, 'Tool progress', Events)
     else if LowerType = 'rate_limit_event' then
-      ParseGenericEvent(JS, aetRateLimit, 'Claude 限流状态', Events)
+      ParseGenericEvent(JS, aetRateLimit, 'Claude rate limit status', Events)
     else if LowerType = 'prompt_suggestion' then
-      ParseGenericEvent(JS, aetPromptSuggestion, 'Claude 建议', Events)
+      ParseGenericEvent(JS, aetPromptSuggestion, 'Claude suggestion', Events)
     else if IsSystemLikeType(TypeName) then
       ParseSystemEvent(JS, Events)
     else begin
       InitEvent(Event, Line);
       Event.TopLevelType := TypeName;
       Event.Content := Line;
-      Event.Summary := '未识别的 Claude 事件：' + TypeName;
+      Event.Summary := 'Unknown Claude event: ' + TypeName;
       AppendEvent(Events, Event);
     end;
 
@@ -979,7 +1023,7 @@ begin
   Result := Event.EventType = aetResult;
 end;
 
-function ExtractFilePath(const Event: TAgentEvent): String;
+function ExtractEventFilePath(const Event: TAgentEvent): String;
 begin
   Result := Event.FilePath;
 end;

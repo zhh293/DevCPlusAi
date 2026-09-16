@@ -45,9 +45,12 @@ type
     fRunning: Boolean;      // running flag
     fWorkDir: String;       // working directory of the child process
     fCliPath: String;       // path to the claude CLI launcher
+    fSystemPromptFile: String; // UTF-8 prompt file kept for child lifetime
     fResumeSessionId: String; // project session to resume, if any
     fLastError: String;     // last error message (for graceful failures)
     function GetIsRunning: Boolean;
+    procedure DeleteSystemPromptFile;
+    function CreateSystemPromptFile(const Prompt: String): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
@@ -67,14 +70,17 @@ type
     // restarting after an unexpected process exit.
     function Restart(const NewWorkDir: String): Boolean;
 
-  // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
-  procedure SendMessage(const Text: String);
+    // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
+    // Returns False and sets LastError if no complete JSONL record was sent.
+    function SendMessage(const Text: String): Boolean;
+    function SendPermissionResponse(const RequestId, InputJSON: String; Allow: Boolean): Boolean;
 
     // Send a user message whose content may contain local image resources.
     // Non-image attachments are sent as path references so Claude can read
     // them with its normal file tools instead of copying their contents into
     // the prompt.
-    procedure SendMessageWithAttachments(const Text: String; Attachments: TStrings);
+    function SendMessageWithAttachments(const Text: String;
+      Attachments: TStrings): Boolean;
 
     // Send an interrupt (Ctrl+C) to the child process group.
     procedure SendInterrupt;
@@ -98,7 +104,7 @@ function BuildEnvironmentBlock(const WorkDir: String): PChar;
 implementation
 
 uses
-  Utils, devCFG;
+  Utils, devCFG, AgentPipeIO, AgentConfig;
 
 type
   TCreateJobObjectFunc = function(lpJobAttributes: Pointer;
@@ -156,8 +162,12 @@ begin
     Result := 'dontAsk'
   else if SameText(Value, 'plan') then
     Result := 'plan'
+  else if SameText(Value, 'manual') or SameText(Value, 'default') then
+    // Claude CLI 2.1.211 documents "manual". Treat the legacy "default"
+    // value as an alias so old IDE configurations keep their safe behavior.
+    Result := 'manual'
   else
-    Result := 'default';
+    Result := 'manual';
 end;
 
 procedure CloseAgentHandle(var Handle: THandle);
@@ -358,21 +368,21 @@ begin
   if Trim(Text) <> '' then
     AddBlock('{"type":"text","text":' + JsonQuoteUtf8(Text) + '}')
   else
-    AddBlock('{"type":"text","text":"请处理以下附件。"}');
+    AddBlock('{"type":"text","text":"Please process the following attachments."}');
 
   for I := 0 to Attachments.Count - 1 do begin
     Path := Attachments[I];
     if ReadImageBase64(Path, MimeType, ImageData) then begin
       AddBlock('{"type":"text","text":' +
-        JsonQuoteUtf8('[IDE 图片附件] ' + Path) + '}');
+        JsonQuoteUtf8('[IDE image attachment] ' + Path) + '}');
       AddBlock('{"type":"image","source":{"type":"base64","media_type":' +
         JsonQuoteUtf8(MimeType) + ',"data":' + JsonQuoteUtf8(ImageData) + '}}');
     end else begin
       // The path is intentionally kept as a normal text block. Claude can
       // decide whether to read it with Read/Glob/Bash under its permissions.
       AddBlock('{"type":"text","text":' + JsonQuoteUtf8(
-        '[IDE 文件附件]' + #13#10 + '路径：' + Path + #13#10 +
-        '请使用 Claude 的文件工具读取它。') + '}');
+        '[IDE file attachment]' + #13#10 + 'Path: ' + Path + #13#10 +
+        'Use Claude file tools to read it.') + '}');
     end;
   end;
   Result := Result + ']';
@@ -468,7 +478,7 @@ var
   EnvList: TStringList;
   InstallDir, OldPath, NewPath, CompilerBinDir: String;
   i, Total, Pos: Integer;
-  Provider, ApiKey, BaseUrl: String;
+  Provider, ApiKey, BaseUrl, Model: String;
 
   procedure SetVar(const Name, Value: String);
   var
@@ -486,6 +496,17 @@ var
       EnvList[idx] := Name + '=' + Value
     else
       EnvList.Add(Name + '=' + Value);
+  end;
+
+  procedure RemoveVar(const Name: String);
+  var
+    j: Integer;
+    Prefix: String;
+  begin
+    Prefix := Name + '=';
+    for j := EnvList.Count - 1 downto 0 do
+      if SameText(Copy(EnvList[j], 1, Length(Prefix)), Prefix) then
+        EnvList.Delete(j);
   end;
 
   function GetVar(const Name: String): String;
@@ -525,9 +546,21 @@ begin
 
     // Inject the API key according to the configured provider.
     if Assigned(devAgentConfig) then begin
-      Provider := LowerCase(devAgentConfig.Provider);
+      Provider := LowerCase(Trim(devAgentConfig.Provider));
       ApiKey := devAgentConfig.ApiKey;
-      BaseUrl := devAgentConfig.BaseUrl;
+      BaseUrl := NormalizeAgentBaseUrl(Provider, devAgentConfig.BaseUrl);
+      if Provider = 'deepseek' then begin
+        Model := NormalizeAgentModel(Provider, devAgentConfig.Model);
+        SetVar('ANTHROPIC_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_OPUS_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_SONNET_MODEL', AgentCliModel(Provider, Model));
+        SetVar('ANTHROPIC_DEFAULT_HAIKU_MODEL', Model);
+        SetVar('ANTHROPIC_SMALL_FAST_MODEL', Model);
+        SetVar('CLAUDE_CODE_SUBAGENT_MODEL', Model);
+        if AgentCliModel(Provider, Model) <> Model then
+          SetVar('CLAUDE_CODE_AUTO_COMPACT_WINDOW', '786432');
+        SetVar('ANTHROPIC_BASE_URL', BaseUrl);
+      end;
 
       if ApiKey <> '' then begin
         // Claude Code authenticates through the Anthropic-compatible channel.
@@ -541,6 +574,10 @@ begin
           SetVar('ANTHROPIC_API_KEY', ApiKey);
           SetVar('ANTHROPIC_AUTH_TOKEN', ApiKey);
         end;
+        // DeepSeek's documented Claude Code path uses bearer authentication.
+        // Do not inherit a competing Anthropic API key from the parent shell.
+        if Provider = 'deepseek' then
+          RemoveVar('ANTHROPIC_API_KEY');
         if BaseUrl <> '' then
           SetVar('ANTHROPIC_BASE_URL', BaseUrl);
       end;
@@ -582,6 +619,7 @@ begin
   fRunning := False;
   fWorkDir := '';
   fCliPath := '';
+  fSystemPromptFile := '';
   fResumeSessionId := '';
   fLastError := '';
 end;
@@ -590,7 +628,60 @@ destructor TAgentProcess.Destroy;
 begin
   Stop;
   CloseOutputRead;
+  DeleteSystemPromptFile;
   inherited;
+end;
+
+procedure TAgentProcess.DeleteSystemPromptFile;
+begin
+  if fSystemPromptFile = '' then
+    Exit;
+  try
+    if FileExists(fSystemPromptFile) then
+      DeleteFile(fSystemPromptFile);
+  except
+    // A stale prompt file is non-fatal; Windows cleans the temp directory.
+  end;
+  fSystemPromptFile := '';
+end;
+
+function TAgentProcess.CreateSystemPromptFile(const Prompt: String): Boolean;
+var
+  TempPath: array[0..MAX_PATH] of Char;
+  Utf8: AnsiString;
+  Stream: TFileStream;
+begin
+  Result := False;
+  DeleteSystemPromptFile;
+  if Trim(Prompt) = '' then begin
+    Result := True;
+    Exit;
+  end;
+  if GetTempPath(SizeOf(TempPath), TempPath) = 0 then
+    Exit;
+  fSystemPromptFile := IncludeTrailingPathDelimiter(String(TempPath)) +
+    'devcpp-agent-prompt-' + IntToStr(GetCurrentProcessId) + '-' +
+    IntToStr(GetTickCount) + '.txt';
+  if not IsSafeCliPath(fSystemPromptFile) then begin
+    fSystemPromptFile := '';
+    Exit;
+  end;
+  Stream := nil;
+  try
+    try
+      Utf8 := AnsiToUTF8(Prompt);
+      Stream := TFileStream.Create(fSystemPromptFile, fmCreate or fmShareExclusive);
+      if Length(Utf8) > 0 then
+        Stream.WriteBuffer(Utf8[1], Length(Utf8));
+      Result := True;
+    except
+      Result := False;
+    end;
+  finally
+    Stream.Free;
+    if not Result then
+      DeleteSystemPromptFile;
+  end;
 end;
 
 function TAgentProcess.Start(const WorkDir: String): Boolean;
@@ -598,7 +689,8 @@ var
   sa: TSecurityAttributes;
   si: TStartupInfo;
   pi: TProcessInformation;
-  CmdLine, CommandShell, ModelArg, PermissionArg, ResumeArg: String;
+  CmdLine, CommandShell, Model, ModelArg, PermissionArg, ResumeArg: String;
+  SystemPromptArg: String;
   McpArg, PluginArg: String;
   EnvBlock: PChar;
   WorkDirPtr: PChar;
@@ -606,6 +698,7 @@ var
 begin
   Result := False;
   fLastError := '';
+  DeleteSystemPromptFile;
 
   // A previous failed launch may have closed a handle without resetting the
   // field. Normalize all fields before attempting another launch.
@@ -687,11 +780,14 @@ begin
   si.wShowWindow := SW_HIDE;
 
   ModelArg := '';
-  if Assigned(devAgentConfig) and (Trim(devAgentConfig.Model) <> '') then begin
-    if (Pos('"', devAgentConfig.Model) = 0) and
-       (Pos(#13, devAgentConfig.Model) = 0) and
-       (Pos(#10, devAgentConfig.Model) = 0) then
-      ModelArg := ' --model "' + Trim(devAgentConfig.Model) + '"';
+  if Assigned(devAgentConfig) then begin
+    Model := AgentCliModel(devAgentConfig.Provider, devAgentConfig.Model);
+    if (Model <> '') and (Pos('"', Model) = 0) and
+       (Pos(#13, Model) = 0) and (Pos(#10, Model) = 0) then
+      ModelArg := ' --model "' + Model + '"';
+    // Keep external Claude settings from overriding the IDE provider credentials.
+    if SameText(devAgentConfig.Provider, 'deepseek') then
+      ModelArg := ModelArg + ' --setting-sources ""';
   end;
 
   ResumeArg := '';
@@ -703,17 +799,31 @@ begin
 
   PermissionArg := '';
   if Assigned(devAgentConfig) then begin
-    PermissionArg := ' --permission-mode ' +
+    PermissionArg := ' --permission-prompt-tool stdio --permission-mode ' +
       CanonicalPermissionMode(devAgentConfig.PermissionMode);
   end;
 
   McpArg := '';
   PluginArg := '';
+  SystemPromptArg := '';
   if Assigned(devAgentConfig) then begin
     McpArg := BuildPathOption('--mcp-config', devAgentConfig.McpConfigFiles,
       WorkDir, False);
     PluginArg := BuildPathOption('--plugin-dir', devAgentConfig.PluginDirs,
       WorkDir, True);
+    if Trim(devAgentConfig.SystemPrompt) <> '' then begin
+      if not CreateSystemPromptFile(devAgentConfig.SystemPrompt) then begin
+        fLastError := 'Could not create the temporary system prompt file.';
+        LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
+        CloseAgentHandle(fOutputRead);
+        CloseAgentHandle(fOutputWrite);
+        CloseAgentHandle(fInputRead);
+        CloseAgentHandle(fInputWrite);
+        Exit;
+      end;
+      SystemPromptArg := ' --append-system-prompt-file "' +
+        fSystemPromptFile + '"';
+    end;
   end;
 
   // CreateProcess cannot execute .cmd/.bat files directly. Route launcher
@@ -727,12 +837,14 @@ begin
     CmdLine := '"' + CommandShell + '" /d /s /c ""' + fCliPath +
       '" --print --input-format stream-json --output-format stream-json --verbose' +
       ' --include-partial-messages --include-hook-events --prompt-suggestions' +
-      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg + '"';
+      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg +
+      SystemPromptArg + '"';
   end else
     CmdLine := '"' + fCliPath +
       '" --print --input-format stream-json --output-format stream-json --verbose' +
       ' --include-partial-messages --include-hook-events --prompt-suggestions' +
-      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg;
+      ModelArg + ResumeArg + PermissionArg + McpArg + PluginArg +
+      SystemPromptArg;
 
   EnvBlock := nil;
   EnvBlock := BuildEnvironmentBlock(WorkDir);
@@ -759,6 +871,7 @@ begin
       CloseAgentHandle(fOutputWrite);
       CloseAgentHandle(fInputRead);
       CloseAgentHandle(fInputWrite);
+      DeleteSystemPromptFile;
       if JobHandle <> 0 then
         CloseHandle(JobHandle);
       Exit;
@@ -787,8 +900,10 @@ end;
 
 procedure TAgentProcess.Stop;
 begin
-  if not fRunning and (fProcessHandle = 0) and (fJobHandle = 0) then
+  if not fRunning and (fProcessHandle = 0) and (fJobHandle = 0) then begin
+    DeleteSystemPromptFile;
     Exit;
+  end;
 
   fRunning := False;
 
@@ -818,6 +933,7 @@ begin
   end;
 
   fProcessId := 0;
+  DeleteSystemPromptFile;
 end;
 
 procedure TAgentProcess.CloseOutputRead;
@@ -835,34 +951,57 @@ begin
   Result := Start(NewWorkDir);
 end;
 
-procedure TAgentProcess.SendMessage(const Text: String);
+function TAgentProcess.SendPermissionResponse(const RequestId, InputJSON: String;
+  Allow: Boolean): Boolean;
+var
+  Data, Decision: AnsiString;
+  PipeError: String;
 begin
-  SendMessageWithAttachments(Text, nil);
+  Result := False;
+  if not IsRunning or (fInputWrite = 0) or (RequestId = '') then Exit;
+  if Allow then begin
+    Decision := '{"behavior":"allow"';
+    if InputJSON <> '' then Decision := Decision + ',"updatedInput":' + InputJSON;
+    Decision := Decision + '}';
+  end else Decision := '{"behavior":"deny","message":"The user denied this tool operation."}';
+  Data := '{"type":"control_response","response":{"subtype":"success","request_id":' +
+    JsonQuoteUtf8(RequestId) + ',"response":' + Decision + '}}' + #10;
+  Result := WriteAgentPipeData(fInputWrite, Data, PipeError);
+  if not Result then fLastError := 'Could not send permission decision: ' + PipeError;
+end;
+function TAgentProcess.SendMessage(const Text: String): Boolean;
+begin
+  Result := SendMessageWithAttachments(Text, nil);
 end;
 
-procedure TAgentProcess.SendMessageWithAttachments(const Text: String;
-  Attachments: TStrings);
+function TAgentProcess.SendMessageWithAttachments(const Text: String;
+  Attachments: TStrings): Boolean;
 var
   Data: AnsiString;
-  BytesWritten, Offset, Remaining: DWORD;
+  PipeError: String;
 begin
-  if not fRunning or (fInputWrite = 0) or
-     ((Text = '') and ((Attachments = nil) or (Attachments.Count = 0))) then
+  Result := False;
+  fLastError := '';
+  if not fRunning or (fInputWrite = 0) then begin
+    fLastError := 'The AI process is not ready to receive messages.';
     Exit;
+  end;
+  if (Text = '') and ((Attachments = nil) or (Attachments.Count = 0)) then begin
+    fLastError := 'Cannot send an empty AI message.';
+    Exit;
+  end;
   // Claude Code's headless streaming mode consumes JSONL user messages. With
   // attachments the content is an Anthropic-compatible content block array.
   Data := '{"type":"user","message":{"role":"user","content":' +
     BuildUserContentJson(Text, Attachments) + '}}' + #10;
-  Offset := 1;
-  Remaining := Length(Data);
-  while Remaining > 0 do begin
-    if not WriteFile(fInputWrite, Data[Offset], Remaining, BytesWritten, nil) then
-      Break;
-    if BytesWritten = 0 then
-      Break;
-    Inc(Offset, BytesWritten);
-    Dec(Remaining, BytesWritten);
+  if not WriteAgentPipeData(fInputWrite, Data, PipeError) then begin
+    fLastError := 'Could not send the AI message: ' + PipeError;
+    LogError('AgentProcess.pas TAgentProcess.SendMessageWithAttachments',
+      fLastError);
+    Stop;
+    Exit;
   end;
+  Result := True;
 end;
 
 procedure TAgentProcess.SendInterrupt;

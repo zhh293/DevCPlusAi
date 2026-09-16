@@ -20,7 +20,7 @@
     delivers each line to the main thread via Synchronize. The CLI uses
     stream-json output, one JSON object per line, so line-splitting is the
     natural framing. Carriage returns (#13) are stripped. The accumulated
-    bytes are treated as UTF-8 and decoded before the callback fires.
+    bytes remain UTF-8 until the JSON parser decodes string values.
 }
 unit AgentReader;
 
@@ -40,7 +40,7 @@ type
   private
     fPipeRead: THandle;            // stdout read end, from TAgentProcess
     fLineBuffer: AnsiString;       // bytes accumulated for the current line
-    fCurrentLine: String;          // decoded line passed to the sync callback
+    fCurrentLine: String;          // UTF-8 line passed to the sync callback
     fOnLineReady: TAgentLineEvent; // line-ready event
     fOnProcessExit: TAgentExitEvent; // process-exit event
     procedure DoLineReady;         // Synchronize target for a ready line
@@ -48,23 +48,25 @@ type
   protected
     procedure Execute; override;
   public
-    constructor Create(PipeHandle: THandle);
+    constructor Create(PipeHandle: THandle; AOnLineReady: TAgentLineEvent;
+      AOnProcessExit: TAgentExitEvent);
     property OnLineReady: TAgentLineEvent read fOnLineReady write fOnLineReady;
     property OnProcessExit: TAgentExitEvent read fOnProcessExit write fOnProcessExit;
   end;
 
 implementation
 
-uses
-  Utils;
-
-constructor TAgentReader.Create(PipeHandle: THandle);
+constructor TAgentReader.Create(PipeHandle: THandle;
+  AOnLineReady: TAgentLineEvent; AOnProcessExit: TAgentExitEvent);
 begin
-  // Create suspended is not necessary; we want it running immediately.
+  // Bind callbacks before resuming so fast CLI output cannot be lost between
+  // construction and the caller assigning event properties.
   inherited Create(True);
   fPipeRead := PipeHandle;
   fLineBuffer := '';
   fCurrentLine := '';
+  fOnLineReady := AOnLineReady;
+  fOnProcessExit := AOnProcessExit;
   FreeOnTerminate := False;
   Resume;
 end;
@@ -102,8 +104,8 @@ begin
     while i < Integer(BytesRead) do begin
       c := Buffer[i];
       if c = #10 then begin
-        // Complete line: decode UTF-8 and hand it to the main thread.
-        fCurrentLine := UTF8ToAnsi(fLineBuffer);
+        // Complete line: preserve UTF-8 for the JSON parser and hand it to the main thread.
+        fCurrentLine := String(fLineBuffer);
         Synchronize(DoLineReady);
         fLineBuffer := '';
       end else if c <> #13 then
@@ -114,7 +116,7 @@ begin
 
   // Flush any trailing partial line (no LF before EOF).
   if (fLineBuffer <> '') and not Terminated then begin
-    fCurrentLine := UTF8ToAnsi(fLineBuffer);
+    fCurrentLine := String(fLineBuffer);
     Synchronize(DoLineReady);
     fLineBuffer := '';
   end;

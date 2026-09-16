@@ -36,6 +36,15 @@
 *.rsm
 *.tds
 *.dcu
+/Source/manifest.RES
+/Source/spin.RES
+/Source/Tests/AgentProtocolSmoke.exe
+/Source/Tests/AgentReaderSmoke.exe
+/Source/Tests/AgentPipeIOSmoke.exe
+/Source/Tests/AgentUISmoke.exe
+/Source/Tests/AgentProviderSmoke.exe
+/Source/Tests/AgentFixtureCli.exe
+/Source/Tests/AgentMainSmoke.exe
 *.lib
 *.ddp
 
@@ -86,3 +95,11 @@ package-lock.json
 /nodejs/
 /claude-cli/
 /AGENT-RUNTIME-VERSIONS.txt
+/.firecrawl/
+/.tools/
+/dist/
+/DevCPlusAi-*-windows-no-compiler.zip
+/DevCPlusAi-*-windows-no-compiler-self-extracting.exe
+
+# Local sample build output
+/test1.exe

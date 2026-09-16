@@ -22,9 +22,9 @@ DevCPlusAi 在保留一个轻量、纯 Windows 原生 C/C++ IDE 的基础上，�
 
 * **项目级会话恢复。** Claude CLI 自己保存对话上下文，IDE 只按项目保存 `session_id`，重新打开项目时通过 `--resume` 恢复；CLI 意外退出时最多自动重启 3 次。
 
-* **附件与扩展能力。** 输入区支持选择文件、从 Windows 资源管理器拖放文件、粘贴剪贴板图片和发送 PNG/JPEG/GIF/WebP 图片内容；普通文件以路径附件交给 Claude 的文件工具读取。设置中可填写项目级 MCP 配置文件和 Plugin 目录，CLI 输出中的 system、hook、MCP、Plugin、Skill 相关事件会保留在面板中。
+* **附件与扩展能力。** 输入区支持选择文件、从 Windows 资源管理器拖放文件、粘贴剪贴板图片和发送 PNG/JPEG/GIF/WebP 图片内容；普通文件以路径附件交给 Claude 的文件工具读取。剪贴板图片使用唯一临时文件名，发送、移除、切换项目或关闭 IDE 时自动清理；用户手动选择的原文件不会被删除。设置中可填写项目级 MCP 配置文件和 Plugin 目录，CLI 输出中的 system、hook、MCP、Plugin、Skill 相关事件会保留在面板中。
 
-* **中文优先的交互体验。** 配置向导、面板与提示信息均提供中文界面，降低初学者的使用门槛。
+* **稳定的英文 AI 界面。** AI 配置向导、面板与提示使用英文 ASCII，避免 Delphi 7 在不同系统代码页下出现乱码；对话内容仍可使用中文。
 
 ---
 
@@ -43,7 +43,7 @@ DevCPlusAi 把 AI 能力拆分为几个职责单一、相互解耦的 Object Pas
 IDE 启动 AI 子进程时使用的命令形如：
 
 ```
-"<CliPath>" --print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions
+"<CliPath>" --print --input-format stream-json --output-format stream-json --verbose --include-partial-messages --include-hook-events --prompt-suggestions [--append-system-prompt-file "<temporary-utf8-file>"]
 ```
 
 子进程以独立进程组（`CREATE_NEW_PROCESS_GROUP`）创建，便于精确地向子进程单独投递中断信号；环境变量块沿用 Delphi 7 工程的 ANSI 表示。`AgentReader` 在后台线程中按行读取子进程标准输出，交由 `AgentProtocol` 解析成结构化事件后，再通过线程安全的方式回调到 UI 面板上渲染。
@@ -70,6 +70,26 @@ AI 集成相关的核心源码位于 `Source/` 目录：
 
 ---
 
+## DeepSeek V4
+
+在 AI Settings 中选择 DeepSeek，模型默认是 `deepseek-v4-flash`，也可选择 `deepseek-v4-pro` 或输入网关模型 ID。填写自己的 DeepSeek API Key；Base URL 为 `https://api.deepseek.com/anthropic`。Validate 只检查 CLI 启动，真实联网需发送一条消息确认。
+
+旧 DeepSeek 配置中的空模型、`deepseek-chat` 和 `deepseek-reasoner` 会迁移到 V4 Flash。显式选择的 Pro 和自定义模型不会被覆盖。官方根地址及 `/v1` 会转换为 Anthropic 兼容地址，自定义网关地址保留。
+
+V4 的 CLI 参数带 `[1m]` 上下文标记；主模型、默认角色模型和子任务模型都映射到所选 DeepSeek 模型。这些设置只写入 IDE 启动的子进程环境，不改全局 Claude 配置或系统环境。
+
+AI 面板沿用 IDE 字体与编辑器主题颜色，支持亮色和暗色切换。顶部 Settings 直接打开配置；底部 Send/Stop 共用紧凑位置，附件列表仅在有附件时显示。回归测试覆盖模型迁移、子进程环境隔离、原生窗体加载、窄宽布局和主题颜色。真实 API 对话仍需使用有效凭据验收。
+
+面板顶部选择 Explain code、Fix code、Improve code、Add comments 或 Diagnose build errors，再点 Run。优先使用编辑器选区，没有选区则使用当前文件；普通聊天也会附带当前编辑内容（包括未保存内容，最多 24,000 字节）和最近的编译错误。Copy answer 复制当前回答，Open code 将回答的第一个完整 Markdown 代码块打开为新编辑标签页，便于检查、修改和编译。Logs 控制后续诊断日志显示，API 重试和错误仍会显示；思考块不再混入正文。
+
+输入框和回答区支持 Ctrl+C、Ctrl+V、Ctrl+A，以及右键菜单；输入框还支持剪切、撤销和 Shift+Insert 粘贴。在回答区粘贴会把文字放进输入框。流式回复到来时会保留已选中的文字，便于复制。工具调用在发生时插入对话流，每个调用独立折叠；结果更新原位置，前后文字顺序不变。点击工具标题展开参数与结果，支持复制；历史恢复保留这些块的顺序。
+
+点击 New chat 新建会话，通过旁边的历史下拉框选择旧会话继续。每个工作目录分别保存会话 ID、正文、工具记录和输入草稿；关闭程序后会恢复最后选中的会话。历史记录存放在本机配置目录的 AgentSessions/History 下，不进入发布包。旧版本在当前工作目录留下的 Claude CLI 历史也会进入列表，首次选择时导入正文；恢复上下文仍需要对应 CLI 会话文件存在。新会话不会继承旧会话 ID。
+
+Windows 构建中的 AgentMainSmoke 使用本地模拟 CLI 检查真实的 `--resume` 参数、会话切换和重启恢复，不使用 API Key 或网络；AgentUISmoke 覆盖工具折叠、正文隔离、历史快照与输入草稿。
+
+接口参考：[DeepSeek Claude Code 接入](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)。
+
 ## 配置项说明
 
 AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
@@ -81,17 +101,17 @@ AI 助手的全部配置由 `TdevAgentConfig` 统一管理，主要包括：
 | `ApiKey` | API 密钥（首启向导中填写，掩码显示） | 空 |
 | `Model` | 使用的模型 | 空（由向导/服务商决定） |
 | `BaseUrl` | 自定义端点 | 空 |
-| `CliPath` | AI CLI 可执行文件路径 | `<程序目录>\claude-cli\bin\claude.exe` |
-| `PanelPosition` | 面板停靠位置 | `right` |
+| `CliPath` | AI CLI 可执行文件路径；可在英文设置窗口中修改 | `<程序目录>\claude-cli\bin\claude.exe` |
+| `PanelPosition` | 兼容配置字段；当前版本固定右侧停靠，无效值会归一化为 `right` | `right` |
 | `PanelWidth` | 面板宽度（像素） | `400` |
-| `FontSize` | 面板字体大小 | `10` |
-| `SendKey` | 发送快捷键 | `enter` |
-| `PermissionMode` | Claude CLI 原生权限模式 | `default` |
+| `FontSize` | 面板字体大小，可在英文设置窗口中设为 8–24 | `10` |
+| `SendKey` | 发送快捷键，可在英文设置窗口中选择 Enter 或 Ctrl+Enter | `enter` |
+| `PermissionMode` | Claude CLI 原生权限模式 | `manual` |
 | `McpConfigFiles` | 传给 `--mcp-config` 的配置文件路径，多个路径用 `;` 分隔 | 空 |
 | `PluginDirs` | 传给 `--plugin-dir` 的目录或 ZIP 路径，多个路径用 `;` 分隔 | 空 |
-| `SystemPrompt` | 系统提示词 | 空 |
+| `SystemPrompt` | 追加系统提示词；以无 BOM UTF-8 临时文件传给 CLI，并在子进程结束后删除 | 空 |
 
-配置随 IDE 设置一并保存，下次启动自动加载。项目会话目录只保存 Claude 的 `session_id`，不保存完整聊天内容；API Key 写入配置前会通过 Windows DPAPI 加密。
+配置随 IDE 设置一并保存，下次启动自动加载。项目会话目录只保存 Claude 的 `session_id`，不保存完整聊天内容；API Key 写入配置前会通过 Windows DPAPI 加密。消息只有在完整写入 CLI 的 JSONL 输入管道后才会显示为已发送；写入失败会立即显示英文错误并重启异常子进程。每次成功发送后由独立主线程定时器等待首个有效 assistant/tool/result 事件；60 秒内无响应时会中断本次请求并显示英文错误提示。
 
 ---
 
@@ -102,7 +122,7 @@ DevCPlusAi 是一个 **Windows + Delphi / Object Pascal** 工程，需要在 Win
 1. 在 Delphi / RAD Studio 中打开 `Source/devcpp.dpr`。
 2. 编译生成可执行文件。
 3. 发布包会内置 portable Node.js 和锁定版本的 AI CLI（默认路径为程序目录下的 `claude-cli\bin\claude.exe`，也兼容 `claude.cmd`）；开发环境也可以在配置向导中指定外部 CLI。
-4. 首次运行 IDE 时会弹出配置向导，填写服务商、API Key、Base URL 与模型后即可开始使用 AI 对话面板。后续可通过 `工具 → AI 设置...` 修改配置。
+4. 首次运行 IDE 时会弹出配置向导，填写服务商、API Key、Base URL 与模型后即可开始使用 AI 对话面板。后续可通过 `工具 → AI Settings...` 修改配置。使用 `视图 → AI Assistant` 或 `Ctrl+Alt+A` 切换 AI 面板，`Ctrl+L` 聚焦输入框；`Ctrl+Shift+A` 保留给原有代码格式化功能。
 
 API Key 只在进程内以明文使用，写入 IDE 配置时会通过 Windows DPAPI 加密；旧版本留下的明文配置会兼容读取，并在下次保存时迁移为密文。发布包必须包含 `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt`，不能只发布主程序。Provider 配置只注入 Agent 子进程，不调用 cc-switch，也不修改全局 Claude settings。
 
@@ -173,12 +193,52 @@ nodejs/ claude-cli/ AGENT-RUNTIME-VERSIONS.txt
 
 ```bat
 cd Source
-dcc32.exe -B devcpp.dpr -E. -NU.\dcu
+dcc32.exe -B devcpp.dpr -E. -N.\dcu
 cd ..
 copy /Y Source\devcpp.exe devcpp.exe
 ```
 
-如果需要生成 NSIS 依赖的辅助程序，也要分别编译 `Source\Tools\Packman\Packman.dpr` 和 `Source\Tools\PackMaker\PackMaker.dpr`，并把生成的 exe 放到仓库根目录。`ConsolePauser.exe` 不是主 Delphi 工程的一部分，需要使用已有 Windows 构建产物或单独构建后放到根目录。
+也可以在仓库根目录执行一键构建脚本。它会编译资源、主程序、Packman、
+PackMaker 和 ConsolePauser，并把发布所需的四个 EXE 复制到仓库根目录：
+
+```bat
+tools\build-windows.cmd
+```
+
+如果 Delphi 的完整 `Lib` 不在默认安装目录，可通过
+`-DelphiLibPath <目录>` 指定包含 `Spin.dcu` 的目录。
+精简安装的 Delphi 7 可能只有 `Spin.dcu` 而缺少配套的 `SPIN.RES`；构建脚本
+会从仓库内的兼容位图资源自动生成该文件。仓库不分发 Delphi 自带的 DCU，
+因此全新构建环境仍需安装完整 Delphi 7 库，或显式指定合法的 `Spin.dcu` 来源。
+
+构建后可检查无编译器安装包所需资源及锁定的 Agent 运行时版本：
+
+```bat
+tools\verify-release.cmd -PackageType NoCompiler
+```
+
+生成包含 Agent 运行时的免安装 ZIP：
+
+```bat
+tools\package-portable.cmd -Version dev
+```
+
+如果构建机已安装带 `7z.sfx` 的 7-Zip，也可以同时生成单文件自解压免安装版：
+
+```bat
+tools\package-self-extracting.cmd -Version dev
+```
+
+双击生成的 `DevCPlusAi-<版本>-windows-no-compiler-self-extracting.exe` 后选择目录即可解压运行，不需要管理员权限。它是便携分发形式，不会创建开始菜单快捷方式或卸载项；需要这些系统集成功能时仍应使用 NSIS 安装包。构建脚本会附带并校验 `7-ZIP-LICENSE.txt`，同时对 SFX 内全部文件执行完整性测试。
+
+上述两个便携产物都是**无编译器版**：AI 助手和编辑器可以直接运行，但编译 C/C++ 前仍需另行安装并在 IDE 中配置兼容的 GCC/MinGW 工具链。本地 `dev` 构建没有商业代码签名证书，Windows 可能显示 SmartScreen 提示；正式公开分发应使用可信证书签名，并同时发布脚本输出的 SHA-256。不要为了运行未签名构建而全局关闭 Windows 安全功能。
+
+脚本会核对关键文件的 SHA-256；如果本机装有 7-Zip，还会对 ZIP 中的全部
+条目执行 CRC 完整性测试。包内的 `BUILD-INFO.txt` 会记录源码提交、工作区
+状态、运行时版本以及四个可执行文件的 SHA-256。
+
+一键脚本会同时生成 NSIS 依赖的 `Packman.exe`、`PackMaker.exe` 和
+`ConsolePauser.exe`；后者使用当前 `PATH` 中的 `g++.exe` 静态编译。
 
 ### 4. 构建安装器
 
@@ -223,4 +283,6 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 
 ## 开发状态
 
-基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启、文件/图片附件、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。仍需在 Windows + Delphi 环境完成真实编译和运行验收；GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、输入管道完整写入/断管失败、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。新增的 `AgentUISmoke` 会实际加载 AI 面板和设置窗体，并检查三种宽度下的按钮布局及 Send/Stop 状态；原有 `btnAttach.Align` 故障已验证会使测试以非零状态退出。仍需完成真实 API 对话和完整安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
+
+普通权限模式通过 CLI 的 stdio 审批通道弹出工具审批窗口，显示工具、工作目录与完整参数。Allow once 只允许本次，Deny 或关闭窗口拒绝；不会自动修改权限模式。

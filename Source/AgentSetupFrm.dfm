@@ -4,7 +4,7 @@ object AgentSetupForm: TAgentSetupForm
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
   Caption = 'AI Setup'
-  ClientHeight = 548
+  ClientHeight = 698
   ClientWidth = 380
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -48,44 +48,80 @@ object AgentSetupForm: TAgentSetupForm
     Height = 15
     Caption = 'Model:'
   end
-  object lblPermissionMode: TLabel
+  object lblFontSize: TLabel
+    Left = 252
+    Top = 244
+    Width = 90
+    Height = 15
+    Caption = 'Panel font size:'
+  end
+  object lblCliPath: TLabel
     Left = 16
     Top = 300
+    Width = 240
+    Height = 15
+    Caption = 'Claude CLI path (empty uses bundled runtime):'
+  end
+  object lblPermissionMode: TLabel
+    Left = 16
+    Top = 356
     Width = 100
     Height = 15
     Caption = 'Permission mode:'
   end
+  object lblSendKey: TLabel
+    Left = 252
+    Top = 356
+    Width = 60
+    Height = 15
+    Caption = 'Send key:'
+  end
   object lblMcpConfig: TLabel
     Left = 16
-    Top = 350
+    Top = 406
     Width = 230
     Height = 15
     Caption = 'MCP config files (semicolon separated):'
   end
   object edtMcpConfig: TEdit
     Left = 16
-    Top = 368
+    Top = 424
     Width = 348
     Height = 23
-    TabOrder = 6
+    TabOrder = 9
   end
   object lblPluginDirs: TLabel
     Left = 16
-    Top = 398
+    Top = 456
     Width = 230
     Height = 15
     Caption = 'Plugin dirs or ZIP files (semicolon separated):'
   end
   object edtPluginDirs: TEdit
     Left = 16
-    Top = 416
+    Top = 474
     Width = 348
     Height = 23
-    TabOrder = 7
+    TabOrder = 10
+  end
+  object lblSystemPrompt: TLabel
+    Left = 16
+    Top = 506
+    Width = 150
+    Height = 15
+    Caption = 'Additional system prompt:'
+  end
+  object memoSystemPrompt: TMemo
+    Left = 16
+    Top = 524
+    Width = 348
+    Height = 60
+    ScrollBars = ssVertical
+    TabOrder = 11
   end
   object lblSkillInfo: TLabel
     Left = 16
-    Top = 446
+    Top = 592
     Width = 348
     Height = 30
     AutoSize = False
@@ -94,20 +130,33 @@ object AgentSetupForm: TAgentSetupForm
   end
   object cboPermissionMode: TComboBox
     Left = 16
-    Top = 318
-    Width = 348
+    Top = 374
+    Width = 230
     Height = 23
     Style = csDropDownList
     ItemIndex = 0
-    TabOrder = 5
-    Text = 'default'
+    TabOrder = 7
+    Text = 'manual'
     Items.Strings = (
-      'default'
+      'manual'
       'acceptEdits'
       'auto'
       'bypassPermissions'
       'dontAsk'
       'plan')
+  end
+  object cboSendKey: TComboBox
+    Left = 252
+    Top = 374
+    Width = 112
+    Height = 23
+    Style = csDropDownList
+    ItemIndex = 0
+    TabOrder = 8
+    Text = 'Enter'
+    Items.Strings = (
+      'Enter'
+      'Ctrl+Enter')
   end
   object lblHelp: TLabel
     Left = 240
@@ -126,7 +175,7 @@ object AgentSetupForm: TAgentSetupForm
   end
   object lblStatus: TLabel
     Left = 16
-    Top = 480
+    Top = 628
     Width = 348
     Height = 24
     AutoSize = False
@@ -173,30 +222,46 @@ object AgentSetupForm: TAgentSetupForm
     Height = 23
     TabOrder = 3
   end
-  object edtModel: TEdit
+  object edtModel: TComboBox
     Left = 16
     Top = 262
+    Width = 230
+    Height = 23
+    ItemHeight = 15
+    TabOrder = 4
+  end
+  object edtFontSize: TEdit
+    Left = 252
+    Top = 262
+    Width = 112
+    Height = 23
+    TabOrder = 5
+    Text = '10'
+  end
+  object edtCliPath: TEdit
+    Left = 16
+    Top = 318
     Width = 348
     Height = 23
-    TabOrder = 4
+    TabOrder = 6
   end
   object btnOK: TButton
     Left = 200
-    Top = 510
+    Top = 660
     Width = 75
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 8
+    TabOrder = 12
     OnClick = btnOKClick
   end
   object btnSkip: TButton
     Left = 289
-    Top = 510
+    Top = 660
     Width = 75
     Height = 25
     Caption = 'Skip'
-    TabOrder = 9
+    TabOrder = 13
     OnClick = btnSkipClick
   end
 end

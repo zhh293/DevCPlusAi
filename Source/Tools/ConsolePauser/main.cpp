@@ -11,6 +11,22 @@ using std::string;
 
 HANDLE hJob;
 
+BOOL CreateChildProcess(LPSTR commandLine, STARTUPINFO* si, PROCESS_INFORMATION* pi) {
+    if (CreateProcess(NULL, commandLine, NULL, NULL, true,
+            CREATE_BREAKAWAY_FROM_JOB, NULL, NULL, si, pi)) {
+        return TRUE;
+    }
+
+    // Sandboxes, CI runners and some enterprise launchers place this process
+    // in a job that does not allow breakaway. Retry as a normal child so the
+    // user's program can still run.
+    if (GetLastError() == ERROR_ACCESS_DENIED) {
+        return CreateProcess(NULL, commandLine, NULL, NULL, true,
+            0, NULL, NULL, si, pi);
+    }
+    return FALSE;
+}
+
 LONGLONG GetClockTick() {
 	LARGE_INTEGER dummy;
 	QueryPerformanceCounter(&dummy);
@@ -50,10 +66,11 @@ void PauseExit(int exitcode, bool reInp) {
         sa.lpSecurityDescriptor = NULL;
         sa.bInheritHandle = TRUE;
 		
-        HANDLE hInp = CreateFile("CONIN$", GENERIC_WRITE | GENERIC_READ, 
+        hInp = CreateFile("CONIN$", GENERIC_WRITE | GENERIC_READ,
             FILE_SHARE_READ , &sa, OPEN_EXISTING, /*FILE_ATTRIBUTE_NORMAL*/0, NULL);
-            //si.hStdInput = hInp;
-        SetStdHandle(STD_INPUT_HANDLE,hInp);
+        if (hInp != INVALID_HANDLE_VALUE) {
+            SetStdHandle(STD_INPUT_HANDLE,hInp);
+        }
     }
 	//system("pause");
 	
@@ -63,10 +80,8 @@ void PauseExit(int exitcode, bool reInp) {
 	si.cb = sizeof(si);
 	memset(&pi,0,sizeof(pi));
 
-	DWORD dwCreationFlags = CREATE_BREAKAWAY_FROM_JOB;
-
-
-	if(!CreateProcess(NULL, (LPSTR)"cmd /c \"pause\"", NULL, NULL, true, dwCreationFlags, NULL, NULL, &si, &pi)) {
+    char pauseCommand[] = "cmd.exe /c pause";
+    if(!CreateChildProcess(pauseCommand, &si, &pi)) {
 		printf("\n--------------------------------");
 		printf("\nFailed to execute 'pause' ");
 		printf("\nError %lu: %s\n",GetLastError(),GetErrorMessage().c_str());
@@ -75,13 +90,13 @@ void PauseExit(int exitcode, bool reInp) {
 	}
     WINBOOL bSuccess = AssignProcessToJobObject( hJob, pi.hProcess );
     if ( bSuccess == FALSE ) {
-        printf( "AssignProcessToJobObject failed: error %d\n", GetLastError() );
-        system("pause");
-        exit(exitcode);
+        printf( "Warning: AssignProcessToJobObject failed: error %d\n", GetLastError() );
     }
 
-	WaitForSingleObject(pi.hProcess, INFINITE); // Wait for it to finish
-    if (reInp) {
+    WaitForSingleObject(pi.hProcess, INFINITE); // Wait for it to finish
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    if (hInp != NULL && hInp != INVALID_HANDLE_VALUE) {
         CloseHandle(hInp);
     }
     CloseHandle( hJob );
@@ -126,10 +141,7 @@ DWORD ExecuteCommand(string& command,bool reInp) {
 	si.cb = sizeof(si);
 	memset(&pi,0,sizeof(pi));
 	
-	DWORD dwCreationFlags = CREATE_BREAKAWAY_FROM_JOB;
-
-	
-	if(!CreateProcess(NULL, (LPSTR)command.c_str(), NULL, NULL, true, dwCreationFlags, NULL, NULL, &si, &pi)) {
+	if(!CreateChildProcess(&command[0], &si, &pi)) {
 		printf("\n--------------------------------");
 		printf("\nFailed to execute \"%s\":",command.c_str());
 		printf("\nError %lu: %s\n",GetLastError(),GetErrorMessage().c_str());
@@ -137,8 +149,7 @@ DWORD ExecuteCommand(string& command,bool reInp) {
 	}
     WINBOOL bSuccess = AssignProcessToJobObject( hJob, pi.hProcess );
     if ( bSuccess == FALSE ) {
-        printf( "AssignProcessToJobObject failed: error %d\n", GetLastError() );
-        return 0;
+        printf( "Warning: AssignProcessToJobObject failed: error %d\n", GetLastError() );
     }
 
 	WaitForSingleObject(pi.hProcess, INFINITE); // Wait for it to finish
@@ -146,6 +157,8 @@ DWORD ExecuteCommand(string& command,bool reInp) {
     
 	DWORD result = 0;
 	GetExitCodeProcess(pi.hProcess, &result);
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
 	return result;
 }
 

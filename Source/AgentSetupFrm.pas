@@ -37,13 +37,21 @@ type
     lblBaseUrl: TLabel;
     edtBaseUrl: TEdit;
     lblModel: TLabel;
-    edtModel: TEdit;
+    edtModel: TComboBox;
+    lblFontSize: TLabel;
+    edtFontSize: TEdit;
+    lblCliPath: TLabel;
+    edtCliPath: TEdit;
     lblPermissionMode: TLabel;
     cboPermissionMode: TComboBox;
+    lblSendKey: TLabel;
+    cboSendKey: TComboBox;
     lblMcpConfig: TLabel;
     edtMcpConfig: TEdit;
     lblPluginDirs: TLabel;
     edtPluginDirs: TEdit;
+    lblSystemPrompt: TLabel;
+    memoSystemPrompt: TMemo;
     lblSkillInfo: TLabel;
     btnValidate: TButton;
     lblHelp: TLabel;
@@ -94,21 +102,27 @@ begin
   Font.Name := devData.InterfaceFont;
   Font.Size := devData.InterfaceFontSize;
 
-  Caption := 'AI 助手配置向导';
-  lblTitle.Caption := '欢迎使用 AI 助手！请先完成基础配置。';
-  rgProvider.Caption := '服务商';
-  lblApiKey.Caption := 'API Key：';
-  lblBaseUrl.Caption := '自定义端点（Base URL）：';
-  lblModel.Caption := '模型：';
-  lblPermissionMode.Caption := 'CLI 权限模式：';
-  lblMcpConfig.Caption := 'MCP 配置文件（多个路径用 ; 分隔）：';
-  lblPluginDirs.Caption := 'Plugin 目录或 ZIP（多个路径用 ; 分隔）：';
-  lblSkillInfo.Caption := 'Skill：Claude 会自动读取项目 .claude\skills，以及已加载插件中的 Skill。';
-  btnValidate.Caption := '验证';
-  lblHelp.Caption := '如何获取 API Key？';
+  // Delphi 7 treats source literals as the active ANSI code page. Keep all
+  // runtime UI text ASCII-only so the dialog renders consistently everywhere.
+  Caption := 'AI Assistant Setup';
+  lblTitle.Caption := 'Welcome! Complete the basic AI configuration.';
+  rgProvider.Caption := 'Provider';
+  lblApiKey.Caption := 'API Key:';
+  lblBaseUrl.Caption := 'Custom endpoint (Base URL):';
+  lblModel.Caption := 'Model:';
+  lblFontSize.Caption := 'Panel font size:';
+  lblCliPath.Caption := 'Claude CLI path (empty uses bundled runtime):';
+  lblPermissionMode.Caption := 'CLI permission mode:';
+  lblSendKey.Caption := 'Send key:';
+  lblMcpConfig.Caption := 'MCP config files (semicolon separated):';
+  lblPluginDirs.Caption := 'Plugin dirs or ZIP files (semicolon separated):';
+  lblSystemPrompt.Caption := 'Additional system prompt:';
+  lblSkillInfo.Caption := 'Skills are loaded from project .claude\skills and active plugins.';
+  btnValidate.Caption := 'Validate';
+  lblHelp.Caption := 'How to get an API key?';
   lblStatus.Caption := '';
-  btnOK.Caption := '确定';
-  btnSkip.Caption := '跳过';
+  btnOK.Caption := 'OK';
+  btnSkip.Caption := 'Skip';
 end;
 
 function TAgentSetupForm.ProviderId: String;
@@ -132,7 +146,7 @@ begin
     4: Result := 'dontAsk';
     5: Result := 'plan';
   else
-    Result := 'default';
+    Result := 'manual';
   end;
 end;
 
@@ -153,8 +167,15 @@ begin
   edtApiKey.Text := devAgentConfig.ApiKey;
   edtBaseUrl.Text := devAgentConfig.BaseUrl;
   edtModel.Text := devAgentConfig.Model;
+  edtFontSize.Text := IntToStr(devAgentConfig.FontSize);
+  edtCliPath.Text := devAgentConfig.CliPath;
   edtMcpConfig.Text := devAgentConfig.McpConfigFiles;
   edtPluginDirs.Text := devAgentConfig.PluginDirs;
+  memoSystemPrompt.Text := devAgentConfig.SystemPrompt;
+  if SameText(devAgentConfig.SendKey, 'ctrl+enter') then
+    cboSendKey.ItemIndex := 1
+  else
+    cboSendKey.ItemIndex := 0;
   if SameText(devAgentConfig.PermissionMode, 'acceptEdits') then
     cboPermissionMode.ItemIndex := 1
   else if SameText(devAgentConfig.PermissionMode, 'auto') then
@@ -165,13 +186,14 @@ begin
     cboPermissionMode.ItemIndex := 4
   else if SameText(devAgentConfig.PermissionMode, 'plan') then
     cboPermissionMode.ItemIndex := 5
-  else
+  else // "manual", legacy "default", and invalid values use the safe mode.
     cboPermissionMode.ItemIndex := 0;
 end;
 
 procedure TAgentSetupForm.ApplyProviderDefaults;
 var
   custom: Boolean;
+  Model: String;
 begin
   // All non-Anthropic providers need an endpoint understood by the Claude
   // CLI. Native OpenAI endpoints are not interchangeable with Anthropic ones,
@@ -180,20 +202,34 @@ begin
   lblBaseUrl.Visible := custom;
   edtBaseUrl.Visible := custom;
 
-  // Suggest a sensible default model / endpoint per provider when empty.
-  if (edtModel.Text = '') or
-     SameText(edtModel.Text, 'sonnet') or
-     SameText(edtModel.Text, 'claude-3-5-sonnet-latest') or
-     SameText(edtModel.Text, 'gpt-4o') or
-     SameText(edtModel.Text, 'deepseek-chat') then
-    case rgProvider.ItemIndex of
-      PROVIDER_ANTHROPIC: edtModel.Text := 'sonnet';
-      PROVIDER_OPENAI:    edtModel.Text := 'gpt-4o';
-      PROVIDER_DEEPSEEK:  edtModel.Text := 'deepseek-chat';
-    end;
-
-  if (rgProvider.ItemIndex = PROVIDER_DEEPSEEK) and (edtBaseUrl.Text = '') then
-    edtBaseUrl.Text := 'https://api.deepseek.com/anthropic';
+  Model := Trim(edtModel.Text);
+  edtModel.Items.Clear;
+  if rgProvider.ItemIndex = PROVIDER_DEEPSEEK then begin
+    edtModel.Items.Add(DEEPSEEK_DEFAULT_MODEL);
+    edtModel.Items.Add(DEEPSEEK_PRO_MODEL);
+    if SameText(Model, 'sonnet') or
+       SameText(Model, 'claude-3-5-sonnet-latest') or
+       SameText(Model, 'gpt-4o') then
+      Model := '';
+    Model := NormalizeAgentModel('deepseek', Model);
+    edtBaseUrl.Text := NormalizeAgentBaseUrl('deepseek', edtBaseUrl.Text);
+  end else begin
+    if (Model = '') or SameText(Model, 'sonnet') or
+       SameText(Model, 'claude-3-5-sonnet-latest') or
+       SameText(Model, 'gpt-4o') or
+       SameText(Model, 'deepseek-chat') or
+       SameText(Model, 'deepseek-reasoner') or
+       SameText(Model, DEEPSEEK_DEFAULT_MODEL) or
+       SameText(Model, DEEPSEEK_PRO_MODEL) then
+      case rgProvider.ItemIndex of
+        PROVIDER_ANTHROPIC: Model := 'sonnet';
+        PROVIDER_OPENAI: Model := 'gpt-4o';
+      end;
+    if rgProvider.ItemIndex = PROVIDER_ANTHROPIC then
+      edtModel.Items.Add('sonnet');
+  end;
+  // Keep the combo editable for gateways and explicitly chosen model IDs.
+  edtModel.Text := Model;
 end;
 
 procedure TAgentSetupForm.rgProviderClick(Sender: TObject);
@@ -204,11 +240,11 @@ end;
 procedure TAgentSetupForm.btnValidateClick(Sender: TObject);
 var
   proc: TAgentProcess;
-  OldProvider, OldApiKey, OldBaseUrl, OldModel, OldPermissionMode: String;
-  OldMcpConfigFiles, OldPluginDirs: String;
+  OldProvider, OldApiKey, OldBaseUrl, OldModel, OldCliPath: String;
+  OldPermissionMode, OldMcpConfigFiles, OldPluginDirs, OldSystemPrompt: String;
 begin
   lblStatus.Font.Color := clNavy;
-  lblStatus.Caption := '正在检测 CLI...';
+  lblStatus.Caption := 'Checking the CLI...';
   Update;
 
   // Validate the values currently visible in the dialog, without mutating the
@@ -217,24 +253,30 @@ begin
   OldApiKey := '';
   OldBaseUrl := '';
   OldModel := '';
+  OldCliPath := '';
   OldPermissionMode := '';
   OldMcpConfigFiles := '';
   OldPluginDirs := '';
+  OldSystemPrompt := '';
   if Assigned(devAgentConfig) then begin
     OldProvider := devAgentConfig.Provider;
     OldApiKey := devAgentConfig.ApiKey;
     OldBaseUrl := devAgentConfig.BaseUrl;
     OldModel := devAgentConfig.Model;
+    OldCliPath := devAgentConfig.CliPath;
     OldPermissionMode := devAgentConfig.PermissionMode;
     OldMcpConfigFiles := devAgentConfig.McpConfigFiles;
     OldPluginDirs := devAgentConfig.PluginDirs;
+    OldSystemPrompt := devAgentConfig.SystemPrompt;
     devAgentConfig.Provider := ProviderId;
     devAgentConfig.ApiKey := Trim(edtApiKey.Text);
     devAgentConfig.BaseUrl := Trim(edtBaseUrl.Text);
     devAgentConfig.Model := Trim(edtModel.Text);
+    devAgentConfig.CliPath := Trim(edtCliPath.Text);
     devAgentConfig.PermissionMode := PermissionModeId;
     devAgentConfig.McpConfigFiles := Trim(edtMcpConfig.Text);
     devAgentConfig.PluginDirs := Trim(edtPluginDirs.Text);
+    devAgentConfig.SystemPrompt := Trim(memoSystemPrompt.Text);
   end;
 
   proc := TAgentProcess.Create;
@@ -244,10 +286,10 @@ begin
     if proc.Start(ExtractFilePath(ParamStr(0))) then begin
       proc.Stop;
       lblStatus.Font.Color := clGreen;
-      lblStatus.Caption := '[OK] CLI 可启动（未验证网络）';
+      lblStatus.Caption := '[OK] CLI started (network not tested)';
     end else begin
       lblStatus.Font.Color := clRed;
-      lblStatus.Caption := '[ERR] 无法启动 CLI：' + proc.LastError;
+      lblStatus.Caption := '[ERR] Could not start CLI: ' + proc.LastError;
     end;
   finally
     proc.Free;
@@ -256,25 +298,36 @@ begin
       devAgentConfig.ApiKey := OldApiKey;
       devAgentConfig.BaseUrl := OldBaseUrl;
       devAgentConfig.Model := OldModel;
+      devAgentConfig.CliPath := OldCliPath;
       devAgentConfig.PermissionMode := OldPermissionMode;
       devAgentConfig.McpConfigFiles := OldMcpConfigFiles;
       devAgentConfig.PluginDirs := OldPluginDirs;
+      devAgentConfig.SystemPrompt := OldSystemPrompt;
     end;
   end;
 end;
 
 procedure TAgentSetupForm.btnOKClick(Sender: TObject);
+var
+  PanelFontSize: Integer;
 begin
+  PanelFontSize := StrToIntDef(Trim(edtFontSize.Text), 0);
+  if (PanelFontSize < 8) or (PanelFontSize > 24) then begin
+    lblStatus.Font.Color := clRed;
+    lblStatus.Caption := 'Panel font size must be between 8 and 24.';
+    edtFontSize.SetFocus;
+    Exit;
+  end;
   if Trim(edtApiKey.Text) = '' then begin
     lblStatus.Font.Color := clRed;
-    lblStatus.Caption := '请填写 API Key，或点击「跳过」。';
+    lblStatus.Caption := 'Enter an API Key, or click Skip.';
     edtApiKey.SetFocus;
     Exit;
   end;
   if (rgProvider.ItemIndex <> PROVIDER_ANTHROPIC) and
      (Trim(edtBaseUrl.Text) = '') then begin
     lblStatus.Font.Color := clRed;
-    lblStatus.Caption := '该服务商需要填写兼容 Anthropic API 的 Base URL。';
+    lblStatus.Caption := 'This provider requires an Anthropic-compatible Base URL.';
     edtBaseUrl.SetFocus;
     Exit;
   end;
@@ -284,9 +337,16 @@ begin
     devAgentConfig.Provider := ProviderId;
     devAgentConfig.ApiKey := Trim(edtApiKey.Text);
     devAgentConfig.Model := Trim(edtModel.Text);
+    devAgentConfig.FontSize := PanelFontSize;
+    if cboSendKey.ItemIndex = 1 then
+      devAgentConfig.SendKey := 'ctrl+enter'
+    else
+      devAgentConfig.SendKey := 'enter';
+    devAgentConfig.CliPath := Trim(edtCliPath.Text);
     devAgentConfig.PermissionMode := PermissionModeId;
     devAgentConfig.McpConfigFiles := Trim(edtMcpConfig.Text);
     devAgentConfig.PluginDirs := Trim(edtPluginDirs.Text);
+    devAgentConfig.SystemPrompt := Trim(memoSystemPrompt.Text);
     if edtBaseUrl.Visible then
       devAgentConfig.BaseUrl := Trim(edtBaseUrl.Text);
     if not edtBaseUrl.Visible then
