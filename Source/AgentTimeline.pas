@@ -7,11 +7,13 @@ type
   private
     fBlocks: TList;
     fLastText: TRichEdit;
+    fLastIsMarkdown: Boolean;
     fWheelRemainder: Integer;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
-    procedure RenderMarkdown(Edit: TRichEdit);
+    procedure RenderMarkdown(Edit: TRichEdit; const RawText: String);
+    function NewTextBlock: TRichEdit;
   protected
     procedure Resize; override;
   public
@@ -26,12 +28,15 @@ type
     function BlockAt(Index: Integer): TControl;
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
+    procedure AppendMarkdown(const Text: String; TextColor: TColor);
     procedure AddTool(const Id, Caption, Details: String);
   end;
 implementation
 type
   TWheelControl = class(TControl);
   TTimelineRichEdit = class(TRichEdit)
+  public
+    RawText: String;
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
@@ -99,6 +104,7 @@ constructor TAgentTimeline.Create(AOwner: TComponent);
 begin
   inherited;
   fBlocks := TList.Create;
+  fLastIsMarkdown := False;
   fWheelRemainder := 0;
   BorderStyle := bsNone;
   AutoScroll := True;
@@ -202,6 +208,7 @@ begin
   for I := fBlocks.Count - 1 downto 0 do TObject(fBlocks[I]).Free;
   fBlocks.Clear;
   fLastText := nil;
+  fLastIsMarkdown := False;
 end;
 procedure TAgentTimeline.Resize;
 begin
@@ -242,97 +249,164 @@ begin
     VertScrollBar.Position := OldPosition;
 end;
 
-procedure TAgentTimeline.RenderMarkdown(Edit: TRichEdit);
-var I, J, K, Start, LineLength, BaseSize, Level: Integer;
-    InCode: Boolean; Line, Token: String;
-    SavedStart, SavedLength: Integer;
+procedure TAgentTimeline.RenderMarkdown(Edit: TRichEdit; const RawText: String);
+var I, J, Start, LineLength, BaseSize, Level: Integer;
+    InCode: Boolean; Line, Token, Normalized: String;
+    SavedStart, SavedLength: Integer; RawLines, DisplayLines, Kinds,
+    InlineSpans, SpanParts: TStringList;
+    CleanLine, SpanInfo: String; InlineStart, SpanEnd, P: Integer;
+    InInline: Boolean;
 begin
-  if (Edit = nil) or (Edit.GetTextLen = 0) then Exit;
+  if Edit = nil then Exit;
   SavedStart := Edit.SelStart;
   SavedLength := Edit.SelLength;
-  BaseSize := Edit.Font.Size;
-  InCode := False;
-  for I := 0 to Edit.Lines.Count - 1 do begin
-    Line := Edit.Lines[I];
-    Start := SendMessage(Edit.Handle, EM_LINEINDEX, I, 0);
-    if Start < 0 then Continue;
-    LineLength := Length(Line);
-    Token := TrimLeft(Line);
-    if (Length(Token) >= 3) and (Copy(Token, 1, 3) = '```') then begin
-      Edit.SelStart := Start;
-      Edit.SelLength := LineLength;
-      Edit.SelAttributes.Name := 'Courier New';
-      Edit.SelAttributes.Size := BaseSize - 1;
-      Edit.SelAttributes.Style := [fsBold];
-      InCode := not InCode;
-      Continue;
-    end;
-    if InCode then begin
-      Edit.SelStart := Start;
-      Edit.SelLength := LineLength;
-      Edit.SelAttributes.Name := 'Courier New';
-      Edit.SelAttributes.Size := BaseSize - 1;
-      Continue;
-    end;
-    Level := 0;
-    while (Level < Length(Token)) and (Token[Level + 1] = '#') do Inc(Level);
-    if (Level > 0) and (Level <= 4) and (Length(Token) > Level) and
-      (Token[Level + 1] = ' ') then begin
-      Edit.SelStart := Start;
-      Edit.SelLength := LineLength;
-      Edit.SelAttributes.Style := [fsBold];
-      Edit.SelAttributes.Size := BaseSize + 4 - Level;
-    end;
-    { Apply inline code and emphasis without changing the transcript text. }
-    J := 1;
-    while J <= LineLength do begin
-      if (Line[J] = '`') then begin
-        K := J + 1;
-        while (K <= LineLength) and (Line[K] <> '`') do Inc(K);
-        if K <= LineLength then begin
-          Edit.SelStart := Start + J;
-          Edit.SelLength := K - J - 1;
-          Edit.SelAttributes.Name := 'Courier New';
-          Edit.SelAttributes.Size := BaseSize - 1;
-          J := K + 1;
+  Normalized := StringReplace(RawText, #13#10, #10, [rfReplaceAll]);
+  Normalized := StringReplace(Normalized, #13, #10, [rfReplaceAll]);
+  Normalized := StringReplace(Normalized, #10, #13#10, [rfReplaceAll]);
+  RawLines := TStringList.Create;
+  DisplayLines := TStringList.Create;
+  Kinds := TStringList.Create;
+  InlineSpans := TStringList.Create;
+  SpanParts := TStringList.Create;
+  try
+    RawLines.Text := Normalized;
+    InCode := False;
+    for I := 0 to RawLines.Count - 1 do begin
+      Line := RawLines[I];
+      Token := TrimLeft(Line);
+      if (Length(Token) >= 3) and (Copy(Token, 1, 3) = '```') then begin
+        InCode := not InCode;
+        Continue;
+      end;
+      if InCode then
+        Kinds.Add('code')
+      else
+        Kinds.Add('text');
+      if (not InCode) and (Length(Token) > 1) and (Token[1] = '#') then begin
+        J := 1;
+        while (J < Length(Token)) and (Token[J] = '#') do Inc(J);
+        if (J <= 4) and (J <= Length(Token)) and (Token[J] = ' ') then begin
+          Line := Copy(Token, J + 1, MaxInt);
+          Kinds[Kinds.Count - 1] := 'heading' + IntToStr(J);
+        end;
+      end else if (not InCode) and (Length(Token) >= 2) and
+        ((Copy(Token, 1, 2) = '- ') or (Copy(Token, 1, 2) = '* ')) then
+        Line := StringOfChar(' ', Length(Line) - Length(Token)) + #183 + ' ' +
+          Copy(Token, 3, MaxInt)
+      else if (not InCode) and (Length(Token) >= 2) and (Copy(Token, 1, 2) = '> ') then
+        Line := StringOfChar(' ', Length(Line) - Length(Token)) + '| ' +
+          Copy(Token, 3, MaxInt);
+      CleanLine := '';
+      SpanInfo := '';
+      InlineStart := -1;
+      InInline := False;
+      J := 1;
+      while J <= Length(Line) do begin
+        if (not InCode) and (Line[J] = '`') then begin
+          if InInline then begin
+            SpanEnd := Length(CleanLine);
+            SpanInfo := SpanInfo + IntToStr(InlineStart) + ':' +
+              IntToStr(SpanEnd - InlineStart) + ';';
+          end else
+            InlineStart := Length(CleanLine);
+          InInline := not InInline;
+          Inc(J);
           Continue;
         end;
-      end;
-      if ((Line[J] = '*') and (J < LineLength) and (Line[J + 1] = '*')) or
-        ((Line[J] = '_') and (J < LineLength) and (Line[J + 1] = '_')) then begin
-        Token := Copy(Line, J, 2);
-        K := J + 2;
-        while (K < LineLength) and (Copy(Line, K, 2) <> Token) do Inc(K);
-        if K < LineLength then begin
-          Edit.SelStart := Start + J + 1;
-          Edit.SelLength := K - J - 2;
-          Edit.SelAttributes.Style := [fsBold];
-          J := K + 2;
+        if (not InCode) and (J < Length(Line)) and
+          ((Copy(Line, J, 2) = '**') or (Copy(Line, J, 2) = '__')) then begin
+          Inc(J, 2);
           Continue;
         end;
+        CleanLine := CleanLine + Line[J];
+        Inc(J);
       end;
-      Inc(J);
+      Line := CleanLine;
+      DisplayLines.Add(Line);
+      InlineSpans.Add(SpanInfo);
     end;
+    Normalized := DisplayLines.Text;
+    if (Length(RawText) > 0) and (RawText[Length(RawText)] <> #10) and
+      (RawText[Length(RawText)] <> #13) and
+      (Length(Normalized) >= 2) and
+      (Copy(Normalized, Length(Normalized) - 1, 2) = #13#10) then
+      Delete(Normalized, Length(Normalized) - 1, 2);
+    Edit.Text := Normalized;
+    Edit.PlainText := True;
+    if Edit.GetTextLen > 0 then begin
+      Edit.SelStart := 0;
+      Edit.SelLength := Edit.GetTextLen;
+      Edit.SelAttributes.Name := Edit.Font.Name;
+      Edit.SelAttributes.Size := Edit.Font.Size;
+      Edit.SelAttributes.Color := Edit.Font.Color;
+      Edit.SelAttributes.Style := [];
+    end;
+    BaseSize := Edit.Font.Size;
+    for I := 0 to Edit.Lines.Count - 1 do begin
+      Line := Edit.Lines[I];
+      Start := SendMessage(Edit.Handle, EM_LINEINDEX, I, 0);
+      if Start < 0 then Continue;
+      LineLength := Length(Line);
+      Token := TrimLeft(Line);
+      if (I < Kinds.Count) and (Kinds[I] = 'code') then begin
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Name := 'Courier New';
+        Edit.SelAttributes.Size := BaseSize - 1;
+      end else if (I < Kinds.Count) and (Copy(Kinds[I], 1, 7) = 'heading') then begin
+        Level := StrToIntDef(Copy(Kinds[I], 8, MaxInt), 2);
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Style := [fsBold];
+        Edit.SelAttributes.Size := BaseSize + 4 - Level;
+      end;
+      if (I < InlineSpans.Count) and (InlineSpans[I] <> '') then begin
+        SpanParts.Delimiter := ';';
+        SpanParts.DelimitedText := InlineSpans[I];
+        for J := 0 to SpanParts.Count - 1 do begin
+          P := Pos(':', SpanParts[J]);
+          if P > 0 then begin
+            Edit.SelStart := Start + StrToIntDef(Copy(SpanParts[J], 1, P - 1), 0);
+            Edit.SelLength := StrToIntDef(Copy(SpanParts[J], P + 1, MaxInt), 0);
+            Edit.SelAttributes.Name := 'Courier New';
+            Edit.SelAttributes.Size := BaseSize - 1;
+          end;
+        end;
+      end;
+    end;
+  finally
+    RawLines.Free;
+    DisplayLines.Free;
+    Kinds.Free;
+    InlineSpans.Free;
+    SpanParts.Free;
   end;
+  if SavedStart > Edit.GetTextLen then SavedStart := Edit.GetTextLen;
   Edit.SelStart := SavedStart;
   Edit.SelLength := SavedLength;
+end;
+
+function TAgentTimeline.NewTextBlock: TRichEdit;
+begin
+  Result := TTimelineRichEdit.Create(Self);
+  Result.Parent := Self;
+  Result.OnMouseWheel := TimelineMouseWheel;
+  Result.ReadOnly := True;
+  Result.PopupMenu := PopupMenu;
+  Result.BorderStyle := bsNone;
+  Result.Color := Color;
+  Result.Font.Assign(Font);
+  Result.ScrollBars := ssNone;
+  Result.WordWrap := True;
+  Result.Width := ClientWidth - 24;
+  fBlocks.Add(Result);
 end;
 procedure TAgentTimeline.AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
 var Lines, OldStart, OldLength: Integer;
 begin
-  if fLastText = nil then begin
-    fLastText := TTimelineRichEdit.Create(Self);
-    fLastText.Parent := Self;
-    fLastText.OnMouseWheel := TimelineMouseWheel;
-    fLastText.ReadOnly := True;
-    fLastText.PopupMenu := PopupMenu;
-    fLastText.BorderStyle := bsNone;
-    fLastText.Color := Color;
-    fLastText.Font.Assign(Font);
-    fLastText.ScrollBars := ssNone;
-    fLastText.WordWrap := True;
-    fLastText.Width := ClientWidth - 24;
-    fBlocks.Add(fLastText);
+  if (fLastText = nil) or fLastIsMarkdown then begin
+    fLastText := NewTextBlock;
+    fLastIsMarkdown := False;
   end;
   OldStart := fLastText.SelStart;
   OldLength := fLastText.SelLength;
@@ -347,7 +421,22 @@ begin
   end;
   Lines := SendMessage(fLastText.Handle, EM_GETLINECOUNT, 0, 0);
   fLastText.Height := (Lines + 1) * (Abs(Font.Height) + 6);
-  RenderMarkdown(fLastText);
+  LayoutBlocks;
+end;
+
+procedure TAgentTimeline.AppendMarkdown(const Text: String; TextColor: TColor);
+var Lines: Integer; R: TTimelineRichEdit;
+begin
+  if (fLastText = nil) or (not fLastIsMarkdown) then begin
+    fLastText := NewTextBlock;
+    fLastIsMarkdown := True;
+  end;
+  R := TTimelineRichEdit(fLastText);
+  R.RawText := R.RawText + Text;
+  R.Font.Color := TextColor;
+  RenderMarkdown(R, R.RawText);
+  Lines := SendMessage(R.Handle, EM_GETLINECOUNT, 0, 0);
+  R.Height := (Lines + 1) * (Abs(Font.Height) + 6);
   LayoutBlocks;
 end;
 procedure TAgentTimeline.ToggleBlock(Sender: TObject);

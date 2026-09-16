@@ -107,9 +107,13 @@ begin
       Panel.AppendAIText('# Heading' + #13#10 + 'Use **bold** and `code`.' + #13#10 +
         '- item');
       Panel.Timeline.LastText.SelStart := 0;
-      Panel.Timeline.LastText.SelLength := Length('# Heading');
+      Panel.Timeline.LastText.SelLength := Length('Heading');
       Require(Panel.Timeline.LastText.SelAttributes.Style = [fsBold],
         'markdown heading was not rendered bold');
+      Require(Pos('# Heading', Panel.Timeline.LastText.Text) = 0,
+        'markdown heading marker was left in display text');
+      Require(Pos('**bold**', Panel.Timeline.LastText.Text) = 0,
+        'markdown emphasis markers were left in display text');
       Panel.Timeline.LastText.SelStart := Pos('code', Panel.Timeline.LastText.Text) - 1;
       Panel.Timeline.LastText.SelLength := 4;
       Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),

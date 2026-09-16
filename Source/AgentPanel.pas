@@ -111,6 +111,7 @@ type
     procedure OpenCodeClick(Sender: TObject);
     procedure UpdateAttachmentLayout;
     procedure AppendText(const Text: String; Color: TColor; Bold: Boolean);
+    procedure AppendTranscript(const Text: String; Color: TColor; Bold: Boolean);
     procedure AppendUserMessageInternal(const Text: String);
     procedure AppendAITextInternal(const Text: String);
     procedure AppendSystemMessageInternal(const Text: String);
@@ -326,10 +327,15 @@ end;
 { ------------------------------------------------------------------ }
 
 procedure TAgentPanelFrame.AppendText(const Text: String; Color: TColor; Bold: Boolean);
+begin
+  if Assigned(fTimeline) then fTimeline.AppendText(Text, Color, Bold);
+  AppendTranscript(Text, Color, Bold);
+end;
+
+procedure TAgentPanelFrame.AppendTranscript(const Text: String; Color: TColor; Bold: Boolean);
 var
   OldStart, OldLength: Integer;
 begin
-  if Assigned(fTimeline) then fTimeline.AppendText(Text, Color, Bold);
   OldStart := reChat.SelStart;
   OldLength := reChat.SelLength;
   SendMessage(reChat.Handle, EM_SETSEL, WPARAM(-1), LPARAM(-1));
@@ -363,7 +369,13 @@ end;
 
 procedure TAgentPanelFrame.AppendAITextInternal(const Text: String);
 begin
-  AppendText(Text, fTextColor, False);
+  if Assigned(fTimeline) then
+    begin
+      fTimeline.AppendMarkdown(Text, fTextColor);
+      AppendTranscript(Text, fTextColor, False);
+    end
+  else
+    AppendText(Text, fTextColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendAIText(const Text: String);
