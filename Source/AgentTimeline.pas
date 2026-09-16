@@ -281,8 +281,8 @@ var I, J, Start, LineLength, BaseSize, Level: Integer;
     InCode: Boolean; Line, Token, Normalized: String;
     SavedStart, SavedLength: Integer; RawLines, DisplayLines, Kinds,
     InlineSpans, SpanParts: TStringList;
-    CleanLine, SpanInfo: String; InlineStart, SpanEnd, P: Integer;
-    InInline: Boolean;
+    CleanLine, SpanInfo: String; InlineStart, SpanEnd, BoldStart, P: Integer;
+    InInline, InBold: Boolean;
   function IsTableSeparator(const Value: String): Boolean;
   var S: String; I: Integer;
   begin
@@ -371,14 +371,16 @@ begin
       end;
       CleanLine := '';
       SpanInfo := '';
-      InlineStart := -1;
-      InInline := False;
+    InlineStart := -1;
+    InInline := False;
+    BoldStart := -1;
+    InBold := False;
       J := 1;
       while J <= Length(Line) do begin
         if (not InCode) and (Line[J] = '`') then begin
           if InInline then begin
             SpanEnd := Length(CleanLine);
-            SpanInfo := SpanInfo + IntToStr(InlineStart) + ':' +
+            SpanInfo := SpanInfo + 'c:' + IntToStr(InlineStart) + ':' +
               IntToStr(SpanEnd - InlineStart) + ';';
           end else
             InlineStart := Length(CleanLine);
@@ -388,6 +390,16 @@ begin
         end;
         if (not InCode) and (J < Length(Line)) and
           ((Copy(Line, J, 2) = '**') or (Copy(Line, J, 2) = '__')) then begin
+          if InBold then begin
+            SpanEnd := Length(CleanLine);
+            SpanInfo := SpanInfo + 'b:' + IntToStr(BoldStart) + ':' +
+              IntToStr(SpanEnd - BoldStart) + ';';
+            InBold := False;
+            BoldStart := -1;
+          end else begin
+            InBold := True;
+            BoldStart := Length(CleanLine);
+          end;
           Inc(J, 2);
           Continue;
         end;
@@ -395,6 +407,11 @@ begin
         Inc(J);
       end;
       Line := CleanLine;
+      if InBold then begin
+        SpanEnd := Length(CleanLine);
+        SpanInfo := SpanInfo + 'b:' + IntToStr(BoldStart) + ':' +
+          IntToStr(SpanEnd - BoldStart) + ';';
+      end;
       DisplayLines.Add(Line);
       InlineSpans.Add(SpanInfo);
     end;
@@ -447,10 +464,26 @@ begin
         for J := 0 to SpanParts.Count - 1 do begin
           P := Pos(':', SpanParts[J]);
           if P > 0 then begin
-            Edit.SelStart := Start + StrToIntDef(Copy(SpanParts[J], 1, P - 1), 0);
-            Edit.SelLength := StrToIntDef(Copy(SpanParts[J], P + 1, MaxInt), 0);
-            Edit.SelAttributes.Name := 'Courier New';
-            Edit.SelAttributes.Size := BaseSize - 1;
+            Token := Copy(SpanParts[J], 1, P - 1);
+            if (Token = 'c') or (Token = 'b') then begin
+              SpanInfo := Copy(SpanParts[J], P + 1, MaxInt);
+              P := Pos(':', SpanInfo);
+              if P > 0 then begin
+                Edit.SelStart := Start + StrToIntDef(Copy(SpanInfo, 1, P - 1), 0);
+                Edit.SelLength := StrToIntDef(Copy(SpanInfo, P + 1, MaxInt), 0);
+                if Token = 'c' then begin
+                  Edit.SelAttributes.Name := 'Courier New';
+                  Edit.SelAttributes.Size := BaseSize - 1;
+                end else begin
+                  Edit.SelAttributes.Style := [fsBold];
+                end;
+              end;
+            end else begin
+              Edit.SelStart := Start + StrToIntDef(Copy(SpanParts[J], 1, P - 1), 0);
+              Edit.SelLength := StrToIntDef(Copy(SpanParts[J], P + 1, MaxInt), 0);
+              Edit.SelAttributes.Name := 'Courier New';
+              Edit.SelAttributes.Size := BaseSize - 1;
+            end;
           end;
         end;
       end;

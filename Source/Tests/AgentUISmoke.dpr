@@ -114,6 +114,10 @@ begin
         'markdown heading marker was left in display text');
       Require(Pos('**bold**', Panel.Timeline.LastText.Text) = 0,
         'markdown emphasis markers were left in display text');
+      Panel.Timeline.LastText.SelStart := Pos('bold', Panel.Timeline.LastText.Text) - 1;
+      Panel.Timeline.LastText.SelLength := 4;
+      Require(Panel.Timeline.LastText.SelAttributes.Style = [fsBold],
+        'markdown emphasis was not rendered bold');
       Panel.Timeline.LastText.SelStart := Pos('code', Panel.Timeline.LastText.Text) - 1;
       Panel.Timeline.LastText.SelLength := 4;
       Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),
