@@ -3,7 +3,7 @@ program AgentUISmoke;
 {$APPTYPE CONSOLE}
 
 uses
-  Windows, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel, AgentSetupFrm, AgentProtocol;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel, AgentSetupFrm, AgentProtocol;
 
 procedure Require(Condition: Boolean; const Message: String);
 begin
@@ -156,7 +156,18 @@ begin
       Require(Panel.Timeline.BlockAt(1).Height = 32, 'inline tool not initially collapsed');
       Panel.SaveConversation(Snapshot);
       Panel.LoadConversation(Snapshot);
-      Require(Panel.Timeline.BlockCount = 3, 'history lost ordered blocks');      Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
+      Require(Panel.Timeline.BlockCount = 3, 'history lost ordered blocks');      Panel.ClearChat;
+      for I := 0 to 80 do Panel.AppendAIText('Scrollable response line' + #13#10);
+      Panel.Timeline.VertScrollBar.Position := 0;
+      Panel.Timeline.ScrollWheel(-WHEEL_DELTA);
+      Require(Panel.Timeline.VertScrollBar.Position > 0, 'wheel over response did not scroll down');
+      Panel.Timeline.ScrollWheel(WHEEL_DELTA);
+      Require(Panel.Timeline.VertScrollBar.Position = 0, 'wheel over response did not scroll up');
+      Panel.Timeline.ScrollWheel(-60);
+      Require(Panel.Timeline.VertScrollBar.Position = 0, 'partial wheel step moved early');
+      Panel.Timeline.ScrollWheel(-60);
+      Require(Panel.Timeline.VertScrollBar.Position > 0, 'high resolution wheel deltas lost');
+      Writeln('Agent UI smoke test: mouse wheel scrolling passed');      Writeln('Agent UI smoke test: load settings DFM and DeepSeek choices');
       Setup := TAgentSetupForm.Create(Host);
       Require(Setup.Caption = 'AI Assistant Setup', 'settings caption missing');
       Require(Setup.edtApiKey.PasswordChar <> #0, 'API key field is not masked');

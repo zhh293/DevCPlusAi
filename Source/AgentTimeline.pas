@@ -7,6 +7,8 @@ type
   private
     fBlocks: TList;
     fLastText: TRichEdit;
+    fWheelRemainder: Integer;
+    procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
   protected
@@ -14,6 +16,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure ScrollWheel(Delta: Integer);
     procedure Clear;
     procedure SaveToFile(const Path: String);
     procedure LoadFromFile(const Path: String);
@@ -26,19 +29,80 @@ type
   end;
 implementation
 type
+  TWheelControl = class(TControl);
+  TTimelineRichEdit = class(TRichEdit)
+  protected
+    procedure WndProc(var Message: TMessage); override;
+  end;
+  TTimelineMemo = class(TMemo)
+  protected
+    procedure WndProc(var Message: TMessage); override;
+  end;
+  TTimelineButton = class(TButton)
+  protected
+    procedure WndProc(var Message: TMessage); override;
+  end;
   TTimelineTool = class(TPanel)
   public
     ToolId: String;
     Header: TButton;
     Body: TMemo;
   end;
-constructor TAgentTimeline.Create(AOwner: TComponent);
+function ForwardWheel(Control: TControl; var Message: TMessage): Boolean;
+var ParentControl: TControl;
+begin
+  Result := Message.Msg = WM_MOUSEWHEEL;
+  if not Result then Exit;
+  ParentControl := Control.Parent;
+  while (ParentControl <> nil) and not (ParentControl is TAgentTimeline) do
+    ParentControl := ParentControl.Parent;
+  Result := ParentControl <> nil;
+  if Result then begin
+    TAgentTimeline(ParentControl).ScrollWheel(SmallInt(Message.WParam shr 16));
+    Message.Result := 1;
+  end;
+end;
+procedure TTimelineRichEdit.WndProc(var Message: TMessage);
+begin
+  if not ForwardWheel(Self, Message) then inherited WndProc(Message);
+end;
+procedure TTimelineMemo.WndProc(var Message: TMessage);
+begin
+  if not ForwardWheel(Self, Message) then inherited WndProc(Message);
+end;
+procedure TTimelineButton.WndProc(var Message: TMessage);
+begin
+  if not ForwardWheel(Self, Message) then inherited WndProc(Message);
+end;constructor TAgentTimeline.Create(AOwner: TComponent);
 begin
   inherited;
   fBlocks := TList.Create;
+  fWheelRemainder := 0;
   BorderStyle := bsNone;
+  AutoScroll := True;
   HorzScrollBar.Visible := False;
   VertScrollBar.Tracking := True;
+  OnMouseWheel := TimelineMouseWheel;
+end;
+procedure TAgentTimeline.ScrollWheel(Delta: Integer);
+var Steps, Distance: Integer; Lines: UINT;
+begin
+  Inc(fWheelRemainder, Delta);
+  Steps := fWheelRemainder div WHEEL_DELTA;
+  fWheelRemainder := fWheelRemainder mod WHEEL_DELTA;
+  if Steps = 0 then Exit;
+  Lines := 3;
+  SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, @Lines, 0);
+  if Lines = UINT(-1) then Distance := ClientHeight
+  else Distance := Integer(Lines) * (Abs(Font.Height) + 6);
+  VertScrollBar.Position := VertScrollBar.Position - Steps * Distance;
+end;
+
+procedure TAgentTimeline.TimelineMouseWheel(Sender: TObject; Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
+begin
+  ScrollWheel(WheelDelta);
+  Handled := True;
 end;
 destructor TAgentTimeline.Destroy;
 begin
@@ -125,7 +189,10 @@ end;
 procedure TAgentTimeline.LayoutBlocks;
 var I, Y: Integer; Block: TControl;
 begin
-  Y := 12 - VertScrollBar.Position;
+  // TScrollBox moves its child controls when the scrollbar position changes.
+  // Do not subtract Position here, otherwise every wheel event moves the
+  // content twice and the scrollbar range collapses back to zero.
+  Y := 12;
   DisableAlign;
   try
     for I := 0 to fBlocks.Count - 1 do begin
@@ -143,8 +210,9 @@ procedure TAgentTimeline.AppendText(const Text: String; TextColor: TColor; Bold:
 var Lines, OldStart, OldLength: Integer;
 begin
   if fLastText = nil then begin
-    fLastText := TRichEdit.Create(Self);
+    fLastText := TTimelineRichEdit.Create(Self);
     fLastText.Parent := Self;
+    fLastText.OnMouseWheel := TimelineMouseWheel;
     fLastText.ReadOnly := True;
     fLastText.PopupMenu := PopupMenu;
     fLastText.BorderStyle := bsNone;
@@ -198,16 +266,19 @@ begin
     fLastText := nil;
     Block := TTimelineTool.Create(Self);
     Block.Parent := Self;
+    Block.OnMouseWheel := TimelineMouseWheel;
     Block.ToolId := Id;
     Block.BevelOuter := bvNone;
     Block.Height := 32;
-    Block.Header := TButton.Create(Block);
+    Block.Header := TTimelineButton.Create(Block);
     Block.Header.Parent := Block;
+    TWheelControl(Block.Header).OnMouseWheel := TimelineMouseWheel;
     Block.Header.SetBounds(0, 0, ClientWidth - 24, 32);
     Block.Header.Anchors := [akLeft, akTop, akRight];
     Block.Header.OnClick := ToggleBlock;
-    Block.Body := TMemo.Create(Block);
+    Block.Body := TTimelineMemo.Create(Block);
     Block.Body.Parent := Block;
+    TWheelControl(Block.Body).OnMouseWheel := TimelineMouseWheel;
     Block.Body.SetBounds(0, 36, ClientWidth - 24, 140);
     Block.Body.Anchors := [akLeft, akTop, akRight, akBottom];
     Block.Body.ReadOnly := True;
