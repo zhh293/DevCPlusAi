@@ -28,7 +28,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG, Menus,
-  AgentProcess, AgentProtocol, AgentTimeline;
+  AgentProcess, AgentProtocol, AgentTimeline, AgentUITheme, AgentWebView;
 
 type
   TAgentStatus = (
@@ -68,6 +68,19 @@ type
     procedure reChatKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     fAgentProcess: TAgentProcess;
+    fWeb: TAgentWebView;
+    fWebTimer: TTimer;
+    fWebCache, fWebQueue: TStringList;
+    fWebStarted: Boolean;
+    fWebGeneration: Integer;
+    fWebState, fWebDraft: String;
+    procedure WebTick(Sender: TObject);
+    procedure WebReady(Sender: TObject);
+    procedure WebMessage(Sender: TObject; const Text: WideString);
+    procedure WebError(Sender: TObject; const Text: WideString);
+    procedure WebDispatch(const Text: WideString);
+    procedure WebSync;
+  private
     fOnPrepareContext: TNotifyEvent;
     fOnQuickAction: TNotifyEvent;
     fOnOpenCode: TNotifyEvent;
@@ -88,6 +101,10 @@ type
     fMutedColor: TColor;
     fErrorColor: TColor;
     fOnSettings: TNotifyEvent;
+    fModelBadge: TLabel;
+    fScrollBottom: TButton;
+    fClearButton: TButton;
+    fContextButton: TButton;
     fStatus: TAgentStatus;
     fModelName: String;
     fContextText: String;
@@ -127,6 +144,11 @@ type
     function SaveClipboardImage: String;
     procedure BeginResponseWait;
     procedure EndResponseWait;
+    procedure ScrollToBottomClick(Sender: TObject);
+    procedure ClearChatClick(Sender: TObject);
+    procedure PrepareContextClick(Sender: TObject);
+  protected
+    procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -164,6 +186,7 @@ type
     function HandleEditShortcut(Key: Word; Shift: TShiftState): Boolean;
     function ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
     property Timeline: TAgentTimeline read fTimeline;
+    property WebView: TAgentWebView read fWeb;
     property ToolTree: TTreeView read fTools;
     property ToolToggle: TButton read fToolToggle;
     property SessionPicker: TComboBox read fSessions;
@@ -184,8 +207,10 @@ type
   end;
 
 implementation
+uses uLkJSON, AgentWebProtocol;
 
 {$R *.dfm}
+{$I AgentPanelWeb.inc}
 
 constructor TAgentPanelFrame.Create(AOwner: TComponent);
 var
@@ -210,6 +235,13 @@ begin
   fOnRequestStarted := nil;
   fOnRequestEnded := nil;
   fOnSettings := nil;
+  fModelBadge := TLabel.Create(Self);
+  fModelBadge.Parent := pnlHeader;
+  fModelBadge.SetBounds(136, 13, 164, 17);
+  fModelBadge.Anchors := [akLeft, akTop];
+  fModelBadge.AutoSize := False;
+  fModelBadge.Caption := 'No model selected';
+  fModelBadge.Font.Size := 9;
   ApplyAppearance(clBtnFace, clWindowText, clWindow, clWindowText,
     Font.Name, Font.Size);
   Toolbar := TPanel.Create(Self);
@@ -250,6 +282,16 @@ begin
   fDetails.Parent := Toolbar;
   fDetails.SetBounds(192, 34, 72, 20);
   fDetails.Caption := 'Logs';
+  fClearButton := TButton.Create(Self);
+  fClearButton.Parent := Toolbar;
+  fClearButton.SetBounds(270, 32, 64, 24);
+  fClearButton.Caption := 'Clear';
+  fClearButton.OnClick := ClearChatClick;
+  fContextButton := TButton.Create(Self);
+  fContextButton.Parent := Toolbar;
+  fContextButton.SetBounds(338, 32, 62, 24);
+  fContextButton.Caption := 'Context';
+  fContextButton.OnClick := PrepareContextClick;
   fSessions := TComboBox.Create(Self);
   fSessions.Parent := Toolbar;
   fSessions.SetBounds(8, 64, Width - 96, 24);
@@ -303,9 +345,27 @@ begin
   fTimeline.Color := reChat.Color;
   fTimeline.Font.Assign(reChat.Font);
   reChat.Visible := False;
+  fScrollBottom := TButton.Create(Self);
+  fScrollBottom.Parent := pnlChat;
+  fScrollBottom.SetBounds(pnlChat.ClientWidth - 44, pnlChat.ClientHeight - 42, 32, 28);
+  fScrollBottom.Anchors := [akRight, akBottom];
+  fScrollBottom.Caption := 'v';
+  fScrollBottom.Hint := 'Scroll to bottom';
+  fScrollBottom.ShowHint := True;
+  fScrollBottom.TabStop := False;
+  fScrollBottom.Font.Assign(Font);
+  fScrollBottom.Font.Color := fMutedColor;
+  fScrollBottom.OnClick := ScrollToBottomClick;
   fToolPanel.Visible := False;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
+  fWebCache := TStringList.Create;
+  fWebQueue := TStringList.Create;
+  fWebGeneration := -1;
+  fWebTimer := TTimer.Create(Self);
+  fWebTimer.Interval := 100;
+  fWebTimer.OnTimer := WebTick;
+  Resize;
 end;
 
 destructor TAgentPanelFrame.Destroy;
@@ -313,6 +373,10 @@ var
   I: Integer;
 begin
   fWaitingForResponse := False;
+  if Assigned(fWebTimer) then fWebTimer.Enabled := False;
+  if Assigned(fWeb) then fWeb.Stop;
+  fWebCache.Free;
+  fWebQueue.Free;
   if fTemporaryAttachments <> nil then
     for I := 0 to fTemporaryAttachments.Count - 1 do
       DeleteFile(fTemporaryAttachments[I]);
@@ -320,6 +384,25 @@ begin
   fSessionKeys.Free;
   fAttachments.Free;
   inherited Destroy;
+end;
+
+procedure TAgentPanelFrame.Resize;
+var BadgeWidth: Integer;
+begin
+  inherited Resize;
+  if Assigned(fModelBadge) then begin
+    BadgeWidth := btnSettings.Left - fModelBadge.Left - 8;
+    if BadgeWidth < 40 then begin
+      fModelBadge.Visible := False;
+    end else begin
+      fModelBadge.Visible := True;
+      fModelBadge.Width := BadgeWidth;
+    end;
+  end;
+  if Assigned(fClearButton) then
+    fClearButton.Visible := ClientWidth >= 340;
+  if Assigned(fContextButton) then
+    fContextButton.Visible := ClientWidth >= 390;
 end;
 
 { ------------------------------------------------------------------ }
@@ -358,8 +441,12 @@ procedure TAgentPanelFrame.AppendUserMessageInternal(const Text: String);
 begin
   if fConversationTitle = '' then
     fConversationTitle := Copy(StringReplace(StringReplace(Text, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), 1, 64);
-  AppendText(#13#10 + 'You:' + #13#10, fTextColor, True);
-  AppendText(Text + #13#10, fTextColor, False);
+  AppendTranscript(#13#10 + 'You:' + #13#10, fTextColor, True);
+  if Assigned(fTimeline) then
+    fTimeline.AppendMessage(Text, fTextColor, True)
+  else
+    AppendText(Text, fTextColor, False);
+  AppendTranscript(Text + #13#10, fTextColor, False);
 end;
 
 procedure TAgentPanelFrame.AppendUserMessage(const Text: String);
@@ -491,7 +578,7 @@ begin
 
   if TextToAppend <> '' then begin
     if fLastAnswer = '' then
-      AppendText(#13#10 + 'AI:' + #13#10, fTextColor, True);
+      AppendTranscript(#13#10 + 'AI:' + #13#10, fTextColor, True);
     fLastAnswer := fLastAnswer + TextToAppend;
     if SameText(Event.ContentType, 'thinking') or
        SameText(Event.ContentType, 'redacted_thinking') then
@@ -675,20 +762,26 @@ end;
 procedure TAgentPanelFrame.ApplyAppearance(APanelColor, APanelTextColor,
   AEditorColor, ATextColor: TColor; const AFontName: String; AFontSize: Integer);
 var
-  Bg, Fg: Longint;
   TextSize, SelectionStart, SelectionLength: Integer;
   UiFontName: String;
+  Palette: TAgentUiPalette;
 begin
   TextSize := memoInput.Font.Size;
-  UiFontName := AFontName;
-  if SameText(UiFontName, 'MS Sans Serif') then
-    UiFontName := 'Segoe UI';
+  UiFontName := AgentUiFontName(AFontName);
+  AgentBuildPalette(AEditorColor, ATextColor, Palette);
   Color := APanelColor;
   Font.Name := UiFontName;
   Font.Size := AFontSize;
   Font.Color := APanelTextColor;
   lblTitle.Font.Assign(Font);
   lblTitle.Font.Style := [fsBold];
+  if Assigned(fModelBadge) then begin
+    fModelBadge.Font.Assign(Font);
+    fModelBadge.Font.Size := TextSize - 1;
+    if fModelBadge.Font.Size < 8 then fModelBadge.Font.Size := 8;
+    fModelBadge.Font.Color := Palette.Muted;
+    fModelBadge.Font.Style := [];
+  end;
   pnlChat.Color := AEditorColor;
   reChat.Color := AEditorColor;
   memoInput.Color := AEditorColor;
@@ -699,15 +792,8 @@ begin
   reChat.Font.Color := ATextColor;
   memoInput.Font.Color := ATextColor;
   lbAttachments.Font.Color := ATextColor;
-  Bg := ColorToRGB(AEditorColor);
-  Fg := ColorToRGB(ATextColor);
-  fMutedColor := RGB((2 * GetRValue(Fg) + GetRValue(Bg)) div 3,
-    (2 * GetGValue(Fg) + GetGValue(Bg)) div 3,
-    (2 * GetBValue(Fg) + GetBValue(Bg)) div 3);
-  if GetRValue(Bg) + GetGValue(Bg) + GetBValue(Bg) < 384 then
-    fErrorColor := RGB(255, 150, 150)
-  else
-    fErrorColor := clMaroon;
+  fMutedColor := Palette.Muted;
+  fErrorColor := Palette.Error;
   if (fTextColor <> ATextColor) and (reChat.GetTextLen > 0) then begin
     // Existing transcript text must remain readable after changing theme.
     SelectionStart := reChat.SelStart;
@@ -726,12 +812,23 @@ begin
   if Assigned(fSessions) then begin
     fSessions.Color := AEditorColor;
     fSessions.Font.Color := ATextColor;
+    fSessions.Font.Name := UiFontName;
+  end;
+  if Assigned(fQuickActions) then begin
+    fQuickActions.Color := AEditorColor;
+    fQuickActions.Font.Color := ATextColor;
+    fQuickActions.Font.Name := UiFontName;
+  end;
+  if Assigned(fDetails) then begin
+    fDetails.Font.Color := ATextColor;
+    fDetails.Font.Name := UiFontName;
   end;
   if Assigned(fTimeline) then begin
-    fTimeline.Color := AEditorColor;
-    fTimeline.Font.Name := UiFontName;
-    fTimeline.Font.Color := ATextColor;
-    fTimeline.Font.Size := TextSize;
+    fTimeline.ApplyAppearance(AEditorColor, ATextColor, UiFontName, TextSize);
+  end;
+  if Assigned(fScrollBottom) then begin
+    fScrollBottom.Font.Name := UiFontName;
+    fScrollBottom.Font.Color := Palette.Muted;
   end;
   SetFontSize(TextSize);
 end;
@@ -879,6 +976,12 @@ end;
 procedure TAgentPanelFrame.SetModelName(const Name: String);
 begin
   fModelName := Name;
+  if Assigned(fModelBadge) then begin
+    if Trim(Name) = '' then
+      fModelBadge.Caption := 'No model selected'
+    else
+      fModelBadge.Caption := Name;
+  end;
   StatusBar.Hint := Name;
   if StatusBar.Panels.Count > 1 then
     StatusBar.Panels[1].Text := Name;
@@ -938,6 +1041,30 @@ begin
   fEditPopup.Items[1].Enabled := Clipboard.HasFormat(CF_TEXT) or Clipboard.HasFormat(CF_UNICODETEXT);
   fEditPopup.Items[2].Enabled := fPopupTarget = memoInput;
   fEditPopup.Items[4].Enabled := (fPopupTarget = memoInput) and memoInput.CanUndo;
+end;
+
+procedure TAgentPanelFrame.ScrollToBottomClick(Sender: TObject);
+begin
+  if Assigned(fTimeline) then begin
+    if fTimeline.VertScrollBar.Range > fTimeline.ClientHeight then
+      fTimeline.VertScrollBar.Position :=
+        fTimeline.VertScrollBar.Range - fTimeline.ClientHeight
+    else
+      fTimeline.VertScrollBar.Position := 0;
+  end;
+end;
+
+procedure TAgentPanelFrame.ClearChatClick(Sender: TObject);
+begin
+  if fStatus in [asThinking, asExecuting] then
+    Exit;
+  ClearChat;
+end;
+
+procedure TAgentPanelFrame.PrepareContextClick(Sender: TObject);
+begin
+  if Assigned(fOnPrepareContext) then
+    fOnPrepareContext(Self);
 end;
 
 procedure TAgentPanelFrame.EditPopupClick(Sender: TObject);

@@ -1,7 +1,7 @@
 unit AgentTimeline;
 interface
 uses Windows, Messages, SysUtils, Classes, Controls, Forms, StdCtrls, ExtCtrls,
-  Graphics, ComCtrls, IniFiles;
+  Graphics, ComCtrls, IniFiles, AgentUITheme;
 type
   TAgentTimeline = class(TScrollBox)
   private
@@ -9,10 +9,14 @@ type
     fLastText: TRichEdit;
     fLastIsMarkdown: Boolean;
     fWheelRemainder: Integer;
+    fPalette: TAgentUiPalette;
+    fGeneration: Integer;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
     procedure RenderMarkdown(Edit: TRichEdit; const RawText: String);
+    procedure ApplyBlockAppearance(Block: TControl; const FontName: String;
+      FontSize: Integer);
     function NewTextBlock: TRichEdit;
   protected
     procedure Resize; override;
@@ -26,17 +30,24 @@ type
     function FocusedEdit: TCustomEdit;
     function BlockCount: Integer;
     function BlockAt(Index: Integer): TControl;
+    function WebBlock(Index: Integer): String;
+    property Generation: Integer read fGeneration;
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
+    procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
     procedure AddTool(const Id, Caption, Details: String);
+    procedure ApplyAppearance(AEditorColor, ATextColor: TColor;
+      const FontName: String; FontSize: Integer);
   end;
 implementation
+uses AgentWebProtocol;
 type
   TWheelControl = class(TControl);
   TTimelineRichEdit = class(TRichEdit)
   public
     RawText: String;
+    IsUserMessage: Boolean;
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
@@ -44,14 +55,14 @@ type
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
-  TTimelineButton = class(TButton)
+  TTimelineButton = class(TPanel)
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
   TTimelineTool = class(TPanel)
   public
     ToolId: String;
-    Header: TButton;
+    Header: TTimelineButton;
     Body: TMemo;
   end;
 function ForwardWheel(Control: TControl; var Message: TMessage): Boolean;
@@ -106,11 +117,64 @@ begin
   fBlocks := TList.Create;
   fLastIsMarkdown := False;
   fWheelRemainder := 0;
+  AgentBuildPalette(clWindow, clWindowText, fPalette);
   BorderStyle := bsNone;
   AutoScroll := True;
   HorzScrollBar.Visible := False;
   VertScrollBar.Tracking := True;
   OnMouseWheel := TimelineMouseWheel;
+end;
+
+procedure TAgentTimeline.ApplyBlockAppearance(Block: TControl;
+  const FontName: String; FontSize: Integer);
+var R: TTimelineRichEdit; Tool: TTimelineTool;
+begin
+  if Block is TTimelineRichEdit then begin
+    R := TTimelineRichEdit(Block);
+    R.Font.Name := FontName;
+    R.Font.Size := FontSize;
+    R.Font.Color := fPalette.Text;
+    R.Color := fPalette.Panel;
+    if R.IsUserMessage then begin
+      if AgentUiIsDark(fPalette.Panel) then
+        R.Color := RGB(48, 51, 56)
+      else
+        R.Color := RGB(237, 242, 248);
+    end;
+  end else if Block is TTimelineTool then begin
+    Tool := TTimelineTool(Block);
+    Tool.Color := fPalette.Panel;
+    Tool.Font.Name := FontName;
+    Tool.Font.Size := FontSize;
+    Tool.Font.Color := fPalette.Text;
+    if Assigned(Tool.Header) then begin
+      Tool.Header.ParentColor := False;
+      Tool.Header.Color := fPalette.Elevated;
+      Tool.Header.Font.Name := FontName;
+      Tool.Header.Font.Size := FontSize;
+      Tool.Header.Font.Color := fPalette.Text;
+    end;
+    if Assigned(Tool.Body) then begin
+      Tool.Body.ParentColor := False;
+      Tool.Body.Color := fPalette.Panel;
+      Tool.Body.Font.Name := FontName;
+      Tool.Body.Font.Size := FontSize;
+      Tool.Body.Font.Color := fPalette.Text;
+    end;
+  end;
+end;
+
+procedure TAgentTimeline.ApplyAppearance(AEditorColor, ATextColor: TColor;
+  const FontName: String; FontSize: Integer);
+var I: Integer;
+begin
+  Color := AEditorColor;
+  Font.Name := FontName;
+  Font.Size := FontSize;
+  Font.Color := ATextColor;
+  AgentBuildPalette(AEditorColor, ATextColor, fPalette);
+  for I := 0 to fBlocks.Count - 1 do
+    ApplyBlockAppearance(TControl(fBlocks[I]), FontName, FontSize);
 end;
 procedure TAgentTimeline.ScrollWheel(Delta: Integer);
 var Steps, Distance: Integer; Lines: UINT;
@@ -143,6 +207,25 @@ begin Result := fBlocks.Count; end;
 function TAgentTimeline.BlockAt(Index: Integer): TControl;
 begin Result := TControl(fBlocks[Index]); end;
 
+function TAgentTimeline.WebBlock(Index: Integer): String;
+var Block: TObject; Kind, Text, Name: String; R: TTimelineRichEdit;
+begin
+  Block := TObject(fBlocks[Index]);
+  Kind := 'system'; Text := ''; Name := '';
+  if Block is TTimelineTool then begin
+    Kind := 'tool'; Name := TTimelineTool(Block).Header.Hint;
+    Text := TTimelineTool(Block).Body.Text;
+  end else if Block is TTimelineRichEdit then begin
+    R := TTimelineRichEdit(Block); Text := R.Text;
+    if R.IsUserMessage then Kind := 'user'
+    else if R.RawText <> '' then begin Kind := 'assistant'; Text := R.RawText; end;
+  end;
+  Result := '{"version":1,"type":"upsert","item":{"id":' +
+    WebQuote(IntToStr(fGeneration) + '-' + IntToStr(Index)) +
+    ',"kind":' + WebQuote(Kind) + ',"text":' + WebQuote(Text) +
+    ',"name":' + WebQuote(Name) + ',"status":""}}';
+end;
+
 function TAgentTimeline.FocusedEdit: TCustomEdit;
 var I: Integer; Block: TObject;
 begin
@@ -156,10 +239,12 @@ end;
 
 procedure TAgentTimeline.SaveToFile(const Path: String);
 var Ini: TMemIniFile; I: Integer; Section: String; Block: TObject;
+    Lines: TStringList;
 begin
   Ini := TMemIniFile.Create(Path);
   try
     Ini.Clear;
+    Ini.WriteInteger('timeline', 'version', 2);
     Ini.WriteInteger('timeline', 'count', fBlocks.Count);
     for I := 0 to fBlocks.Count - 1 do begin
       Section := IntToStr(I);
@@ -171,8 +256,23 @@ begin
         TTimelineTool(Block).Body.Lines.SaveToFile(Path + '.' + Section);
       end else begin
         Ini.WriteString(Section, 'kind', 'text');
-        TRichEdit(Block).PlainText := True;
-        TRichEdit(Block).Lines.SaveToFile(Path + '.' + Section);
+        if (Block is TTimelineRichEdit) and TTimelineRichEdit(Block).IsUserMessage then
+          Ini.WriteString(Section, 'role', 'user')
+        else
+          Ini.WriteString(Section, 'role', 'assistant');
+        if (Block is TTimelineRichEdit) and (TTimelineRichEdit(Block).RawText <> '') then begin
+          Ini.WriteString(Section, 'markdown', '1');
+          Lines := TStringList.Create;
+          try
+            Lines.Text := TTimelineRichEdit(Block).RawText;
+            Lines.SaveToFile(Path + '.' + Section);
+          finally
+            Lines.Free;
+          end;
+        end else begin
+          TRichEdit(Block).PlainText := True;
+          TRichEdit(Block).Lines.SaveToFile(Path + '.' + Section);
+        end;
       end;
     end;
     Ini.UpdateFile;
@@ -194,6 +294,10 @@ begin
       if FileExists(Path + '.' + Section) then Lines.LoadFromFile(Path + '.' + Section);
       if Ini.ReadString(Section, 'kind', '') = 'tool' then
         AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text)
+      else if SameText(Ini.ReadString(Section, 'markdown', ''), '1') then
+        AppendMarkdown(Lines.Text, Font.Color)
+      else if SameText(Ini.ReadString(Section, 'role', ''), 'user') then
+        AppendMessage(Lines.Text, Font.Color, True)
       else AppendText(Lines.Text, Font.Color, False);
     end;
   finally
@@ -207,6 +311,7 @@ begin
   if fBlocks = nil then Exit;
   for I := fBlocks.Count - 1 downto 0 do TObject(fBlocks[I]).Free;
   fBlocks.Clear;
+  Inc(fGeneration);
   fLastText := nil;
   fLastIsMarkdown := False;
 end;
@@ -215,6 +320,9 @@ begin
   inherited;
   if fBlocks <> nil then LayoutBlocks;
 end;
+
+procedure HighlightCppLine(Edit: TRichEdit; Start, LineLength: Integer); forward;
+
 procedure TAgentTimeline.LayoutBlocks;
 var I, Y, OldPosition, BottomPosition: Integer; Block: TControl;
     KeepAtBottom: Boolean;
@@ -231,7 +339,11 @@ begin
   try
     for I := 0 to fBlocks.Count - 1 do begin
       Block := TControl(fBlocks[I]);
-      Block.SetBounds(12, Y, ClientWidth - 24, Block.Height);
+      if (Block is TTimelineRichEdit) and TTimelineRichEdit(Block).IsUserMessage then
+        Block.SetBounds(ClientWidth - 12 - ((ClientWidth - 24) * 3 div 4), Y,
+          (ClientWidth - 24) * 3 div 4, Block.Height)
+      else
+        Block.SetBounds(12, Y, ClientWidth - 24, Block.Height);
       if Block is TRichEdit then
         Block.Height := (SendMessage(TRichEdit(Block).Handle, EM_GETLINECOUNT, 0, 0) + 1) * (Abs(Font.Height) + 6);
       Inc(Y, Block.Height + 12);
@@ -254,8 +366,38 @@ var I, J, Start, LineLength, BaseSize, Level: Integer;
     InCode: Boolean; Line, Token, Normalized: String;
     SavedStart, SavedLength: Integer; RawLines, DisplayLines, Kinds,
     InlineSpans, SpanParts: TStringList;
-    CleanLine, SpanInfo: String; InlineStart, SpanEnd, P: Integer;
-    InInline: Boolean;
+    CleanLine, SpanInfo: String; InlineStart, SpanEnd, BoldStart, P: Integer;
+    InInline, InBold: Boolean;
+  function IsTableSeparator(const Value: String): Boolean;
+  var S: String; I: Integer;
+  begin
+    S := Trim(Value);
+    Result := Pos('|', S) > 0;
+    if not Result then Exit;
+    Result := Pos('-', S) > 0;
+    if not Result then Exit;
+    for I := Length(S) downto 1 do
+      if S[I] in ['|', '-', ':', ' ', #9] then Delete(S, I, 1);
+    Result := S = '';
+  end;
+  function TableCellText(const Value: String): String;
+  var S: String; Cells: TStringList; I: Integer;
+  begin
+    S := Trim(Value);
+    if (S <> '') and (S[1] = '|') then Delete(S, 1, 1);
+    if (S <> '') and (S[Length(S)] = '|') then Delete(S, Length(S), 1);
+    Cells := TStringList.Create;
+    try
+      ExtractStrings(['|'], [], PChar(S), Cells);
+      Result := '';
+      for I := 0 to Cells.Count - 1 do begin
+        if I > 0 then Result := Result + '   ';
+        Result := Result + Trim(Cells[I]);
+      end;
+    finally
+      Cells.Free;
+    end;
+  end;
 begin
   if Edit = nil then Exit;
   SavedStart := Edit.SelStart;
@@ -282,6 +424,18 @@ begin
         Kinds.Add('code')
       else
         Kinds.Add('text');
+      if (not InCode) and IsTableSeparator(Line) then begin
+        Kinds[Kinds.Count - 1] := 'table-separator';
+        Line := '';
+      end;
+      if (not InCode) and (Pos('|', Line) > 0) and
+        (Pos('|', Copy(Line, Pos('|', Line) + 1, MaxInt)) > 0) then begin
+        Line := TableCellText(Line);
+        if (I + 1 < RawLines.Count) and IsTableSeparator(RawLines[I + 1]) then begin
+          Kinds[Kinds.Count - 1] := 'tablehead';
+        end else
+          Kinds[Kinds.Count - 1] := 'table';
+      end;
       if (not InCode) and (Length(Token) > 1) and (Token[1] = '#') then begin
         J := 1;
         while (J < Length(Token)) and (Token[J] = '#') do Inc(J);
@@ -296,16 +450,22 @@ begin
       else if (not InCode) and (Length(Token) >= 2) and (Copy(Token, 1, 2) = '> ') then
         Line := StringOfChar(' ', Length(Line) - Length(Token)) + '| ' +
           Copy(Token, 3, MaxInt);
+      if (not InCode) and ((Trim(Line) = '---') or (Trim(Line) = '***')) then begin
+        Line := StringOfChar('-', 32);
+        Kinds[Kinds.Count - 1] := 'divider';
+      end;
       CleanLine := '';
       SpanInfo := '';
-      InlineStart := -1;
-      InInline := False;
+    InlineStart := -1;
+    InInline := False;
+    BoldStart := -1;
+    InBold := False;
       J := 1;
       while J <= Length(Line) do begin
         if (not InCode) and (Line[J] = '`') then begin
           if InInline then begin
             SpanEnd := Length(CleanLine);
-            SpanInfo := SpanInfo + IntToStr(InlineStart) + ':' +
+            SpanInfo := SpanInfo + 'c:' + IntToStr(InlineStart) + ':' +
               IntToStr(SpanEnd - InlineStart) + ';';
           end else
             InlineStart := Length(CleanLine);
@@ -315,6 +475,16 @@ begin
         end;
         if (not InCode) and (J < Length(Line)) and
           ((Copy(Line, J, 2) = '**') or (Copy(Line, J, 2) = '__')) then begin
+          if InBold then begin
+            SpanEnd := Length(CleanLine);
+            SpanInfo := SpanInfo + 'b:' + IntToStr(BoldStart) + ':' +
+              IntToStr(SpanEnd - BoldStart) + ';';
+            InBold := False;
+            BoldStart := -1;
+          end else begin
+            InBold := True;
+            BoldStart := Length(CleanLine);
+          end;
           Inc(J, 2);
           Continue;
         end;
@@ -322,6 +492,11 @@ begin
         Inc(J);
       end;
       Line := CleanLine;
+      if InBold then begin
+        SpanEnd := Length(CleanLine);
+        SpanInfo := SpanInfo + 'b:' + IntToStr(BoldStart) + ':' +
+          IntToStr(SpanEnd - BoldStart) + ';';
+      end;
       DisplayLines.Add(Line);
       InlineSpans.Add(SpanInfo);
     end;
@@ -353,12 +528,22 @@ begin
         Edit.SelLength := LineLength;
         Edit.SelAttributes.Name := 'Courier New';
         Edit.SelAttributes.Size := BaseSize - 1;
+        Edit.SelAttributes.Color := Edit.Font.Color;
+        HighlightCppLine(Edit, Start, LineLength);
       end else if (I < Kinds.Count) and (Copy(Kinds[I], 1, 7) = 'heading') then begin
         Level := StrToIntDef(Copy(Kinds[I], 8, MaxInt), 2);
         Edit.SelStart := Start;
         Edit.SelLength := LineLength;
         Edit.SelAttributes.Style := [fsBold];
         Edit.SelAttributes.Size := BaseSize + 4 - Level;
+      end else if (I < Kinds.Count) and (Kinds[I] = 'tablehead') then begin
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Style := [fsBold];
+      end else if (I < Kinds.Count) and (Kinds[I] = 'divider') then begin
+        Edit.SelStart := Start;
+        Edit.SelLength := LineLength;
+        Edit.SelAttributes.Color := RGB(128, 128, 128);
       end;
       if (I < InlineSpans.Count) and (InlineSpans[I] <> '') then begin
         SpanParts.Delimiter := ';';
@@ -366,10 +551,26 @@ begin
         for J := 0 to SpanParts.Count - 1 do begin
           P := Pos(':', SpanParts[J]);
           if P > 0 then begin
-            Edit.SelStart := Start + StrToIntDef(Copy(SpanParts[J], 1, P - 1), 0);
-            Edit.SelLength := StrToIntDef(Copy(SpanParts[J], P + 1, MaxInt), 0);
-            Edit.SelAttributes.Name := 'Courier New';
-            Edit.SelAttributes.Size := BaseSize - 1;
+            Token := Copy(SpanParts[J], 1, P - 1);
+            if (Token = 'c') or (Token = 'b') then begin
+              SpanInfo := Copy(SpanParts[J], P + 1, MaxInt);
+              P := Pos(':', SpanInfo);
+              if P > 0 then begin
+                Edit.SelStart := Start + StrToIntDef(Copy(SpanInfo, 1, P - 1), 0);
+                Edit.SelLength := StrToIntDef(Copy(SpanInfo, P + 1, MaxInt), 0);
+                if Token = 'c' then begin
+                  Edit.SelAttributes.Name := 'Courier New';
+                  Edit.SelAttributes.Size := BaseSize - 1;
+                end else begin
+                  Edit.SelAttributes.Style := [fsBold];
+                end;
+              end;
+            end else begin
+              Edit.SelStart := Start + StrToIntDef(Copy(SpanParts[J], 1, P - 1), 0);
+              Edit.SelLength := StrToIntDef(Copy(SpanParts[J], P + 1, MaxInt), 0);
+              Edit.SelAttributes.Name := 'Courier New';
+              Edit.SelAttributes.Size := BaseSize - 1;
+            end;
           end;
         end;
       end;
@@ -396,9 +597,13 @@ begin
   Result.BorderStyle := bsNone;
   Result.Color := Color;
   Result.Font.Assign(Font);
+  Result.Font.Color := fPalette.Text;
   Result.ScrollBars := ssNone;
   Result.WordWrap := True;
   Result.Width := ClientWidth - 24;
+  SendMessage(Result.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN,
+    LPARAM(8 or (8 shl 16)));
+  TTimelineRichEdit(Result).IsUserMessage := False;
   fBlocks.Add(Result);
 end;
 procedure TAgentTimeline.AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
@@ -439,6 +644,122 @@ begin
   R.Height := (Lines + 1) * (Abs(Font.Height) + 6);
   LayoutBlocks;
 end;
+
+procedure TAgentTimeline.AppendMessage(const Text: String; TextColor: TColor;
+  IsUser: Boolean);
+var R: TTimelineRichEdit; Lines: Integer;
+begin
+  fLastText := NewTextBlock;
+  fLastIsMarkdown := False;
+  R := TTimelineRichEdit(fLastText);
+  R.IsUserMessage := IsUser;
+  R.Font.Color := TextColor;
+  R.Color := Color;
+  if IsUser then begin
+    if AgentUiIsDark(Color) then
+      R.Color := RGB(48, 51, 56)
+    else
+      R.Color := RGB(237, 242, 248);
+    R.Paragraph.Alignment := taLeftJustify;
+  end else
+    R.Paragraph.Alignment := taLeftJustify;
+  R.SelStart := 0;
+  R.SelLength := 0;
+  R.SelText := Text;
+  Lines := SendMessage(R.Handle, EM_GETLINECOUNT, 0, 0);
+  R.Height := (Lines + 1) * (Abs(Font.Height) + 8);
+  LayoutBlocks;
+end;
+
+function IsCppKeyword(const Token: String): Boolean;
+begin
+  Result := SameText(Token, 'auto') or SameText(Token, 'bool') or
+    SameText(Token, 'break') or SameText(Token, 'case') or
+    SameText(Token, 'catch') or SameText(Token, 'char') or
+    SameText(Token, 'class') or SameText(Token, 'const') or
+    SameText(Token, 'continue') or SameText(Token, 'default') or
+    SameText(Token, 'delete') or SameText(Token, 'do') or
+    SameText(Token, 'double') or SameText(Token, 'else') or
+    SameText(Token, 'enum') or SameText(Token, 'explicit') or
+    SameText(Token, 'extern') or SameText(Token, 'false') or
+    SameText(Token, 'float') or SameText(Token, 'for') or
+    SameText(Token, 'friend') or SameText(Token, 'if') or
+    SameText(Token, 'inline') or SameText(Token, 'int') or
+    SameText(Token, 'long') or SameText(Token, 'namespace') or
+    SameText(Token, 'new') or SameText(Token, 'nullptr') or
+    SameText(Token, 'operator') or SameText(Token, 'private') or
+    SameText(Token, 'protected') or SameText(Token, 'public') or
+    SameText(Token, 'return') or SameText(Token, 'short') or
+    SameText(Token, 'signed') or SameText(Token, 'sizeof') or
+    SameText(Token, 'static') or SameText(Token, 'struct') or
+    SameText(Token, 'switch') or SameText(Token, 'template') or
+    SameText(Token, 'this') or SameText(Token, 'throw') or
+    SameText(Token, 'true') or SameText(Token, 'try') or
+    SameText(Token, 'typedef') or SameText(Token, 'typename') or
+    SameText(Token, 'union') or SameText(Token, 'unsigned') or
+    SameText(Token, 'using') or SameText(Token, 'virtual') or
+    SameText(Token, 'void') or SameText(Token, 'volatile') or
+    SameText(Token, 'while');
+end;
+
+procedure HighlightCppLine(Edit: TRichEdit; Start, LineLength: Integer);
+var
+  Line, Token: String;
+  I, TokenStart, QuoteEnd, CommentStart: Integer;
+  Dark: Boolean;
+  KeywordColor, StringColor, CommentColor: TColor;
+begin
+  if (Edit = nil) or (LineLength <= 0) then
+    Exit;
+  Line := Copy(Edit.Text, Start + 1, LineLength);
+  Dark := AgentUiIsDark(Edit.Color);
+  if Dark then begin
+    KeywordColor := RGB(86, 156, 214);
+    StringColor := RGB(206, 145, 120);
+    CommentColor := RGB(106, 153, 85);
+  end else begin
+    KeywordColor := RGB(0, 80, 160);
+    StringColor := RGB(128, 40, 0);
+    CommentColor := RGB(0, 110, 40);
+  end;
+  CommentStart := Pos('//', Line);
+  if CommentStart > 0 then begin
+    Edit.SelStart := Start + CommentStart - 1;
+    Edit.SelLength := LineLength - CommentStart + 1;
+    Edit.SelAttributes.Color := CommentColor;
+  end;
+  I := 1;
+  while I <= Length(Line) do begin
+    if (CommentStart > 0) and (I >= CommentStart) then
+      Break;
+    if Line[I] in ['"', ''''] then begin
+      QuoteEnd := I + 1;
+      while QuoteEnd <= Length(Line) do begin
+        if (Line[QuoteEnd] = Line[I]) and (Line[QuoteEnd - 1] <> '\') then
+          Break;
+        Inc(QuoteEnd);
+      end;
+      if QuoteEnd > Length(Line) then QuoteEnd := Length(Line);
+      Edit.SelStart := Start + I - 1;
+      Edit.SelLength := QuoteEnd - I + 1;
+      Edit.SelAttributes.Color := StringColor;
+      I := QuoteEnd + 1;
+    end else if (Line[I] in ['A'..'Z', 'a'..'z', '_']) then begin
+      TokenStart := I;
+      Inc(I);
+      while (I <= Length(Line)) and
+        (Line[I] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) do Inc(I);
+      Token := Copy(Line, TokenStart, I - TokenStart);
+      if IsCppKeyword(Token) then begin
+        Edit.SelStart := Start + TokenStart - 1;
+        Edit.SelLength := Length(Token);
+        Edit.SelAttributes.Color := KeywordColor;
+      end;
+    end else
+      Inc(I);
+  end;
+end;
+
 procedure TAgentTimeline.ToggleBlock(Sender: TObject);
 var Block: TTimelineTool;
 begin
@@ -473,10 +794,16 @@ begin
     Block.Height := 32;
     Block.Header := TTimelineButton.Create(Block);
     Block.Header.Parent := Block;
+    Block.Header.BevelOuter := bvNone;
+    Block.Header.Alignment := taLeftJustify;
     TWheelControl(Block.Header).OnMouseWheel := TimelineMouseWheel;
     Block.Header.SetBounds(0, 0, ClientWidth - 24, 32);
     Block.Header.Anchors := [akLeft, akTop, akRight];
     Block.Header.OnClick := ToggleBlock;
+    Block.Header.ParentColor := False;
+    Block.Header.Color := fPalette.Elevated;
+    Block.Header.Font.Assign(Font);
+    Block.Header.Font.Color := fPalette.Text;
     Block.Body := TTimelineMemo.Create(Block);
     Block.Body.Parent := Block;
     TWheelControl(Block.Body).OnMouseWheel := TimelineMouseWheel;
@@ -486,10 +813,14 @@ begin
     Block.Body.PopupMenu := PopupMenu;
     Block.Body.Color := Color;
     Block.Body.Font.Assign(Font);
+    Block.Body.ParentColor := False;
+    Block.Body.Color := fPalette.Panel;
+    Block.Body.Font.Color := fPalette.Text;
     Block.Body.ScrollBars := ssBoth;
     Block.Body.Visible := False;
     fBlocks.Add(Block);
   end;
+  ApplyBlockAppearance(Block, Font.Name, Font.Size);
   Block.Header.Hint := Caption;
   Block.Header.Caption := '>  ' + Caption;
   if Details <> '' then Block.Body.Lines.Add(Details);

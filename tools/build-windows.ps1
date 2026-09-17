@@ -267,7 +267,8 @@ if (-not $SkipConsolePauser) {
     }
 }
 
-$requiredOutputs = @('devcpp.exe', 'Packman.exe', 'PackMaker.exe')
+& (Join-Path $PSScriptRoot 'deploy-agent-web.ps1') -Destination $RepoRoot
+$requiredOutputs = @('devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'AgentWebHost.dll')
 if (-not $SkipConsolePauser) {
     $requiredOutputs += 'ConsolePauser.exe'
 }

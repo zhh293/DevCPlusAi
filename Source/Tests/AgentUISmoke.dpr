@@ -102,6 +102,11 @@ begin
       ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"text","text":"Example:\n```cpp\nint main() {}\n```"}]}}', Events);
       Panel.HandleAgentEvent(Events[0]);
       Require(Panel.AnswerCode = 'int main() {}' + #10, 'code extraction lost content');
+      Panel.Timeline.LastText.SelStart := Pos('int', Panel.Timeline.LastText.Text) - 1;
+      Panel.Timeline.LastText.SelLength := 3;
+      Require(Panel.Timeline.LastText.SelAttributes.Color <>
+        Panel.Timeline.LastText.Font.Color,
+        'C++ keyword was not syntax highlighted');
       Panel.ClearChat;
       Require(Panel.AnswerCode = '', 'clear retained stale code');
       Panel.AppendAIText('# Heading' + #13#10 + 'Use **bold** and `code`.' + #13#10 +
@@ -114,10 +119,28 @@ begin
         'markdown heading marker was left in display text');
       Require(Pos('**bold**', Panel.Timeline.LastText.Text) = 0,
         'markdown emphasis markers were left in display text');
+      Panel.Timeline.LastText.SelStart := Pos('bold', Panel.Timeline.LastText.Text) - 1;
+      Panel.Timeline.LastText.SelLength := 4;
+      Require(Panel.Timeline.LastText.SelAttributes.Style = [fsBold],
+        'markdown emphasis was not rendered bold');
       Panel.Timeline.LastText.SelStart := Pos('code', Panel.Timeline.LastText.Text) - 1;
       Panel.Timeline.LastText.SelLength := 4;
       Require(SameText(Panel.Timeline.LastText.SelAttributes.Name, 'Courier New'),
         'markdown inline code was not rendered with a code font');
+      Panel.ClearChat;
+      Panel.AppendAIText('| Op | Avg | Worst |' + #13#10 +
+        '| --- | --- | --- |' + #13#10 + '| 查找 | O(1) | O(n) |' + #13#10 +
+        '---');
+      Require(Pos('| --- |', Panel.Timeline.LastText.Text) = 0,
+        'markdown table separator was left in display text');
+      Require((Pos('Op', Panel.Timeline.LastText.Text) > 0) and
+        (Pos('Avg', Panel.Timeline.LastText.Text) > 0) and
+        (Pos('Worst', Panel.Timeline.LastText.Text) > 0),
+        'markdown table columns were not rendered');
+      Panel.ClearChat;
+      Panel.AppendUserMessage('User bubble');
+      Require(Panel.Timeline.BlockCount = 1, 'user message did not become a card');
+      Require(Panel.Timeline.BlockAt(0).Left > 12, 'user message is not right aligned');
       Writeln('Agent UI smoke test: collapsed tool activity and persistence');
       Panel.AppendAIText('Visible answer');
       BeforeTools := Panel.reChat.Text;

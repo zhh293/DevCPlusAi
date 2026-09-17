@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><title>Agent native bridge probe</title>
+<p>32-bit Delphi WebView2 bridge probe</p>
+<script>
+window.chrome.webview.addEventListener('message', event => {
+  if(event.data.kind==='probe') window.chrome.webview.postMessage(event.data.text);
+});
+</script>
