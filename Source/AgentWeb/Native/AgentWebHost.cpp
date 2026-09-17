@@ -37,6 +37,7 @@ extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
                     s->controller = controller;
                     controller->get_CoreWebView2(&s->view);
                     RECT bounds{}; GetClientRect(s->parent, &bounds); controller->put_Bounds(bounds);
+                    controller->put_IsVisible(IsWindowVisible(s->parent));
                     ComPtr<ICoreWebView2Settings> settings;
                     s->view->get_Settings(&settings);
                     settings->put_AreDevToolsEnabled(FALSE);
@@ -77,12 +78,21 @@ extern "C" __declspec(dllexport) void __cdecl ABResize(void* value) {
     if (!value) return; auto s = *static_cast<Handle*>(value);
     if (!s->closed && s->controller && IsWindow(s->parent)) {
         RECT bounds{}; GetClientRect(s->parent, &bounds); s->controller->put_Bounds(bounds);
+        s->controller->put_IsVisible(IsWindowVisible(s->parent));
+        s->controller->NotifyParentWindowPositionChanged();
     }
 }
 extern "C" __declspec(dllexport) HRESULT __cdecl ABPost(void* value, const wchar_t* json) {
     if (!value || !json) return E_INVALIDARG;
     auto s = *static_cast<Handle*>(value);
     return !s->closed && s->view ? s->view->PostWebMessageAsJson(json) : E_PENDING;
+}
+extern "C" __declspec(dllexport) int __cdecl ABIsVisible(void* value) {
+    if (!value) return 0;
+    auto s = *static_cast<Handle*>(value);
+    BOOL visible = FALSE;
+    if (!s->closed && s->controller) s->controller->get_IsVisible(&visible);
+    return visible ? 1 : 0;
 }
 extern "C" __declspec(dllexport) void __cdecl ABClose(void* value) {
     if (!value) return; auto handle = static_cast<Handle*>(value); auto s = *handle;

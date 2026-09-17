@@ -103,3 +103,6 @@ package-lock.json
 
 # Local sample build output
 /test1.exe
+
+# Web renderer copied beside devcpp.exe by deploy-agent-web.ps1.
+/AgentWeb/

@@ -10,6 +10,7 @@ type
     fLastIsMarkdown: Boolean;
     fWheelRemainder: Integer;
     fPalette: TAgentUiPalette;
+    fGeneration: Integer;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
@@ -29,6 +30,8 @@ type
     function FocusedEdit: TCustomEdit;
     function BlockCount: Integer;
     function BlockAt(Index: Integer): TControl;
+    function WebBlock(Index: Integer): String;
+    property Generation: Integer read fGeneration;
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
@@ -38,6 +41,7 @@ type
       const FontName: String; FontSize: Integer);
   end;
 implementation
+uses AgentWebProtocol;
 type
   TWheelControl = class(TControl);
   TTimelineRichEdit = class(TRichEdit)
@@ -203,6 +207,25 @@ begin Result := fBlocks.Count; end;
 function TAgentTimeline.BlockAt(Index: Integer): TControl;
 begin Result := TControl(fBlocks[Index]); end;
 
+function TAgentTimeline.WebBlock(Index: Integer): String;
+var Block: TObject; Kind, Text, Name: String; R: TTimelineRichEdit;
+begin
+  Block := TObject(fBlocks[Index]);
+  Kind := 'system'; Text := ''; Name := '';
+  if Block is TTimelineTool then begin
+    Kind := 'tool'; Name := TTimelineTool(Block).Header.Hint;
+    Text := TTimelineTool(Block).Body.Text;
+  end else if Block is TTimelineRichEdit then begin
+    R := TTimelineRichEdit(Block); Text := R.Text;
+    if R.IsUserMessage then Kind := 'user'
+    else if R.RawText <> '' then begin Kind := 'assistant'; Text := R.RawText; end;
+  end;
+  Result := '{"version":1,"type":"upsert","item":{"id":' +
+    WebQuote(IntToStr(fGeneration) + '-' + IntToStr(Index)) +
+    ',"kind":' + WebQuote(Kind) + ',"text":' + WebQuote(Text) +
+    ',"name":' + WebQuote(Name) + ',"status":""}}';
+end;
+
 function TAgentTimeline.FocusedEdit: TCustomEdit;
 var I: Integer; Block: TObject;
 begin
@@ -288,6 +311,7 @@ begin
   if fBlocks = nil then Exit;
   for I := fBlocks.Count - 1 downto 0 do TObject(fBlocks[I]).Free;
   fBlocks.Clear;
+  Inc(fGeneration);
   fLastText := nil;
   fLastIsMarkdown := False;
 end;

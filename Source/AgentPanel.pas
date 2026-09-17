@@ -28,7 +28,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   StdCtrls, ComCtrls, ExtCtrls, RichEdit, Dialogs, Clipbrd, JPEG, Menus,
-  AgentProcess, AgentProtocol, AgentTimeline, AgentUITheme;
+  AgentProcess, AgentProtocol, AgentTimeline, AgentUITheme, AgentWebView;
 
 type
   TAgentStatus = (
@@ -68,6 +68,19 @@ type
     procedure reChatKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     fAgentProcess: TAgentProcess;
+    fWeb: TAgentWebView;
+    fWebTimer: TTimer;
+    fWebCache, fWebQueue: TStringList;
+    fWebStarted: Boolean;
+    fWebGeneration: Integer;
+    fWebState, fWebDraft: String;
+    procedure WebTick(Sender: TObject);
+    procedure WebReady(Sender: TObject);
+    procedure WebMessage(Sender: TObject; const Text: WideString);
+    procedure WebError(Sender: TObject; const Text: WideString);
+    procedure WebDispatch(const Text: WideString);
+    procedure WebSync;
+  private
     fOnPrepareContext: TNotifyEvent;
     fOnQuickAction: TNotifyEvent;
     fOnOpenCode: TNotifyEvent;
@@ -173,6 +186,7 @@ type
     function HandleEditShortcut(Key: Word; Shift: TShiftState): Boolean;
     function ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
     property Timeline: TAgentTimeline read fTimeline;
+    property WebView: TAgentWebView read fWeb;
     property ToolTree: TTreeView read fTools;
     property ToolToggle: TButton read fToolToggle;
     property SessionPicker: TComboBox read fSessions;
@@ -193,8 +207,10 @@ type
   end;
 
 implementation
+uses uLkJSON, AgentWebProtocol;
 
 {$R *.dfm}
+{$I AgentPanelWeb.inc}
 
 constructor TAgentPanelFrame.Create(AOwner: TComponent);
 var
@@ -343,6 +359,12 @@ begin
   fToolPanel.Visible := False;
   UpdateAttachmentLayout;
   SetStatus(asDisconnected);
+  fWebCache := TStringList.Create;
+  fWebQueue := TStringList.Create;
+  fWebGeneration := -1;
+  fWebTimer := TTimer.Create(Self);
+  fWebTimer.Interval := 100;
+  fWebTimer.OnTimer := WebTick;
   Resize;
 end;
 
@@ -351,6 +373,10 @@ var
   I: Integer;
 begin
   fWaitingForResponse := False;
+  if Assigned(fWebTimer) then fWebTimer.Enabled := False;
+  if Assigned(fWeb) then fWeb.Stop;
+  fWebCache.Free;
+  fWebQueue.Free;
   if fTemporaryAttachments <> nil then
     for I := 0 to fTemporaryAttachments.Count - 1 do
       DeleteFile(fTemporaryAttachments[I]);
