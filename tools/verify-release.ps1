@@ -204,7 +204,7 @@ function Invoke-ClaudeCompatibilityCheck {
 
     # Exercise the exact non-interactive base flags with an empty, closed stdin.
     # The file form of append-system-prompt is hidden from the short help in
-    # current Claude builds, so this behavior check is its compatibility test.
+    # Current Agent CLI builds use this behavior check.
     # No user prompt is sent and therefore this does not make an API request.
     $promptFile = [System.IO.Path]::GetTempFileName()
     [System.IO.File]::WriteAllText($promptFile, 'verify')

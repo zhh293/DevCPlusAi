@@ -43,6 +43,11 @@ extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
                     settings->put_AreDevToolsEnabled(FALSE);
                     settings->put_AreDefaultContextMenusEnabled(FALSE);
                     EventRegistrationToken token{};
+                    s->view->add_ProcessFailed(Callback<ICoreWebView2ProcessFailedEventHandler>(
+                        [s](ICoreWebView2*, ICoreWebView2ProcessFailedEventArgs*)->HRESULT {
+                            s->emit(2, L"Browser process failed. Retry the AI chat renderer.");
+                            return S_OK;
+                        }).Get(), &token);
                     s->view->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>(
                         [s](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args)->HRESULT {
                             LPWSTR uri{}; args->get_Uri(&uri);

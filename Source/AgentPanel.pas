@@ -13,13 +13,8 @@
 
     AgentPanel.pas
 
-    Sub-task P1.4: the AI conversation panel (TFrame).
-
-    A frame embeddable in MainForm's right-hand panel. It owns the chat history
-    view, the user input box, send/stop buttons and a status bar. It receives
-    parsed TAgentEvent objects (HandleAgentEvent) and renders them, and sends
-    user input to the Agent process. Text is appended to the RichEdit using the
-    SelStart/SelText technique to avoid full repaints.
+    Owns conversation state, host actions and the WebView chat surface.
+    AgentPanelWeb.inc dispatches browser actions on the VCL thread.
 }
 unit AgentPanel;
 
@@ -31,6 +26,7 @@ uses
   AgentProcess, AgentProtocol, AgentTimeline, AgentUITheme, AgentWebView;
 
 type
+  TAgentSessionAction = procedure(Sender: TObject; const Action, Key, Title: String) of object;
   TAgentStatus = (
     asReady,        // ready / idle
     asThinking,     // waiting for the model
@@ -72,14 +68,21 @@ type
     fWebTimer: TTimer;
     fWebCache, fWebQueue: TStringList;
     fWebStarted: Boolean;
+    fWebFailed: Boolean;
+    fWebStartTick: DWORD;
+    fWebRetry: TButton;
     fWebGeneration: Integer;
+    fWebTimelineRevision: Integer;
     fWebState, fWebDraft: String;
+    fWebCode: String;
+    fOnSessionAction: TAgentSessionAction;
     procedure WebTick(Sender: TObject);
     procedure WebReady(Sender: TObject);
     procedure WebMessage(Sender: TObject; const Text: WideString);
     procedure WebError(Sender: TObject; const Text: WideString);
     procedure WebDispatch(const Text: WideString);
     procedure WebSync;
+    procedure RetryWeb(Sender: TObject);
   private
     fOnPrepareContext: TNotifyEvent;
     fOnQuickAction: TNotifyEvent;
@@ -196,6 +199,8 @@ type
     procedure SetSessions(Items: TStrings; const Selected: String);
     function SelectedSession: String;
     property OnSessionChange: TNotifyEvent read fOnSessionChange write fOnSessionChange;
+    property OnSessionAction: TAgentSessionAction read fOnSessionAction write fOnSessionAction;
+    property ConversationTitle: String read fConversationTitle write fConversationTitle;
     function AnswerCode: String;
     property OnOpenCode: TNotifyEvent read fOnOpenCode write fOnOpenCode;
     property OnPrepareContext: TNotifyEvent read fOnPrepareContext write fOnPrepareContext;
@@ -207,7 +212,7 @@ type
   end;
 
 implementation
-uses uLkJSON, AgentWebProtocol;
+uses uLkJSON, AgentWebProtocol, devcfg;
 
 {$R *.dfm}
 {$I AgentPanelWeb.inc}
@@ -1296,7 +1301,12 @@ begin
     fToolToggle.Caption := '> Tool activity - failure';
   end
   else if Event.EventType = aetToolResult then Node.Text := Node.Text + ' [Done]';
-  fTimeline.AddTool(Key, Node.Text, Summary);
+  if Event.IsError then
+    fTimeline.AddTool(Key, Node.Text, Summary, 'failed', True)
+  else if Event.EventType = aetToolResult then
+    fTimeline.AddTool(Key, Node.Text, Summary, 'done', True)
+  else
+    fTimeline.AddTool(Key, Node.Text, Summary, 'running', False);
   Lines := TStringList.Create;
   try
     Lines.Text := Summary;
@@ -1317,6 +1327,7 @@ var
   StartPos, EndPos: Integer;
   Tail: String;
 begin
+  if fWebCode <> '' then begin Result := fWebCode; Exit; end;
   Result := '';
   StartPos := Pos('```', fLastAnswer);
   if StartPos = 0 then Exit;

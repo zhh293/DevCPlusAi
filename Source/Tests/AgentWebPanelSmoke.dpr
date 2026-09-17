@@ -17,7 +17,7 @@ begin
     Application.ProcessMessages; Sleep(5);
   end;
 end;
-var Host: TForm; Panel: TAgentPanelFrame; Probe: TProbe; Started: DWORD;
+var Host: TForm; Panel: TAgentPanelFrame; Probe: TProbe; Started: DWORD; Snapshot: String;
 begin
   try
     Application.Initialize;
@@ -61,6 +61,15 @@ begin
       Pump(150);
       if Probe.SettingsCount <> 1 then raise Exception.Create('Unknown protocol version accepted');
       Host.ClientWidth := 320; Pump(150); Host.ClientWidth := 800; Pump(150);
+      Panel.Timeline.AddTool('result', 'Bash', 'input command', 'running', False);
+      Panel.Timeline.AddTool('result', 'Bash', 'error output', 'failed', True);
+      Snapshot := ChangeFileExt(Application.ExeName, '.timeline');
+      Panel.Timeline.SaveToFile(Snapshot);
+      Panel.Timeline.LoadFromFile(Snapshot);
+      Snapshot := Panel.Timeline.WebBlock(Panel.Timeline.BlockCount - 1);
+      if (Pos('input command', Snapshot) = 0) or (Pos('error output', Snapshot) = 0) or
+        (Pos('"status":"failed"', Snapshot) = 0) then
+        raise Exception.Create('Structured tool persistence failed');
       Panel.ClearChat; Pump(150);
       if Panel.Timeline.BlockCount <> 0 then raise Exception.Create('Clear failed');
       Panel.Free; Pump(200);

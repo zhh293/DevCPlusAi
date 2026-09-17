@@ -1076,7 +1076,6 @@ type
     fTools: TToolController; // tool list controller
     fProjectToolWindow: TForm; // floating left tab control
     fReportToolWindow: TForm; // floating bottom tab control
-    WindowPlacement: TWindowPlacement; // idem
     fFirstShow: boolean; // true for first WM_SHOW, false for others
     fRunEndAction: TRunEndAction; // determines what to do when program execution finishes
     fCompSuccessAction: TCompSuccessAction; // determines what to do when compilation finishes
@@ -1139,6 +1138,7 @@ type
     procedure UpdateAgentCompileContext;
     procedure AgentPrepareContext(Sender: TObject);
     procedure AgentSessionChange(Sender: TObject);
+    procedure AgentSessionAction(Sender: TObject; const Action, Key, Title: String);
     procedure RefreshAgentSessions;
     function AgentCliHistoryDir: String;
     function AgentHistoryPath(const SessionFile: String): String;
@@ -1176,7 +1176,6 @@ type
     function PrepareForClean(ForcedCompileTarget: TTarget = cttInvalid): Boolean;
     procedure LoadTheme;
     procedure CheckForDLLProfiling;
-    procedure ProjectWindowClose(Sender: TObject; var Action: TCloseAction);
     procedure BuildOpenWith;
     procedure PrepareDebugger;
     procedure ClearCompileMessages;
@@ -1400,9 +1399,8 @@ var
 //  C: TControlCanvas;
   R: TRect;
   i,iTab:integer;
-  DC: HDC;
   PS: TPaintStruct;
-  bgColor,fgColor: TColor;
+  bgColor: TColor;
   gtc : TThemeColor;
 
 begin
@@ -1411,14 +1409,12 @@ begin
     exit;
   end;
   self.Font := MainForm.Font;
-  DC := Message.DC;
-  if DC = 0 then
-    DC := BeginPaint(Handle, PS);
+  if Message.DC = 0 then
+    BeginPaint(Handle, PS);
   try
     self.Canvas.Font := MainForm.Font;
     strToThemeColor(gtc, devEditor.Syntax.Values[cPNL]);
     bgColor := gtc.Background;
-    fgColor := gtc.Foreground;
     self.Canvas.Brush.Color := bgColor;
 //    self.Canvas.FillRect(self.DisplayRect);
     R.Top:=0;
@@ -1520,7 +1516,7 @@ begin
         MoveToEx(NMCustomDraw.hdc, NMCustomDraw.rc.left, NMCustomDraw.rc.top, nil);
         LineTo(NMCustomDraw.hdc, NMCustomDraw.rc.left, NMCustomDraw.rc.bottom);
         end;
-        if (NMCustomDraw.dwItemSpec <> self.Columns.Count-1) then begin
+        if Integer(NMCustomDraw.dwItemSpec) <> self.Columns.Count - 1 then begin
           MoveToEx(NMCustomDraw.hdc, NMCustomDraw.rc.right, NMCustomDraw.rc.top, nil);
           LineTo(NMCustomDraw.hdc, NMCustomDraw.rc.right, NMCustomDraw.rc.bottom);
         end;
@@ -4578,7 +4574,6 @@ var
   filepath: AnsiString;
   DebugEnabled, StripEnabled: boolean;
   params: string;
-  t: TValueRelationShip;
 
   function hasBreakPoint:boolean;
   var
@@ -6931,23 +6926,6 @@ begin
   ClassBrowser.Refresh;
 end;
 
-procedure TMainForm.ProjectWindowClose(Sender: TObject; var Action: TCloseAction);
-begin
-  LeftPageControl.Visible := false;
-  (Sender as TForm).RemoveControl(LeftPageControl);
-
-  LeftPageControl.Left := 0;
-  LeftPageControl.Top := ToolbarDock.Height;
-  LeftPageControl.Align := alLeft;
-  LeftPageControl.Visible := true;
-  InsertControl(LeftPageControl);
-  fProjectToolWindow.Free;
-  fProjectToolWindow := nil;
-
-  if assigned(fProject) then
-    fProject.SetNodeValue(ProjectView.TopItem); // nodes needs to be recreated
-end;
-
 procedure TMainForm.ReportWindowClose(Sender: TObject; var Action: TCloseAction);
 begin
   MessageControl.Visible := false;
@@ -8259,9 +8237,9 @@ procedure TMainForm.actPackageManagerExecute(Sender: TObject);
 var
   s: AnsiString;
 begin
-  s := IncludeTrailingBackslash(devDirs.Exec) + PACKMAN_PROGRAM;
+  s := IncludeTrailingPathDelimiter(devDirs.Exec) + PACKMAN_PROGRAM;
   if FileExists(s) then
-    ExecuteFile(s, '', IncludeTrailingBackslash(devDirs.Exec), SW_SHOW);
+    ExecuteFile(s, '', IncludeTrailingPathDelimiter(devDirs.Exec), SW_SHOW);
 end;
 
 procedure TMainForm.actHelpExecute(Sender: TObject);
@@ -8471,17 +8449,10 @@ end;
 procedure TMainForm.WMMenuSelect(var Msg: TWMMenuSelect) ;
 var
   menuItem : TMenuItem;
-  hSubMenu : HMENU;
 begin
   inherited; // from TCustomForm (so that Application.Hint is assigned)
   menuItem := nil;
   if (Msg.MenuFlag <> $FFFF) or (Msg.IDItem <> 0) then begin
-  {
-    if Msg.MenuFlag and MF_POPUP = MF_POPUP then begin
-      hSubMenu := GetSubMenu(Msg.Menu, Msg.IDItem) ;
-      menuItem := Self.Menu.FindItem(hSubMenu, fkHandle) ;
-    end else begin
-  }
       menuItem := Self.MainMenu.FindItem(Msg.IDItem, fkCommand) ;
   end;
   fMenuItemHint.DoActivateHint(menuItem) ;
@@ -9259,6 +9230,7 @@ begin
   fAgentPanelFrame.OnQuickAction := AgentQuickAction;
   fAgentPanelFrame.OnOpenCode := AgentOpenCode;
   fAgentPanelFrame.OnSessionChange := AgentSessionChange;
+  fAgentPanelFrame.OnSessionAction := AgentSessionAction;
   fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
   fAgentPanelFrame.OnSettings := AgentSettingsExecute;
   fAgentPanelFrame.ApplyAppearance(Color, Font.Color,
@@ -9598,8 +9570,8 @@ begin
       repeat
         Key := ChangeFileExt(Search.Name, '');
         if (Search.Attr and faDirectory) = 0 then begin
-          Items.Add(Key);
           KnownIds.Add(LoadAgentSession(Dir + Search.Name));
+          if not FileExists(Dir + Key + '.deleted') then Items.Add(Key);
         end;
       until FindNext(Search) <> 0;
       FindClose(Search);
@@ -9616,7 +9588,8 @@ begin
       until FindNext(Search) <> 0;
       FindClose(Search);
     end;
-    if (fAgentChatKey <> '') and (Items.IndexOf(fAgentChatKey) < 0) then Items.Add(fAgentChatKey);
+    if (fAgentChatKey <> '') and (Items.IndexOf(fAgentChatKey) < 0) and
+      not FileExists(Dir + fAgentChatKey + '.deleted') then Items.Add(fAgentChatKey);
     Items.Sort;
     for I := 0 to Items.Count - 1 do begin
       Key := Items[I];
@@ -9634,6 +9607,32 @@ begin
     Items.Free;
   end;
 end;
+procedure TMainForm.AgentSessionAction(Sender: TObject; const Action, Key, Title: String);
+var Dir: String; Lines: TStringList;
+begin
+  if (Key = '') or (ExtractFileName(Key) <> Key) or (Pos('..', Key) > 0) or
+    (Pos(':', Key) > 0) or (fAgentSessionFile = '') then Exit;
+  Dir := IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile));
+  if not FileExists(Dir + Key + '.session') then Exit;
+  Lines := TStringList.Create;
+  try
+    if Action = 'rename-session' then begin
+      if Trim(Title) = '' then Exit;
+      Lines.Text := Title;
+      Lines.SaveToFile(Dir + Key + '.title');
+      if Key = fAgentChatKey then fAgentPanelFrame.ConversationTitle := Title;
+    end else if Action = 'delete-session' then begin
+      if Key = fAgentChatKey then begin
+        fAgentPanelFrame.SessionPicker.ItemIndex := -1;
+        AgentSessionChange(Self);
+      end;
+      Lines.Text := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+      Lines.SaveToFile(Dir + Key + '.deleted');
+    end;
+    RefreshAgentSessions;
+  finally Lines.Free; end;
+end;
+
 procedure TMainForm.AgentSessionChange(Sender: TObject);
 var
   Key, Dir, Path: String;
@@ -9878,10 +9877,18 @@ begin
     for I := 0 to Length(Events) - 1 do begin
       ev := Events[I];
       if ev.EventType = aetPermission then begin
+        fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
+          ev.ToolName, ev.ToolInput, 'approval', False);
         if Assigned(fAgentResponseTimer) then fAgentResponseTimer.Enabled := False;
         Allowed := False;
         if ev.Subtype = 'can_use_tool' then
           Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
+        if Allowed then
+          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
+            ev.ToolName, 'Allowed once', 'done', True)
+        else
+          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
+            ev.ToolName, 'Denied', 'denied', True);
         if Assigned(fAgentProcess) and not fAgentProcess.SendPermissionResponse(ev.EventId, ev.ToolInput, Allowed) then
           fAgentPanelFrame.AppendSystemMessage('Failed to deliver approval decision. Stop and retry the request.');
         Continue;

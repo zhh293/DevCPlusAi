@@ -1,53 +1,40 @@
-# AI panel web renderer
+# AI chat renderer
 
-Visibility fix: the native controller now synchronizes `IsVisible` with the parent HWND during refresh, including the initial hidden-to-visible transition. The host no longer repeatedly calls BringToFront on each polling tick. The native panel smoke test now queries the controller and verifies hidden/show/hide/show transitions; all passed. This specifically covers a gap in the earlier hidden-host tests, which proved navigation but not actual controller visibility.
+`AgentPanel` loads `AgentWeb/index.html` through the x86 `AgentWebHost.dll` bridge. Keep the DLL and the complete `AgentWeb` folder beside `devcpp.exe`. Microsoft Edge WebView2 Runtime must be installed. Missing assets, initialization timeout and browser process failure expose a retry button in the native panel.
 
-The production `AgentPanel` now starts this renderer automatically when `AgentWebHost.dll` and `AgentWeb/index.html` are beside the executable. `tools/deploy-agent-web.ps1` builds the x86 bridge and stages these assets; `tools/build-windows.ps1` also invokes deployment. Keep the DLL and whole `AgentWeb` directory with `devcpp.exe`.
+## Build and deployment
 
-`AgentPanelWeb.inc` adapts existing timeline/history records to stable message IDs, sends only changed blocks, synchronizes drafts, sessions, attachments and theme, and queues browser actions for the VCL timer instead of opening modal dialogs from COM callbacks. Sending, stopping, settings, attachments, quick actions and sessions use the existing handlers. Command approval remains in the existing agent host. The native controls remain as the persistence adapter and fallback when the browser cannot initialize.
+Run `tools/build-windows.ps1 -SkipConsolePauser` for the application and integration checks. `tools/deploy-agent-web.ps1` builds the bridge and copies the web assets. The native build uses MSVC x86 and Microsoft.Web.WebView2 SDK 1.0.4191.47 at `.tools/webview-sdk/extracted`.
 
-`AgentWebPanelSmoke.dpr` passed against the real production page: startup, message/tool snapshots, Unicode draft, settings dispatch, protocol-version rejection, resizing, clearing and teardown. Browser renderer tests also passed after integration. The existing full integration suite passed on the first build; a subsequent run timed out in `AgentMainSmoke`. End-user visual and interaction acceptance is pending user testing.
+## Data and lifetime
 
-`preview.html` is an interactive layout prototype, not the shipping UI. It uses fixed example content and never sends a model request or executes commands. Native actions are explicitly labelled as prototype-only. Six states, three widths and light/dark themes can be selected from the preview toolbar.
+`AgentPanelWeb.inc` queues browser commands and dispatches them from the VCL timer. Modal dialogs never open inside a WebView COM callback. Message IDs combine conversation generation and block index. Timeline revisions avoid serializing unchanged conversations. Changed messages retain chronological position, tool expansion, code controls and reading offsets. Updates intersecting selected text wait until the selection is released.
 
-`Native/AgentWebHost.cpp` is an experimental x86 C ABI bridge. Delphi owns the parent window and calls create/resize/post/close on the same STA thread. Native asynchronous callbacks retain their state; closing marks that state inactive and suppresses callbacks into Delphi. Navigation is restricted to the initial local page and new windows are suppressed. The DLL must remain loaded until process exit because pending COM callbacks can still contain DLL code. Model output must never be passed to an executable script interface.
+Delphi owns the WebView parent. The bridge synchronizes controller visibility and bounds with that window. Closing a view suppresses asynchronous callbacks into Delphi. The DLL remains loaded until process exit because queued COM callbacks can retain its code pointers.
 
-The bridge statically links the Microsoft SDK loader, not the WebView2 browser runtime. The final distribution will need runtime detection and a documented installation path. The local machine has an installed runtime; this does not prove availability on clean Windows installations.
+Tool input, output and status are stored with the timeline. Approvals are decided by the IDE approval dialog and recorded inline. The renderer cannot approve commands. Session removal hides the conversation with a `.deleted` marker while retaining its local records; the history scanner excludes those records from automatic import.
 
-## Evidence, 2026-09-17
+## Protocol
 
-- `index.html`, `panel.css`, `messages.js` and `panel.js` now provide the message renderer and versioned host protocol, separate from the fixture-based preview. Markdown is tokenized with locally bundled Marked 17.0.5 and rendered using DOM creation/textContent only. Raw HTML is displayed as text; remote images and clickable links are not activated yet.
-- `tools/verify-agent-web-messages.cjs` checks real Markdown tables/nested lists/code, HTML injection, stable message order, tool expansion through updates, follow-at-bottom vs reading older messages, composing Enter, send acknowledgment and 320/480/800 px layouts. Passed on Edge; screenshot `.tools/ui-redesign/messages.png` was visually inspected.
-- `Source/Tests/AgentWebControlSmoke.dpr` checks the reusable `TAgentWebView`: missing-parent guard, Unicode roundtrip, resize, stop and destruction during asynchronous initialization. Passed with Delphi 7 x86.
+All packets contain `version: 1`. Host packets use `PostWebMessageAsJson`; browser packets are JSON strings.
 
-- Browser prototype: 36 layout cases (six states × three widths × two themes), tool folding, deny action, input treated as text, composing Enter and attachment removal are checked by `tools/verify-agent-web-preview.cjs`.
-- Delphi 7 probe: x86 DLL loaded in a real VCL parent, local HTML navigation, width changes, Unicode host-to-page-to-host roundtrip and close passed on the development machine.
-- SDK used for experiment: Microsoft.Web.WebView2 1.0.4191.47, downloaded from the NuGet flat-container endpoint to `.tools/webview-sdk/extracted`.
-- SDK archive SHA-256: `F492BBF547D0DA329553B6727435B677579B1E9F91CC9E4A1AD029366D5F23D0`.
-- Compiler: MSVC x86 bridge and Delphi 7 VCL host. `tools/build-agent-web-probe.cmd` is a local developer probe script, not the production build pipeline.
+Host packets:
 
-## Not yet complete
+- `state`: busy/status, model, theme, permission mode, session list, selected session, attachments and send shortcut.
+- `upsert`: item with stable `id`, immutable `kind`, cumulative `text`, and optional tool `name`, `status`, `input`, `output`.
+- `reset`: changes the conversation and clears pending message updates.
+- `draft`: restores the input draft.
+- `accepted` / `rejected`: acknowledges `requestId`. Acceptance clears only the submitted draft, preserving edits typed while sending.
 
-- The original preview still uses fixtures; the new renderer parses Markdown and updates message blocks. Full streaming selection retention and large-history performance still require work.
-- The production AgentPanel now uses the renderer when its runtime assets are present. The rebuilt root executable includes the integration.
-- Native focus/IME input, clipboard images, accessibility and runtime missing/error behavior require further testing. Browser event simulation is not a substitute for native IME testing.
-- Existing history remains in its original format and is adapted for display. A future standalone web data model can remove the native rendering work currently retained for compatibility. Installer/distribution packaging outside the local build still needs to include the new runtime assets.
-- Current probe settings/navigation controls are not a complete security review of a production renderer. Files and external links need explicit host-side policies before activation.
+Browser actions: `draft`, `send`, `stop`, `session`, `new`, `rename-session`, `delete-session`, `settings`, `attach`, `paste-image`, `remove`, `copy`, `open-code`, `open-code-block`, `context`, `clear`, `logs`, `quick`.
 
-## Upstream references
+## Rendering and tests
 
-- [Microsoft runtime distribution](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)
-- [Microsoft Win32 setup](https://learn.microsoft.com/microsoft-edge/webview2/get-started/win32)
+Marked 17.0.5 supplies Markdown tokens. Rendering creates fixed DOM nodes with text content; model output never becomes arbitrary HTML or JavaScript. Raw HTML is displayed as text. Links and images are represented as text, and message content cannot initiate network requests. The bundled Marked license is in `vendor/marked.LICENSE.md`.
 
-## Renderer protocol v1
+- `tools/verify-agent-web-messages.cjs` checks Markdown, code actions, input transactions, IME handling, selection retention, scroll behavior, structured tools, history actions, safe rendering and responsive layouts.
+- `Source/Tests/AgentWebPanelSmoke.dpr` checks native startup, visibility transitions, host dispatch, Unicode drafts, tool persistence, resizing and teardown.
+- `Source/Tests/AgentWebControlSmoke.dpr` checks parent guard, bridge roundtrip and destruction during asynchronous initialization.
+- `Source/Tests/AgentMainSmoke.dpr` checks approval decisions, clipboard routing, session persistence, history removal and project isolation.
 
-All packets contain `version: 1`. Host-to-view packets are delivered through WebView2 `PostWebMessageAsJson`:
-
-- `state`: `busy`, `status`, `model`, `theme` (`dark` or `light`). Enables the composer after host initialization.
-- `upsert`: `item` with stable `id`, immutable `kind` (`user`, `assistant`, `tool`, `system`), complete `text`, optional tool `name` and `status`. First insertion determines chronological position; subsequent updates preserve that position and tool expansion. Send cumulative text, not a delta.
-- `reset`: clears messages and pending updates when changing conversations.
-- `accepted`: clears composer text only after the host accepted the send request. Failed sends must not emit this packet.
-
-View-to-host packets are JSON strings with `action`: `ready`, `send` (plus `text`), `stop`, `history`, `new`, `settings`, `attach`. The host must validate the schema and current application state and route actions through existing application handlers. No packet authorizes command execution or bypasses approval.
-
-Marked is vendored from the installed 17.0.5 package; its MIT license is included at `vendor/marked.LICENSE.md`. The renderer does not use Marked's HTML output. It builds a fixed set of DOM elements from tokens, with no arbitrary attributes, HTML insertion, network requests or script execution from message content.
+Native IME behavior and visual acceptance on other DPI settings require testing on the target desktop.
