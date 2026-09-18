@@ -223,6 +223,18 @@ tools\verify-release.cmd -PackageType NoCompiler
 tools\package-portable.cmd -Version dev
 ```
 
+如果需要开箱即用、无需另外配置 MinGW 的 64 位版本，先准备仓库根目录下的
+`MinGW64\bin\g++.exe`、完整头文件和库，然后执行：
+
+```bat
+tools\verify-release.cmd -PackageType X64Compiler
+tools\package-portable.cmd -Version dev -PackageType X64Compiler -SelfExtracting
+```
+
+带编译器的产物命名为 `DevCPlusAi-<版本>-windows-x64-gcc.zip` 和
+`DevCPlusAi-<版本>-windows-x64-gcc-self-extracting.exe`。首次启动时会自动扫描
+程序目录下的 `MinGW64`，无需手动填写编译器路径。
+
 如果构建机已安装带 `7z.sfx` 的 7-Zip，也可以同时生成单文件自解压免安装版：
 
 ```bat

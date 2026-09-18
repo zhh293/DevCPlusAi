@@ -260,6 +260,16 @@ foreach ($directory in $requiredDirectories) {
 
 if ($PackageType -eq 'X64Compiler') {
     Require-Directory 'MinGW64'
+    foreach ($compilerFile in @(
+        'MinGW64\bin\gcc.exe',
+        'MinGW64\bin\g++.exe',
+        'MinGW64\bin\gdb.exe',
+        'MinGW64\bin\mingw32-make.exe',
+        'MinGW64\licenses\gcc\COPYING',
+        'MinGW64\licenses\mingw-w64\COPYING'
+    )) {
+        Require-File $compilerFile
+    }
 }
 Warn-OptionalDirectory 'AStyle'
 Warn-OptionalDirectory 'ResEd'
