@@ -73,7 +73,8 @@ type
     // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
     // Returns False and sets LastError if no complete JSONL record was sent.
     function SendMessage(const Text: String): Boolean;
-    function SendPermissionResponse(const RequestId, InputJSON: String; Allow: Boolean): Boolean;
+    function SendPermissionResponse(const RequestId, InputJSON: String;
+      Allow: Boolean; const DenyMessage: String = ''): Boolean;
 
     // Send a user message whose content may contain local image resources.
     // Non-image attachments are sent as path references so Claude can read
@@ -100,11 +101,39 @@ type
 //   - injects the provider API key environment variables
 // Returns a freshly allocated block; caller must FreeMem it after use.
 function BuildEnvironmentBlock(const WorkDir: String): PChar;
+function BuildAgentSystemPrompt(const CompilerName,
+  AdditionalInstructions: String): String;
 
 implementation
 
 uses
   Utils, devCFG, AgentPipeIO, AgentConfig;
+
+function BuildAgentSystemPrompt(const CompilerName,
+  AdditionalInstructions: String): String;
+begin
+  Result :=
+    'You are Claude Code running inside the Dev-C++ IDE. The process working ' +
+    'directory is the active project workspace. Prefer paths relative to this ' +
+    'workspace and inspect relevant files before changing them. The IDE may ' +
+    'attach the active editor buffer, including unsaved edits; treat that ' +
+    'snapshot as newer than the file on disk and do not overwrite unsaved IDE ' +
+    'content based on stale disk data. Use the compiler available first on ' +
+    'PATH when building so your checks match the IDE toolchain. Preserve each ' +
+    'source file''s existing encoding and line endings when editing; do not ' +
+    're-encode unrelated content. Keep existing Chinese text readable and ' +
+    'never introduce mojibake or garbled comments. Reply in the user''s language. ' +
+    'For code examples requested as a complete program, include the required ' +
+    'headers and entry point, and make the result buildable with the active ' +
+    'Dev-C++ compiler. Explain which files you change and report the exact ' +
+    'build or test result.';
+  if CompilerName <> '' then
+    Result := Result + #13#10 +
+      'The active Dev-C++ compiler set is: ' + CompilerName + '.';
+  if Trim(AdditionalInstructions) <> '' then
+    Result := Result + #13#10#13#10 +
+      'Additional user instructions:' + #13#10 + AdditionalInstructions;
+end;
 
 type
   TCreateJobObjectFunc = function(lpJobAttributes: Pointer;
@@ -842,25 +871,15 @@ begin
   if Assigned(CompilerSet) then
     CompilerName := CompilerSet.Name;
   SystemPromptText :=
-    'You are Claude Code running inside the Dev-C++ IDE. The process working ' +
-    'directory is the active project workspace. Prefer paths relative to this ' +
-    'workspace and inspect relevant files before changing them. The IDE may ' +
-    'attach the active editor buffer, including unsaved edits; treat that ' +
-    'snapshot as newer than the file on disk and do not overwrite unsaved IDE ' +
-    'content based on stale disk data. Use the compiler available first on ' +
-    'PATH when building so your checks match the IDE toolchain. Explain which ' +
-    'files you change and report the exact build or test result.';
-  if CompilerName <> '' then
-    SystemPromptText := SystemPromptText + #13#10 +
-      'The active Dev-C++ compiler set is: ' + CompilerName + '.';
+    BuildAgentSystemPrompt(CompilerName, '');
   if Assigned(devAgentConfig) then begin
     McpArg := BuildPathOption('--mcp-config', devAgentConfig.McpConfigFiles,
       WorkDir, False);
     PluginArg := BuildPathOption('--plugin-dir', devAgentConfig.PluginDirs,
       WorkDir, True);
     if Trim(devAgentConfig.SystemPrompt) <> '' then
-      SystemPromptText := SystemPromptText + #13#10#13#10 +
-        'Additional user instructions:' + #13#10 + devAgentConfig.SystemPrompt;
+      SystemPromptText := BuildAgentSystemPrompt(CompilerName,
+        devAgentConfig.SystemPrompt);
   end;
   if not CreateSystemPromptFile(SystemPromptText) then begin
     fLastError := 'Could not create the temporary system prompt file.';
@@ -1000,10 +1019,10 @@ begin
 end;
 
 function TAgentProcess.SendPermissionResponse(const RequestId, InputJSON: String;
-  Allow: Boolean): Boolean;
+  Allow: Boolean; const DenyMessage: String): Boolean;
 var
   Data, Decision: AnsiString;
-  PipeError: String;
+  PipeError, MessageText: String;
 begin
   Result := False;
   if not IsRunning or (fInputWrite = 0) or (RequestId = '') then Exit;
@@ -1011,7 +1030,13 @@ begin
     Decision := '{"behavior":"allow"';
     if InputJSON <> '' then Decision := Decision + ',"updatedInput":' + InputJSON;
     Decision := Decision + '}';
-  end else Decision := '{"behavior":"deny","message":"The user denied this tool operation."}';
+  end else begin
+    MessageText := DenyMessage;
+    if MessageText = '' then
+      MessageText := 'The user denied this tool operation.';
+    Decision := '{"behavior":"deny","message":' +
+      JsonQuoteUtf8(MessageText) + '}';
+  end;
   Data := '{"type":"control_response","response":{"subtype":"success","request_id":' +
     JsonQuoteUtf8(RequestId) + ',"response":' + Decision + '}}' + #10;
   Result := WriteAgentPipeData(fInputWrite, Data, PipeError);

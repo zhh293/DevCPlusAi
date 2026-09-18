@@ -97,7 +97,10 @@ begin
 end;
 
 procedure TAgentPanelFrame.WebDispatch(const Text: WideString);
-var J, Field: TlkJSONbase; Action: String; I: Integer;
+var J, Field: TlkJSONbase; Action, Packet, RequestId, CopyError, LinkUrl,
+    PermissionMode, PermissionModeError, PermissionModeReason: String;
+  CopySucceeded, ContextEnabled, PermissionModeSuccess: Boolean;
+  I: Integer; OpenResult: HINST;
   function Value(const Name: String): WideString;
   var V: TlkJSONbase;
   begin
@@ -117,7 +120,7 @@ begin
     if Action = 'draft' then begin
       memoInput.Text := String(Value('text')); fWebDraft := memoInput.Text;
     end else if Action = 'send' then begin
-      if fStatus in [asThinking, asExecuting] then begin
+      if IsAgentBusy then begin
         fWeb.PostJSON(WideString('{"version":1,"type":"rejected","requestId":' + WebQuote(Value('requestId')) + '}'));
         Exit;
       end;
@@ -130,36 +133,110 @@ begin
         fWeb.PostJSON(WideString('{"version":1,"type":"rejected","requestId":' + WebQuote(Value('requestId')) + '}'));
     end else if Action = 'stop' then btnStopClick(Self)
     else if Action = 'settings' then btnSettingsClick(Self)
+    else if Action = 'permission-mode' then begin
+      PermissionMode := String(Value('mode'));
+      PermissionModeError := '';
+      PermissionModeReason := '';
+      PermissionModeSuccess := False;
+      if SameText(PermissionMode, 'plan') then PermissionMode := 'plan'
+      else if SameText(PermissionMode, 'manual') then PermissionMode := 'manual'
+      else if SameText(PermissionMode, 'acceptEdits') then PermissionMode := 'acceptEdits'
+      else PermissionModeReason := 'unsupported';
+      if PermissionModeReason = '' then begin
+        if IsAgentBusy then
+          PermissionModeReason := 'busy'
+        else if not Assigned(fOnPermissionModeChange) then
+          PermissionModeReason := 'unavailable'
+        else begin
+          PermissionModeSuccess := fOnPermissionModeChange(Self,
+            PermissionMode, PermissionModeError);
+          if not PermissionModeSuccess then PermissionModeReason := 'failed';
+        end;
+      end;
+      Packet := '{"version":1,"type":"permission-mode-result","success":' +
+        LowerCase(BoolToStr(PermissionModeSuccess, True)) +
+        ',"mode":' + WebQuote(PermissionMode) +
+        ',"reason":' + WebQuote(PermissionModeReason);
+      if PermissionModeError <> '' then
+        Packet := Packet + ',"detail":' + WebQuote(PermissionModeError);
+      Packet := Packet + '}';
+      fWeb.PostJSON(WideString(Packet));
+    end
     else if Action = 'attach' then btnAttachClick(Self)
     else if Action = 'paste-image' then btnPasteImageClick(Self)
     else if Action = 'remove' then begin
       I := StrToIntDef(String(Value('index')), -1);
       if (I >= 0) and (I < fAttachments.Count) then RemoveAttachmentAt(I);
     end else if Action = 'new' then begin
-      if not (fStatus in [asThinking, asExecuting]) then NewSessionClick(Self);
+      if not IsAgentBusy then NewSessionClick(Self);
     end else if Action = 'session' then begin
-      if fStatus in [asThinking, asExecuting] then Exit;
+      if IsAgentBusy then Exit;
       I := fSessionKeys.IndexOf(String(Value('key')));
       if I >= 0 then begin fSessions.ItemIndex := I; SessionChange(Self); end;
     end else if (Action = 'rename-session') or (Action = 'delete-session') then begin
-      if fStatus in [asThinking, asExecuting] then Exit;
+      if IsAgentBusy then Exit;
       I := fSessionKeys.IndexOf(String(Value('key')));
       if (I >= 0) and Assigned(fOnSessionAction) then
         fOnSessionAction(Self, Action, fSessionKeys[I], Copy(Trim(String(Value('title'))), 1, 120));
     end else if Action = 'copy' then CopyAnswerClick(Self)
+    else if Action = 'copy-code-block' then begin
+      RequestId := String(Value('requestId'));
+      CopySucceeded := False;
+      CopyError := '';
+      try
+        Clipboard.AsText := String(Value('text'));
+        CopySucceeded := True;
+      except
+        on E: Exception do CopyError := E.Message;
+      end;
+      Packet := '{"version":1,"type":"code-copy-result","requestId":' +
+        WebQuote(RequestId) + ',"success":' +
+        LowerCase(BoolToStr(CopySucceeded, True));
+      if CopyError <> '' then Packet := Packet + ',"error":' + WebQuote(CopyError);
+      Packet := Packet + '}';
+      fWeb.PostJSON(WideString(Packet));
+    end
     else if Action = 'open-code' then OpenCodeClick(Self)
     else if Action = 'open-code-block' then begin
       fWebCode := String(Value('text'));
       try OpenCodeClick(Self); finally fWebCode := ''; end;
     end
+    else if Action = 'open-link' then begin
+      LinkUrl := String(Value('url'));
+      if not AgentIsSafeExternalUrl(LinkUrl) then Exit;
+      OpenResult := ShellExecute(Application.Handle, 'open', PChar(LinkUrl), nil, nil, SW_SHOWNORMAL);
+      if Integer(OpenResult) <= 32 then
+        AppendSystemMessage('[Error] Could not open the external link in the default browser.');
+    end
+    else if Action = 'insert-code-block' then begin
+      if not IsAgentBusy and Assigned(fOnInsertCode) then
+        fOnInsertCode(Self, String(Value('text')));
+    end
+    else if Action = 'open-file' then
+      OpenChangedFile(String(Value('path')))
+    else if Action = 'undo-file-change' then
+      UndoFileChange(String(Value('undoToken')))
     else if Action = 'context' then PrepareContextClick(Self)
+    else if Action = 'context-enabled' then begin
+      if not IsAgentBusy then begin
+        ContextEnabled := SameText(String(Value('enabled')), 'true');
+        if ContextEnabled <> fContextEnabled then begin
+          fContextEnabled := ContextEnabled;
+          if Assigned(devAgentConfig) then begin
+            devAgentConfig.AttachIdeContext := fContextEnabled;
+            devAgentConfig.SaveSettings;
+          end;
+        end;
+      end;
+    end
     else if Action = 'clear' then begin
-      if not (fStatus in [asThinking, asExecuting]) then ClearChatClick(Self);
+      if not IsAgentBusy then ClearChatClick(Self);
     end else if Action = 'permission' then begin
       if not ResolvePermission(String(Value('requestId')), String(Value('decision')),
-        String(Value('answers'))) then
-        fWeb.PostJSON(WideString('{"version":1,"type":"permission-error","message":' +
-          WebQuote('This request expired or the answers are incomplete. Review the form and try again.') + '}'));
+        String(Value('answers')), String(Value('reason'))) then
+        fWeb.PostJSON(WideString('{"version":1,"type":"permission-error","requestId":' +
+          WebQuote(String(Value('requestId'))) + ',"message":' +
+          WebQuote('此请求已失效或提交失败，请检查回答后重试。') + '}'));
     end else if Action = 'logs' then fDetails.Checked := not fDetails.Checked
     else if Action = 'quick' then begin
       I := StrToIntDef(String(Value('index')), -1);
@@ -176,7 +253,8 @@ begin
 end;
 
 procedure TAgentPanelFrame.WebSync;
-var I: Integer; Packet, Sessions, Attachments, Theme, Busy, Permission: String;
+var I: Integer; Packet, Sessions, Attachments, Theme, Busy, Permission,
+    FontName, FontSize: String;
 begin
   if fWebGeneration <> fTimeline.Generation then begin
     fWeb.PostJSON('{"version":1,"type":"reset"}');
@@ -202,18 +280,26 @@ begin
   Attachments := '[';
   for I := 0 to fAttachments.Count - 1 do begin
     if I > 0 then Attachments := Attachments + ',';
-    Attachments := Attachments + WebQuote(ExtractFileName(fAttachments[I]));
+    Attachments := Attachments + '{"name":' +
+      WebQuote(ExtractFileName(fAttachments[I])) + ',"path":' +
+      WebQuote(fAttachments[I]) + '}';
   end;
   Attachments := Attachments + ']';
   Theme := 'light'; if AgentUiIsDark(reChat.Color) then Theme := 'dark';
-  Busy := 'false'; if fStatus in [asThinking, asExecuting] then Busy := 'true';
+  Busy := 'false'; if IsAgentBusy then Busy := 'true';
   Permission := 'manual';
   if Assigned(devAgentConfig) then Permission := devAgentConfig.PermissionMode;
+  FontName := reChat.Font.Name;
+  FontSize := IntToStr(reChat.Font.Size);
   Packet := '{"version":1,"type":"state","busy":' + Busy +
+    ',"contextEnabled":' + LowerCase(BoolToStr(fContextEnabled, True)) +
     ',"status":' + WebQuote(StatusBar.Panels[0].Text) + ',"model":' + WebQuote(fModelName) +
     ',"theme":' + WebQuote(Theme) + ',"sessions":' + Sessions +
     ',"selected":' + WebQuote(SelectedSession) + ',"attachments":' + Attachments +
     ',"permission":' + WebQuote(Permission) +
+    ',"contextSummary":' + WebQuote(fContextSummary) +
+    ',"contextPayload":' + WebQuote(fContextPreviewPayload) +
+    ',"fontName":' + WebQuote(FontName) + ',"fontSize":' + FontSize +
     ',"ctrlEnter":' + LowerCase(BoolToStr(fSendOnCtrlEnter, True)) + '}';
   if Packet <> fWebState then
     if fWeb.PostJSON(WideString(Packet)) then fWebState := Packet;

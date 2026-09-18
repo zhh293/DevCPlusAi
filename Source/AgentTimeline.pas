@@ -3,6 +3,8 @@ interface
 uses Windows, Messages, SysUtils, Classes, Controls, Forms, StdCtrls, ExtCtrls,
   Graphics, ComCtrls, IniFiles, AgentUITheme;
 type
+  TAgentOpenFile = procedure(Sender: TObject; const FileName: String) of object;
+
   TAgentTimeline = class(TScrollBox)
   private
     fBlocks: TList;
@@ -13,8 +15,10 @@ type
     fGeneration: Integer;
     fRevision: Integer;
     fClearing, fLayoutActive: Boolean;
+    fOnOpenFile: TAgentOpenFile;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
+    procedure OpenChangedFile(Sender: TObject);
     procedure LayoutBlocks;
     procedure RenderMarkdown(Edit: TRichEdit; const RawText: String);
     procedure ApplyBlockAppearance(Block: TControl; const FontName: String;
@@ -38,13 +42,20 @@ type
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
-    procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
+    procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean;
+      const ContextSummary: String = ''; const ContextPayload: String = '');
     procedure AddTool(const Id, Caption, Details: String;
       const Status: String = ''; IsResult: Boolean = False);
+    procedure AddFileChange(const State, FileName, DiffText, DiffSummary: String;
+      CanOpen: Boolean; const UndoToken: String = '';
+      CanUndo: Boolean = False);
+    procedure SetFileChangeUndoState(const UndoToken, State: String);
     procedure AddPermission(const Id, Caption, InputJSON, WorkDir: String);
-    procedure UpdatePermission(const Id, Status, Details: String);
+    procedure UpdatePermission(const Id, Status, Details: String;
+      const InputJSON: String = '');
     procedure ApplyAppearance(AEditorColor, ATextColor: TColor;
       const FontName: String; FontSize: Integer);
+    property OnOpenFile: TAgentOpenFile read fOnOpenFile write fOnOpenFile;
   end;
 implementation
 uses AgentWebProtocol;
@@ -54,6 +65,7 @@ type
   public
     RawText: String;
     IsUserMessage: Boolean;
+    ContextSummary, ContextPayload: String;
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
@@ -65,13 +77,21 @@ type
   protected
     procedure WndProc(var Message: TMessage); override;
   end;
+  TTimelineNativeButton = class(TButton)
+  protected
+    procedure WndProc(var Message: TMessage); override;
+  end;
   TTimelineTool = class(TPanel)
   public
     ToolId: String;
     InputText, OutputText, State: String;
+    IsFileChange, CanOpenFile: Boolean;
+    FilePath, FileState, DiffSummary, UndoToken, UndoState: String;
+    CanUndoFile: Boolean;
     PermissionRequestId, PermissionWorkDir: String;
     Header: TTimelineButton;
     Body: TMemo;
+    OpenButton: TButton;
   end;
 function ForwardWheel(Control: TControl; var Message: TMessage): Boolean;
 var ParentControl: TControl; Info: TScrollInfo; Delta: Integer; AtEdge: Boolean;
@@ -115,6 +135,10 @@ begin
   if not ForwardWheel(Self, Message) then inherited WndProc(Message);
 end;
 procedure TTimelineButton.WndProc(var Message: TMessage);
+begin
+  if not ForwardWheel(Self, Message) then inherited WndProc(Message);
+end;
+procedure TTimelineNativeButton.WndProc(var Message: TMessage);
 begin
   if not ForwardWheel(Self, Message) then inherited WndProc(Message);
 end;
@@ -217,11 +241,16 @@ begin Result := TControl(fBlocks[Index]); end;
 
 function TAgentTimeline.WebBlock(Index: Integer): String;
 var Block: TObject; Kind, Text, Name, InputText, OutputText, State,
-  RequestId, WorkDir: String; R: TTimelineRichEdit;
+  RequestId, WorkDir, FilePath, FileState, DiffSummary, ContextSummary,
+  ContextPayload, UndoToken, UndoState: String;
+  CanOpen, CanUndo: Boolean; R: TTimelineRichEdit;
 begin
   Block := TObject(fBlocks[Index]);
   Kind := 'system'; Text := ''; Name := '';
   InputText := ''; OutputText := ''; State := ''; RequestId := ''; WorkDir := '';
+  FilePath := ''; FileState := ''; DiffSummary := ''; ContextSummary := '';
+  ContextPayload := '';
+  UndoToken := ''; UndoState := ''; CanOpen := False; CanUndo := False;
   if Block is TTimelineTool then begin
     Kind := 'tool'; Name := TTimelineTool(Block).Header.Hint;
     Text := TTimelineTool(Block).Body.Text;
@@ -230,8 +259,20 @@ begin
     State := TTimelineTool(Block).State;
     RequestId := TTimelineTool(Block).PermissionRequestId;
     WorkDir := TTimelineTool(Block).PermissionWorkDir;
+    if TTimelineTool(Block).IsFileChange then begin
+      Kind := 'file-change';
+      FilePath := TTimelineTool(Block).FilePath;
+      FileState := TTimelineTool(Block).FileState;
+      DiffSummary := TTimelineTool(Block).DiffSummary;
+      CanOpen := TTimelineTool(Block).CanOpenFile;
+      UndoToken := TTimelineTool(Block).UndoToken;
+      UndoState := TTimelineTool(Block).UndoState;
+      CanUndo := TTimelineTool(Block).CanUndoFile;
+    end;
   end else if Block is TTimelineRichEdit then begin
     R := TTimelineRichEdit(Block); Text := R.Text;
+    ContextSummary := R.ContextSummary;
+    ContextPayload := R.ContextPayload;
     if R.IsUserMessage then Kind := 'user'
     else if R.RawText <> '' then begin Kind := 'assistant'; Text := R.RawText; end;
   end;
@@ -241,7 +282,16 @@ begin
     ',"name":' + WebQuote(Name) + ',"status":' + WebQuote(State) +
     ',"input":' + WebQuote(InputText) + ',"output":' + WebQuote(OutputText) +
     ',"requestId":' + WebQuote(RequestId) +
-    ',"workDir":' + WebQuote(WorkDir) + '}}';
+    ',"workDir":' + WebQuote(WorkDir) +
+    ',"path":' + WebQuote(FilePath) +
+    ',"fileState":' + WebQuote(FileState) +
+    ',"diffSummary":' + WebQuote(DiffSummary) +
+    ',"contextSummary":' + WebQuote(ContextSummary) +
+    ',"contextPayload":' + WebQuote(ContextPayload) +
+    ',"undoToken":' + WebQuote(UndoToken) +
+    ',"undoState":' + WebQuote(UndoState) +
+    ',"canUndo":' + LowerCase(BoolToStr(CanUndo, True)) +
+    ',"canOpen":' + LowerCase(BoolToStr(CanOpen, True)) + '}}';
 end;
 
 function TAgentTimeline.FocusedEdit: TCustomEdit;
@@ -256,18 +306,28 @@ begin
 end;
 
 procedure TAgentTimeline.SaveToFile(const Path: String);
-var Ini: TMemIniFile; I: Integer; Section: String; Block: TObject;
-    Lines: TStringList;
+var Ini: TMemIniFile; I, OldCount: Integer; Section: String; Block: TObject;
+    Lines: TStringList; Stream: TFileStream;
 begin
   Ini := TMemIniFile.Create(Path);
   try
+    OldCount := Ini.ReadInteger('timeline', 'count', 0);
+    for I := 0 to OldCount - 1 do
+      DeleteFile(Path + '.' + IntToStr(I) + '.context');
     Ini.Clear;
-    Ini.WriteInteger('timeline', 'version', 2);
+    Ini.WriteInteger('timeline', 'version', 5);
     Ini.WriteInteger('timeline', 'count', fBlocks.Count);
     for I := 0 to fBlocks.Count - 1 do begin
       Section := IntToStr(I);
       Block := TObject(fBlocks[I]);
-      if Block is TTimelineTool then begin
+      if (Block is TTimelineTool) and TTimelineTool(Block).IsFileChange then begin
+        Ini.WriteString(Section, 'kind', 'file-change');
+        Ini.WriteString(Section, 'state', TTimelineTool(Block).FileState);
+        Ini.WriteString(Section, 'file', TTimelineTool(Block).FilePath);
+        Ini.WriteString(Section, 'summary', TTimelineTool(Block).DiffSummary);
+        Ini.WriteBool(Section, 'canOpen', TTimelineTool(Block).CanOpenFile);
+        TTimelineTool(Block).Body.Lines.SaveToFile(Path + '.' + Section);
+      end else if Block is TTimelineTool then begin
         Ini.WriteString(Section, 'kind', 'tool');
         Ini.WriteString(Section, 'id', TTimelineTool(Block).ToolId);
         Ini.WriteString(Section, 'title', TTimelineTool(Block).Header.Hint);
@@ -286,6 +346,21 @@ begin
           Ini.WriteString(Section, 'role', 'user')
         else
           Ini.WriteString(Section, 'role', 'assistant');
+        if (Block is TTimelineRichEdit) and
+           (TTimelineRichEdit(Block).ContextSummary <> '') then
+          Ini.WriteString(Section, 'contextSummary',
+            TTimelineRichEdit(Block).ContextSummary);
+        if (Block is TTimelineRichEdit) and
+           (TTimelineRichEdit(Block).ContextPayload <> '') then begin
+          Ini.WriteBool(Section, 'hasContextPayload', True);
+          Stream := TFileStream.Create(Path + '.' + Section + '.context', fmCreate);
+          try
+            Stream.WriteBuffer(PChar(TTimelineRichEdit(Block).ContextPayload)^,
+              Length(TTimelineRichEdit(Block).ContextPayload));
+          finally
+            Stream.Free;
+          end;
+        end;
         if (Block is TTimelineRichEdit) and (TTimelineRichEdit(Block).RawText <> '') then begin
           Ini.WriteString(Section, 'markdown', '1');
           Lines := TStringList.Create;
@@ -308,7 +383,8 @@ begin
 end;
 
 procedure TAgentTimeline.LoadFromFile(const Path: String);
-var Ini: TMemIniFile; Lines: TStringList; I: Integer; Section: String;
+var Ini: TMemIniFile; Lines: TStringList; I, Size: Integer; Section: String;
+    ContextPayload: String; Stream: TFileStream;
 begin
   Clear;
   Ini := TMemIniFile.Create(Path);
@@ -318,7 +394,27 @@ begin
       Section := IntToStr(I);
       Lines.Clear;
       if FileExists(Path + '.' + Section) then Lines.LoadFromFile(Path + '.' + Section);
-      if Ini.ReadString(Section, 'kind', '') = 'tool' then begin
+      ContextPayload := '';
+      if Ini.ReadBool(Section, 'hasContextPayload', False) and
+         FileExists(Path + '.' + Section + '.context') then begin
+        Stream := TFileStream.Create(Path + '.' + Section + '.context',
+          fmOpenRead or fmShareDenyNone);
+        try
+          if (Stream.Size > 0) and (Stream.Size <= 1048576) then begin
+            Size := Integer(Stream.Size);
+            SetLength(ContextPayload, Size);
+            Stream.ReadBuffer(PChar(ContextPayload)^, Size);
+          end;
+        finally
+          Stream.Free;
+        end;
+      end;
+      if Ini.ReadString(Section, 'kind', '') = 'file-change' then begin
+        AddFileChange(Ini.ReadString(Section, 'state', 'Modified'),
+          Ini.ReadString(Section, 'file', ''), Lines.Text,
+          Ini.ReadString(Section, 'summary', ''),
+          Ini.ReadBool(Section, 'canOpen', False));
+      end else if Ini.ReadString(Section, 'kind', '') = 'tool' then begin
         AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text,
           Ini.ReadString(Section, 'status', ''));
         if SameText(TTimelineTool(fBlocks[fBlocks.Count - 1]).State, 'approval') then
@@ -335,7 +431,8 @@ begin
       else if SameText(Ini.ReadString(Section, 'markdown', ''), '1') then
         AppendMarkdown(Lines.Text, Font.Color)
       else if SameText(Ini.ReadString(Section, 'role', ''), 'user') then
-        AppendMessage(Lines.Text, Font.Color, True)
+        AppendMessage(Lines.Text, Font.Color, True,
+          Ini.ReadString(Section, 'contextSummary', ''), ContextPayload)
       else AppendText(Lines.Text, Font.Color, False);
     end;
   finally
@@ -701,13 +798,15 @@ begin
 end;
 
 procedure TAgentTimeline.AppendMessage(const Text: String; TextColor: TColor;
-  IsUser: Boolean);
+  IsUser: Boolean; const ContextSummary, ContextPayload: String);
 var R: TTimelineRichEdit; Lines: Integer;
 begin
   fLastText := NewTextBlock;
   fLastIsMarkdown := False;
   R := TTimelineRichEdit(fLastText);
   R.IsUserMessage := IsUser;
+  R.ContextSummary := ContextSummary;
+  R.ContextPayload := ContextPayload;
   R.Font.Color := TextColor;
   R.Color := Color;
   if IsUser then begin
@@ -829,6 +928,18 @@ begin
   end;
   LayoutBlocks;
 end;
+
+procedure TAgentTimeline.OpenChangedFile(Sender: TObject);
+var Control: TControl; Block: TTimelineTool;
+begin
+  if not (Sender is TControl) then Exit;
+  Control := TControl(Sender).Parent;
+  if (Control = nil) or not (Control.Parent is TTimelineTool) then Exit;
+  Block := TTimelineTool(Control.Parent);
+  if Block.CanOpenFile and Assigned(fOnOpenFile) then
+    fOnOpenFile(Self, Block.FilePath);
+end;
+
 procedure TAgentTimeline.AddTool(const Id, Caption, Details: String;
   const Status: String; IsResult: Boolean);
 var I: Integer; Block: TTimelineTool; OldText: String;
@@ -846,6 +957,9 @@ begin
     Block.Parent := Self;
     Block.OnMouseWheel := TimelineMouseWheel;
     Block.ToolId := Id;
+    Block.IsFileChange := False;
+    Block.CanOpenFile := False;
+    Block.OpenButton := nil;
     Block.BevelOuter := bvNone;
     Block.Height := 32;
     Block.Header := TTimelineButton.Create(Block);
@@ -897,11 +1011,65 @@ begin
   LayoutBlocks;
 end;
 
+procedure TAgentTimeline.AddFileChange(const State, FileName, DiffText,
+  DiffSummary: String; CanOpen: Boolean; const UndoToken: String;
+  CanUndo: Boolean);
+var Block: TTimelineTool; Caption: String; Id: String;
+begin
+  Id := 'file-change-' + IntToStr(fGeneration) + '-' + IntToStr(fBlocks.Count);
+  Caption := '[' + State + '] ' + FileName;
+  AddTool(Id, Caption, DiffText, State, False);
+  Block := TTimelineTool(fBlocks[fBlocks.Count - 1]);
+  Block.IsFileChange := True;
+  Block.CanOpenFile := CanOpen;
+  Block.FilePath := FileName;
+  Block.FileState := State;
+  Block.DiffSummary := DiffSummary;
+  Block.UndoToken := UndoToken;
+  Block.UndoState := '';
+  Block.CanUndoFile := CanUndo and (UndoToken <> '');
+  if Block.OpenButton = nil then begin
+    Block.OpenButton := TTimelineNativeButton.Create(Block);
+    Block.OpenButton.Parent := Block.Header;
+    TTimelineNativeButton(Block.OpenButton).OnMouseWheel := TimelineMouseWheel;
+    Block.OpenButton.SetBounds(Block.Header.ClientWidth - 84, 3, 80, 25);
+    Block.OpenButton.Anchors := [akTop, akRight];
+    Block.OpenButton.Caption := 'Open file';
+    Block.OpenButton.Enabled := CanOpen;
+    Block.OpenButton.OnClick := OpenChangedFile;
+  end else
+    Block.OpenButton.Enabled := CanOpen;
+  Block.Header.Hint := Caption;
+  if Block.Body.Visible then Block.Header.Caption := 'v  ' + Caption
+  else Block.Header.Caption := '>  ' + Caption;
+  LayoutBlocks;
+end;
+
+procedure TAgentTimeline.SetFileChangeUndoState(const UndoToken,
+  State: String);
+var I: Integer; Block: TTimelineTool;
+begin
+  if UndoToken = '' then Exit;
+  for I := 0 to fBlocks.Count - 1 do
+    if TObject(fBlocks[I]) is TTimelineTool then begin
+      Block := TTimelineTool(fBlocks[I]);
+      if Block.IsFileChange and (Block.UndoToken = UndoToken) then begin
+        Block.UndoState := State;
+        Block.CanUndoFile := False;
+        Inc(fRevision);
+        Exit;
+      end;
+    end;
+end;
+
 procedure TAgentTimeline.AddPermission(const Id, Caption, InputJSON,
   WorkDir: String);
 var I: Integer; Block: TTimelineTool;
 begin
-  AddTool('permission-' + Id, Caption, InputJSON, 'approval', False);
+  // Keep permission payloads as UTF-8 for the CLI, but store a local-codepage
+  // copy in the timeline because it is only used for display/history.
+  AddTool('permission-' + Id, Caption, String(UTF8Decode(InputJSON)),
+    'approval', False);
   for I := 0 to fBlocks.Count - 1 do
     if TObject(fBlocks[I]) is TTimelineTool then
       if TTimelineTool(fBlocks[I]).ToolId = 'permission-' + Id then begin
@@ -913,7 +1081,8 @@ begin
       end;
 end;
 
-procedure TAgentTimeline.UpdatePermission(const Id, Status, Details: String);
+procedure TAgentTimeline.UpdatePermission(const Id, Status, Details: String;
+  const InputJSON: String);
 var I: Integer; Block: TTimelineTool;
 begin
   for I := 0 to fBlocks.Count - 1 do
@@ -921,6 +1090,8 @@ begin
       if TTimelineTool(fBlocks[I]).PermissionRequestId = Id then begin
         Block := TTimelineTool(fBlocks[I]);
         Block.State := Status;
+        if InputJSON <> '' then
+          Block.InputText := String(UTF8Decode(InputJSON));
         Block.OutputText := Details;
         if Details <> '' then begin
           if Block.InputText <> '' then

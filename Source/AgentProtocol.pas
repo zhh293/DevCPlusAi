@@ -134,6 +134,13 @@ begin
     Result := TlkJSON.GenerateText(Node);
 end;
 
+function GetDisplayJSONText(Node: TlkJSONbase): String;
+begin
+  Result := GetJSONText(Node);
+  if Result <> '' then
+    Result := String(UTF8Decode(Result));
+end;
+
 function GetNodeText(Node: TlkJSONbase): String;
 begin
   Result := '';
@@ -142,11 +149,11 @@ begin
   if Node is TlkJSONobject then begin
     Result := GetStr(Node, 'text');
     if Result = '' then
-      Result := GetStr(Node, 'content');
+    Result := GetStr(Node, 'content');
     if Result = '' then
-      Result := GetJSONText(Node);
+      Result := GetDisplayJSONText(Node);
   end else if Node is TlkJSONlist then
-    Result := GetJSONText(Node)
+    Result := GetDisplayJSONText(Node)
   else
     Result := VarToStr(Node.Value);
 end;
@@ -200,7 +207,7 @@ begin
   if Result = '' then
     Result := GetStr(Node, 'message');
   if Result = '' then
-    Result := GetJSONText(Node);
+    Result := GetDisplayJSONText(Node);
 end;
 
 function ReadBoolean(Node: TlkJSONbase; const Name: String): Boolean;
@@ -473,7 +480,7 @@ begin
       AppendEvent(Events, Event);
     end else begin
       Event.EventType := aetUnknown;
-      Event.Content := GetJSONText(Block);
+      Event.Content := GetDisplayJSONText(Block);
       AppendEvent(Events, Event);
     end;
   end;
@@ -741,7 +748,7 @@ begin
 
   Event := Base;
   Event.Summary := 'Unknown stream event: ' + NestedType;
-  Event.Content := GetJSONText(Nested);
+  Event.Content := GetDisplayJSONText(Nested);
   AppendEvent(Events, Event);
 end;
 
@@ -819,7 +826,7 @@ begin
   if Event.Content = '' then
     Event.Content := GetStr(Node, 'message');
   if Event.Content = '' then
-    Event.Content := GetJSONText(Node);
+    Event.Content := GetDisplayJSONText(Node);
   AppendEvent(Events, Event);
 end;
 
@@ -899,7 +906,7 @@ begin
 
     if (JS = nil) or not (JS is TlkJSONobject) then begin
       InitEvent(Event, Line);
-      Event.Content := Line;
+      Event.Content := String(UTF8Decode(Line));
       AppendEvent(Events, Event);
       Result := Length(Events);
       Exit;

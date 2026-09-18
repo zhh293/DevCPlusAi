@@ -34,6 +34,8 @@ begin
         Continue;
       end;
       if Line <> '' then begin
+        Data.Text := Line;
+        Data.SaveToFile('fixture-last-message.txt');
         Writeln('{"type":"assistant","session_id":"' + Id + '","message":{"id":"msg-' + Id + '","content":[{"type":"text","text":"Reply for ' + Id + '"}]}}');
         Writeln('{"type":"result","subtype":"success","session_id":"' + Id + '","result":"Reply for ' + Id + '","is_error":false}');
         Flush(Output);

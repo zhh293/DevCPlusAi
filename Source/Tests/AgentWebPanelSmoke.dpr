@@ -5,10 +5,22 @@ uses Windows, SysUtils, Classes, Controls, Forms, Graphics,
 type
   TProbe = class
     SettingsCount: Integer;
+    ModeChangeCount: Integer;
+    LastPermissionMode: String;
     procedure Settings(Sender: TObject);
+    function ChangePermissionMode(Sender: TObject; const Mode: String;
+      out ErrorText: String): Boolean;
   end;
 procedure TProbe.Settings(Sender: TObject);
 begin Inc(SettingsCount); end;
+function TProbe.ChangePermissionMode(Sender: TObject; const Mode: String;
+  out ErrorText: String): Boolean;
+begin
+  Inc(ModeChangeCount);
+  LastPermissionMode := Mode;
+  ErrorText := '';
+  Result := True;
+end;
 procedure Pump(Milliseconds: DWORD);
 var Started: DWORD;
 begin
@@ -27,6 +39,7 @@ begin
       Panel := TAgentPanelFrame.Create(Host);
       Panel.Parent := Host; Panel.Align := alClient;
       Panel.OnSettings := Probe.Settings;
+      Panel.OnPermissionModeChange := Probe.ChangePermissionMode;
       Started := GetTickCount;
       repeat
         Pump(20);
@@ -55,6 +68,20 @@ begin
       Panel.WebView.OnMessage(Panel.WebView, '{"version":1,"action":"settings"}');
       Pump(250);
       if Probe.SettingsCount <> 1 then raise Exception.Create('Settings bridge not dispatched');
+      Panel.WebView.OnMessage(Panel.WebView, '{"version":1,"action":"permission-mode","mode":"plan"}');
+      Pump(100);
+      if (Probe.ModeChangeCount <> 1) or (Probe.LastPermissionMode <> 'plan') then
+        raise Exception.Create('Permission mode bridge was not dispatched');
+      Panel.WebView.OnMessage(Panel.WebView, '{"version":1,"action":"permission-mode","mode":"bypassPermissions"}');
+      Pump(100);
+      if Probe.ModeChangeCount <> 1 then
+        raise Exception.Create('Unsupported permission mode reached the host');
+      Panel.SetStatus(asThinking);
+      Panel.WebView.OnMessage(Panel.WebView, '{"version":1,"action":"permission-mode","mode":"manual"}');
+      Pump(100);
+      if Probe.ModeChangeCount <> 1 then
+        raise Exception.Create('Permission mode changed during an active turn');
+      Panel.SetStatus(asReady);
       if Panel.memoInput.Text <> String(WideChar($4F60) + WideString(WideChar($597D))) then
         raise Exception.Create('Unicode draft bridge failed');
       Panel.WebView.OnMessage(Panel.WebView, '{"version":99,"action":"settings"}');
@@ -74,6 +101,6 @@ begin
       if Panel.Timeline.BlockCount <> 0 then raise Exception.Create('Clear failed');
       Panel.Free; Pump(200);
     finally Probe.Free; Host.Free; end;
-    Writeln('PASS: real AgentPanel WebView startup, messages, tools, Unicode draft, settings dispatch, protocol validation, resize, clear, teardown');
+    Writeln('PASS: real AgentPanel WebView startup, messages, tools, Unicode draft, settings and permission-mode dispatch, protocol validation, resize, clear, teardown');
   except on E: Exception do begin Writeln(E.Message); Halt(1); end; end;
 end.

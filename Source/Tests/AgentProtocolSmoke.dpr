@@ -4,7 +4,8 @@ program AgentProtocolSmoke;
 
 uses
   SysUtils,
-  AgentProtocol;
+  AgentProtocol,
+  AgentWebLinks;
 
 procedure Require(Condition: Boolean; const Message: String);
 begin
@@ -15,7 +16,27 @@ end;
 var
   Events: TAgentEventArray;
   Count: Integer;
+  ChineseWide: WideString;
+  ChineseUTF8, ChineseText: String;
 begin
+  Require(AgentIsSafeExternalUrl('https://en.cppreference.com/w/cpp/vector'),
+    'HTTPS documentation link should be accepted');
+  Require(AgentIsSafeExternalUrl('http://example.com/guide'),
+    'HTTP documentation link should be accepted');
+  Require(not AgentIsSafeExternalUrl('javascript:alert(1)'),
+    'JavaScript URL must be blocked');
+  Require(not AgentIsSafeExternalUrl('file:///C:/Windows/win.ini'),
+    'local file URL must be blocked');
+  Require(not AgentIsSafeExternalUrl('https:///missing-host'),
+    'web URL without a host must be blocked');
+  Require(not AgentIsSafeExternalUrl('https://user:pass@example.com/'),
+    'credential-bearing URL must be blocked');
+  Require(not AgentIsSafeExternalUrl('https://example.com' + #10 + 'evil'),
+    'control characters must be blocked');
+
+  ChineseWide := UTF8Decode(#$E4#$BD#$A0#$E5#$A5#$BD);
+  ChineseUTF8 := UTF8Encode(ChineseWide);
+  ChineseText := String(ChineseWide);
   Count := ParseLineEvents('{"type":"control_request","request_id":"approve-1","request":{"subtype":"can_use_tool","tool_name":"Bash","tool_use_id":"tool-1","input":{"command":"echo test"}}}', Events);
   Require((Count = 1) and (Events[0].EventType = aetPermission), 'approval not recognized');
   Require(Events[0].EventId = 'approve-1', 'approval request id lost');
@@ -93,6 +114,13 @@ begin
     '"content":"failed"}]}}', Events);
   Require(Count = 2, 'multiple tool results');
   Require(Events[1].IsError, 'tool result error marker');
+
+  Count := ParseLineEvents(
+    '{"type":"user","message":{"content":[{"type":"tool_result",' +
+    '"tool_use_id":"tool-c","is_error":true,"content":{"diagnostic":"' +
+    ChineseUTF8 + '"}}]}}', Events);
+  Require((Count = 1) and (Pos(ChineseText, Events[0].Content) > 0),
+    'UTF-8 structured tool error was not decoded for display');
 
   Writeln('AgentProtocol smoke test: system event');
   Count := ParseLineEvents(

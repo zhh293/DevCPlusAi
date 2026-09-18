@@ -63,7 +63,7 @@ var
   SavedModel, SavedKey, SavedBaseUrl: String;
   SavedCompilerSets: TdevCompilerSets;
   TestCompiler: TdevCompilerSet;
-  TestCompilerRoot, TestCompilerBin, SearchPath: String;
+  TestCompilerRoot, TestCompilerBin, SearchPath, Prompt: String;
   TempPath: array[0..MAX_PATH] of Char;
   TestCompilerEnvironment: PChar;
 begin
@@ -83,6 +83,19 @@ begin
       '1M context marker missing');
     Require(AgentCliModel('anthropic', 'sonnet') = 'sonnet',
       'another provider model was changed');
+    Prompt := BuildAgentSystemPrompt('MinGW GCC 12.2', 'Keep answers concise.');
+    Require(Pos('Preserve each source file''s existing encoding', Prompt) > 0,
+      'IDE prompt does not preserve source encoding');
+    Require(Pos('never introduce mojibake', Prompt) > 0,
+      'IDE prompt does not guard against corrupted text');
+    Require(Pos('Reply in the user''s language', Prompt) > 0,
+      'IDE prompt does not follow the user language');
+    Require(Pos('make the result buildable with the active Dev-C++ compiler', Prompt) > 0,
+      'IDE prompt does not require buildable complete examples');
+    Require(Pos('MinGW GCC 12.2', Prompt) > 0,
+      'IDE prompt omitted the active compiler set');
+    Require(Pos('Keep answers concise.', Prompt) > 0,
+      'IDE prompt omitted additional user instructions');
     Require(NormalizeAgentBaseUrl('deepseek', 'https://api.deepseek.com/v1/') =
       'https://api.deepseek.com/anthropic', 'OpenAI URL was not normalized');
     Require(NormalizeAgentBaseUrl('deepseek', 'https://gateway.example/anthropic') =
@@ -96,6 +109,8 @@ begin
     devAgentConfig := TdevAgentConfig(TdevAgentConfig.NewInstance);
     try
       devAgentConfig.SettoDefaults;
+      Require(devAgentConfig.AttachIdeContext,
+        'IDE context attachment should default to enabled for existing installs');
       devAgentConfig.Provider := 'deepseek';
       devAgentConfig.ApiKey := 'test-placeholder-token';
       devAgentConfig.BaseUrl := 'https://api.deepseek.com/v1';
