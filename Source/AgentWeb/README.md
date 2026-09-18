@@ -23,6 +23,8 @@ Selecting text in an assistant response reveals “追问这段”. It adds a qu
 
 The native manual-approval window shows a color-coded unified diff for `Write` and `Edit` requests, including the current file, proposed result, and added/removed line counts. It only reads existing targets inside the active working directory, and caps the file at 2 MB and the line comparison at four million cells. Outside-workspace targets are never opened automatically. If the file cannot be decoded or the change is too large to compare responsively, the dialog explains why and falls back to the complete request details. The in-chat undo action is disabled while any assistant request or approval is active; the host checks the same condition before restoring a file.
 
+When a conversation contains file edits, the header shows a unique-file count. Its review list groups repeated edits by path, summarizes available diff counts, and expands and scrolls to the latest matching timeline card. Clearing or switching conversations resets this overview; each card remains the source of truth for its own diff, open-file action and guarded undo.
+
 ## Protocol
 
 All packets contain `version: 1`. Host packets use `PostWebMessageAsJson`; browser packets are JSON strings.

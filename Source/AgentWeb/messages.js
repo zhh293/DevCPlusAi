@@ -468,7 +468,15 @@
         ? 'AI 正在处理本轮任务，请等完成后再撤销。'
         : '仅当文件仍保持本轮 AI 写入的内容时才会恢复';
     }
-    reset() { this.pending.clear(); this.items.clear(); this.root.replaceChildren(); this.follow = true; this.jump.hidden = true; }
+    reset() { this.pending.clear(); this.items.clear(); this.root.replaceChildren(); this.follow = true; this.jump.hidden = true; this.publishFileChanges(); }
+    publishFileChanges() {
+      const changes=[];
+      for(const [id,entry] of this.items) {
+        const item=entry.item;
+        if(entry.kind==='file-change'&&item&&item.path)changes.push({id,path:String(item.path),fileState:String(item.fileState||''),diffSummary:String(item.diffSummary||''),undoState:String(item.undoState||'')});
+      }
+      document.dispatchEvent(new CustomEvent('agent-file-changes',{detail:changes}));
+    }
     positionJump() {
       const readerRect=this.reader.getBoundingClientRect(), footer=document.querySelector('footer');
       const footerTop=footer?footer.getBoundingClientRect().top:window.innerHeight;
@@ -520,6 +528,8 @@
         }
         delete button.dataset.undoPending;
         this.syncUndoButton(button);
+        if(entry.item)entry.item.undoState=message.success?'restored':message.stale?'stale':entry.item.undoState||'';
+        this.publishFileChanges();
         break;
       }
     }
@@ -555,6 +565,7 @@
           }
           this.root.append(node); this.items.set(id,entry);
         }
+        entry.item={...item};
         if (entry.title && item.kind==='file-change') {
           const labels={Added:'新增',Modified:'修改',Renamed:'重命名',Deleted:'删除','Written/edited':'已写入/编辑'};
           const title=el('span',(labels[item.fileState]||item.fileState||'文件变化')+' · '+(item.path||'未知文件'));
@@ -694,6 +705,7 @@
       if (this.follow) reader.scrollTop = reader.scrollHeight;
       else if (anchor && anchor.isConnected) reader.scrollTop = top + anchor.getBoundingClientRect().top-offset;
       this.positionJump();
+      this.publishFileChanges();
     }
   }
   window.AgentMessages = {markdown, MessageView, formatContextSummary};

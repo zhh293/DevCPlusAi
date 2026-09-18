@@ -300,3 +300,4 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 基础对话通路和 IDE 联动已经接入：编译错误上下文、已打开文件刷新、项目切换重启、CLI 权限模式、编辑器选中代码快捷提问、项目级 session 恢复、进程自动重启与 60 秒首响应超时、文件/图片附件、追加系统提示词、MCP 配置和 Plugin 目录参数均已接入。Skill 不使用不存在的 `--skill-dir` 参数，Claude CLI 会按当前项目工作目录自动发现 `.claude\skills` 和插件内 Skill。本地 Windows + Delphi 7 全量编译及协议、Reader 管道分片/UTF-8/1000 行、输入管道完整写入/断管失败、CLI 参数、ConsolePauser 冒烟测试已通过；三种 NSIS 脚本的 Agent runtime 安装/卸载约束已纳入静态发布校验。新增的 `AgentUISmoke` 会实际加载 AI 面板和设置窗体，并检查三种宽度下的按钮布局及 Send/Stop 状态；原有 `btnAttach.Align` 故障已验证会使测试以非零状态退出。仍需完成真实 API 对话和完整安装包 GUI 验收。GitHub Actions 在缺少 `dcc32.exe` 时会直接失败，不再生成占位 exe。
 
 普通权限模式通过 CLI 的 stdio 审批通道弹出工具审批窗口，显示工具、工作目录与完整参数。Allow once 只允许本次，Deny 或关闭窗口拒绝；不会自动修改权限模式。AI 文件改动会在对话中显示逐行差异与原/当前行号，并提供打开和安全撤回入口，便于先审阅再继续。
+顶部“改动”会汇总当前会话涉及的文件、变更次数和可比较的行数。选择文件即可跳到最新一条差异卡片；原位的预览、打开和安全撤回操作仍然可用。

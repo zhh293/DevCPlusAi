@@ -79,7 +79,16 @@ if ($gitCommand) {
     $sourceCommitOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot rev-parse HEAD 2>$null
     if ($LASTEXITCODE -eq 0) {
         $sourceCommit = ($sourceCommitOutput | Out-String).Trim()
-        $dirtyOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot status --porcelain 2>$null
+        $releaseInputs = @(
+            'devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe',
+            'devcpp.exe.manifest', 'AgentWebHost.dll', 'RedPanda.ico', 'LICENSE',
+            'NEWS.txt', 'README.md', 'AGENT-RUNTIME-VERSIONS.txt', 'AgentWeb',
+            'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs',
+            'claude-cli', 'MinGW64', 'AStyle', 'ResEd', 'Source',
+            ':(exclude)Source/Tests/dcu-agent-main',
+            ':(exclude)Source/Tests/ui-compile.log'
+        )
+        $dirtyOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot status --porcelain --untracked-files=normal -- $releaseInputs 2>$null
         if ($LASTEXITCODE -eq 0) {
             if ($dirtyOutput) {
                 $sourceDirty = 'true'

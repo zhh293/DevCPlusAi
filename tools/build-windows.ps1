@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $SourceRoot = Join-Path $RepoRoot 'Source'
+$SkipRootDevCppCopy = $false
 
 function Resolve-Executable {
     param(
@@ -153,7 +154,27 @@ try {
         '-N.\dcu',
         ('-U' + ($mainUnitPaths -join ';'))
     ) 'Compile Dev-C++'
-    Copy-Item -LiteralPath 'devcpp.exe' -Destination (Join-Path $RepoRoot 'devcpp.exe') -Force
+    try {
+        Copy-Item -LiteralPath 'devcpp.exe' -Destination (Join-Path $RepoRoot 'devcpp.exe') -Force
+    }
+    catch {
+        $runningFromRepo = $false
+        foreach ($process in @(Get-Process -Name 'devcpp' -ErrorAction SilentlyContinue)) {
+            try {
+                if ($process.Path -and [String]::Equals(
+                    [System.IO.Path]::GetFullPath($process.Path),
+                    (Join-Path $RepoRoot 'devcpp.exe'),
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                    $runningFromRepo = $true
+                    break
+                }
+            }
+            catch { }
+        }
+        if (-not $runningFromRepo) { throw }
+        $SkipRootDevCppCopy = $true
+        Write-Warning 'Dev-C++ is running, so the root executable was left untouched. The fresh build remains at Source\devcpp.exe; close Dev-C++ and rerun to deploy it.'
+    }
 }
 finally {
     Remove-Item -LiteralPath $spinUpBmp, $spinDownBmp -Force -ErrorAction SilentlyContinue
@@ -268,7 +289,9 @@ if (-not $SkipConsolePauser) {
 }
 
 & (Join-Path $PSScriptRoot 'deploy-agent-web.ps1') -Destination $RepoRoot
-$requiredOutputs = @('devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'AgentWebHost.dll')
+$devCppOutput = 'devcpp.exe'
+if ($SkipRootDevCppCopy) { $devCppOutput = 'Source\devcpp.exe' }
+$requiredOutputs = @($devCppOutput, 'Packman.exe', 'PackMaker.exe', 'AgentWebHost.dll')
 if (-not $SkipConsolePauser) {
     $requiredOutputs += 'ConsolePauser.exe'
 }
@@ -281,7 +304,7 @@ foreach ($name in $requiredOutputs) {
     }
     $item = Get-Item -LiteralPath $path
     $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
-    Write-Host ("{0} ({1} bytes) SHA256={2}" -f $item.Name, $item.Length, $hash)
+    Write-Host ("{0} ({1} bytes) SHA256={2}" -f $name, $item.Length, $hash)
 }
 
 Write-Host 'Windows build completed successfully.'

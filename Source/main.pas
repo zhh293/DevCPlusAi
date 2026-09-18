@@ -3623,13 +3623,13 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(2, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CutToClipboard;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(2, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3646,10 +3646,6 @@ procedure TMainForm.actCopyExecute(Sender: TObject);
 var
   e: TEditor;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(0, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CopyToClipboard;
@@ -3657,6 +3653,10 @@ begin
     end;
     if fAgentPanelFrame.reChat.Focused then begin
       fAgentPanelFrame.reChat.CopyToClipboard;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(0, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3670,13 +3670,17 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
-    if fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused then begin
+    if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.memoInput);
+      Exit;
+    end;
+    if fAgentPanelFrame.reChat.Focused then begin
+      fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.reChat);
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3693,10 +3697,6 @@ procedure TMainForm.actSelectAllExecute(Sender: TObject);
 var
   e: TEditor;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(3, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.SelectAll;
@@ -3704,6 +3704,10 @@ begin
     end;
     if fAgentPanelFrame.reChat.Focused then begin
       fAgentPanelFrame.reChat.SelectAll;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(3, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;

@@ -20,7 +20,48 @@
     document.querySelectorAll('.session-remove[data-confirm="yes"]').forEach(resetSessionRemoval);
     $('history-panel').hidden=true;$('menu').hidden=true;
     $('history').setAttribute('aria-expanded','false');$('more').setAttribute('aria-expanded','false');
+    $('changes-panel').hidden=true;$('changes').setAttribute('aria-expanded','false');
     $('permission-menu').hidden=true;$('permission-mode').setAttribute('aria-expanded','false');
+  }
+  function renderChangeOverview(items) {
+    items=Array.isArray(items)?items:[];
+    const files=new Map();let operations=0,added=0,removed=0,knownDiffs=0;
+    for(const item of items) {
+      const path=String(item.path||'').trim();if(!path)continue;
+      const key=path.replace(/\//g,'\\').toLocaleLowerCase();
+      const file=files.get(key)||{path,count:0,latest:item};
+      file.count++;file.latest=item;operations++;
+      files.delete(key);files.set(key,file);
+      const counts=/^\+(\d+) \/ -(\d+) lines$/.exec(String(item.diffSummary||''));
+      if(counts){added+=Number(counts[1]);removed+=Number(counts[2]);knownDiffs++;}
+    }
+    const count=files.size,button=$('changes');
+    button.hidden=count===0;
+    $('changes-count').textContent=count>99?'99+':String(count);
+    button.setAttribute('aria-label',count?'查看本次对话改动，'+count+' 个文件':'查看本次对话的文件改动');
+    if(!count){$('changes-panel').hidden=true;button.setAttribute('aria-expanded','false');$('change-list').replaceChildren();return;}
+    $('changes-summary').textContent=count+' 个文件 · '+operations+' 项改动'+(knownDiffs?' · +'+added+' / −'+removed+' 行':'');
+    $('changes-note').textContent=knownDiffs<operations?'选择文件跳到差异；部分改动无法逐行比较。':'选择文件跳到对话中的差异。';
+    const labels={Added:'新增',Modified:'修改',Renamed:'重命名',Deleted:'删除','Written/edited':'已写入/编辑'};
+    const fragment=document.createDocumentFragment();
+    for(const file of files.values()) {
+      const row=document.createElement('button');row.type='button';row.className='change-entry';row.dataset.targetId=file.latest.id;row.title=file.path;
+      const pathText=document.createElement('span');pathText.className='change-entry-path';pathText.textContent=file.path;
+      const state=file.latest.undoState==='restored'?'已撤销':(labels[file.latest.fileState]||file.latest.fileState||'文件变更');
+      const diff=/^\+(\d+) \/ -(\d+) lines$/.exec(String(file.latest.diffSummary||''));
+      const detail=[state,file.count>1?file.count+' 次改动':'',diff?'+'+diff[1]+' / −'+diff[2]+' 行':file.latest.diffSummary==='Diff unavailable'?'差异暂不可用':''].filter(Boolean).join(' · ');
+      const meta=document.createElement('span');meta.className='change-entry-meta';meta.textContent=detail;
+      row.append(pathText,meta);
+      row.onclick=()=>{
+        const entry=view.items.get(row.dataset.targetId);
+        closePopups();
+        if(!entry)return;
+        entry.node.open=true;entry.node.scrollIntoView({block:'center',behavior:'smooth'});
+        entry.title?.focus({preventScroll:true});
+      };
+      fragment.append(row);
+    }
+    $('change-list').replaceChildren(fragment);
   }
   function renderSessions() {
     const query=$('session-search').value.trim().toLocaleLowerCase();
@@ -290,8 +331,11 @@
   document.addEventListener('agent-open-file', e=>post('open-file',{path:e.detail}));
   document.addEventListener('agent-open-link',e=>post('open-link',{url:e.detail}));
   document.addEventListener('agent-undo-file',e=>post('undo-file-change',e.detail||{}));
+  document.addEventListener('agent-file-changes',e=>renderChangeOverview(e.detail));
   document.addEventListener('agent-permission', e=>post('permission',e.detail||{}));
   $('history').onclick=()=>{const open=$('history-panel').hidden;closePopups();$('history-panel').hidden=!open;$('history').setAttribute('aria-expanded',String(open));if(open)$('session-search').focus();};
+  $('changes').onclick=()=>{const open=$('changes-panel').hidden;closePopups();if(!open)return;$('changes-panel').hidden=false;$('changes').setAttribute('aria-expanded','true');$('change-list').querySelector('button')?.focus();};
+  $('changes-close').onclick=()=>{closePopups();$('changes').focus();};
   $('context-summary').onclick=()=>{const expanded=$('context-preview').classList.toggle('expanded');$('context-details').hidden=!expanded;$('context-summary').setAttribute('aria-expanded',String(expanded));view.layoutChanged();};
   $('context-refresh').onclick=()=>{if(!busy)post('context');};
   $('context-toggle').onchange=()=>{if(busy){updateContextControl();return;}contextEnabled=$('context-toggle').checked;updateContextControl();post('context-enabled',{enabled:String(contextEnabled)});};
@@ -304,8 +348,8 @@
     ($('permission-menu').querySelector('[aria-pressed="true"]')||$('permission-menu').querySelector('[data-permission-mode]'))?.focus();
   };
   $('session-search').oninput=renderSessions;
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const closeMode=!$('permission-menu').hidden;closePopups();if(closeMode)$('permission-mode').focus();}});
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.popup,#history,#more,#permission-menu,#permission-mode'))closePopups();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const closeMode=!$('permission-menu').hidden,closeChanges=!$('changes-panel').hidden;closePopups();if(closeMode)$('permission-mode').focus();else if(closeChanges)$('changes').focus();}});
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.popup,#history,#changes,#more,#permission-menu,#permission-mode'))closePopups();});
   document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{if(!busy)post('quick',{index:b.dataset.quick});});
   $('quick').onchange=()=>{if($('quick').value!=='')post('quick',{index:$('quick').value});$('quick').value='';$('menu').hidden=true;};
   document.querySelectorAll('[data-permission-mode]').forEach(button=>button.onclick=()=>{
