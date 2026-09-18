@@ -242,6 +242,7 @@ $requiredFiles = @(
     'PackMaker.exe',
     'ConsolePauser.exe',
     'devcpp.exe.manifest',
+    'AgentWebHost.dll',
     'LICENSE',
     'NEWS.txt',
     'README.md',
@@ -253,7 +254,7 @@ foreach ($file in $requiredFiles) {
     Require-File $file
 }
 
-$requiredDirectories = @('Lang', 'Templates', 'Help', 'Icons', 'contributes')
+$requiredDirectories = @('AgentWeb', 'Lang', 'Templates', 'Help', 'Icons', 'contributes')
 foreach ($directory in $requiredDirectories) {
     Require-Directory $directory
 }

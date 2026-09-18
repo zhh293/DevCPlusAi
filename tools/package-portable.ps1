@@ -38,6 +38,7 @@ $files = @(
     'PackMaker.exe',
     'ConsolePauser.exe',
     'devcpp.exe.manifest',
+    'AgentWebHost.dll',
     'RedPanda.ico',
     'LICENSE',
     'NEWS.txt',
@@ -48,7 +49,7 @@ foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot $file) -Destination $packageRoot -Force
 }
 
-$directories = @('Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
+$directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
 if ($PackageType -eq 'X64Compiler') {
     $directories += 'MinGW64'
 }
@@ -127,8 +128,10 @@ try {
         'Packman.exe',
         'PackMaker.exe',
         'ConsolePauser.exe',
+        'AgentWebHost.dll',
         'nodejs/node.exe',
         'claude-cli/bin/claude.exe',
+        'AgentWeb/index.html',
         'AGENT-RUNTIME-VERSIONS.txt',
         'BUILD-INFO.txt'
     )
@@ -238,8 +241,10 @@ if ($SelfExtracting) {
     )
     foreach ($requiredEntry in @(
         'devcpp.exe',
+        'AgentWebHost.dll',
         'nodejs\node.exe',
         'claude-cli\bin\claude.exe',
+        'AgentWeb\index.html',
         'AGENT-RUNTIME-VERSIONS.txt',
         'BUILD-INFO.txt',
         '7-ZIP-LICENSE.txt'
