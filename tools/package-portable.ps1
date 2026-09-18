@@ -2,18 +2,25 @@
 param(
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
     [string]$Version = 'dev',
+    [ValidateSet('NoCompiler', 'X64Compiler')]
+    [string]$PackageType = 'NoCompiler',
     [switch]$SelfExtracting
 )
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 
-& (Join-Path $PSScriptRoot 'verify-release.ps1') -PackageType NoCompiler
+& (Join-Path $PSScriptRoot 'verify-release.ps1') -PackageType $PackageType
 
 $distRoot = Join-Path $RepoRoot 'dist'
 $packageRoot = Join-Path $distRoot 'DevCPlusAi'
-$zipPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-windows-no-compiler.zip" -f $Version)
-$sfxPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-windows-no-compiler-self-extracting.exe" -f $Version)
+$packageLabel = if ($PackageType -eq 'X64Compiler') {
+    'windows-x64-gcc'
+} else {
+    'windows-no-compiler'
+}
+$zipPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-{1}.zip" -f $Version, $packageLabel)
+$sfxPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-{1}-self-extracting.exe" -f $Version, $packageLabel)
 
 if (Test-Path -LiteralPath $packageRoot) {
     $resolvedDist = [System.IO.Path]::GetFullPath($distRoot).TrimEnd('\') + '\'
@@ -31,6 +38,7 @@ $files = @(
     'PackMaker.exe',
     'ConsolePauser.exe',
     'devcpp.exe.manifest',
+    'AgentWebHost.dll',
     'RedPanda.ico',
     'LICENSE',
     'NEWS.txt',
@@ -41,7 +49,10 @@ foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot $file) -Destination $packageRoot -Force
 }
 
-$directories = @('Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
+$directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
+if ($PackageType -eq 'X64Compiler') {
+    $directories += 'MinGW64'
+}
 foreach ($directory in $directories) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot $directory) -Destination $packageRoot -Recurse -Force
 }
@@ -74,6 +85,7 @@ if ($gitCommand) {
 $buildInfo = New-Object System.Collections.Generic.List[string]
 $buildInfo.Add('DevCPlusAi portable build')
 $buildInfo.Add("Package-Version: $Version")
+$buildInfo.Add("Package-Type: $PackageType")
 $buildInfo.Add("Source-Commit: $sourceCommit")
 $buildInfo.Add("Source-Dirty: $sourceDirty")
 $buildInfo.Add("Generated-UTC: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
@@ -111,16 +123,27 @@ try {
         $normalizedName = $entry.FullName.Replace('\', '/').TrimStart('.', '/')
         $archiveEntries[$normalizedName] = $entry
     }
-    foreach ($requiredEntry in @(
+    $requiredEntries = @(
         'devcpp.exe',
         'Packman.exe',
         'PackMaker.exe',
         'ConsolePauser.exe',
+        'AgentWebHost.dll',
         'nodejs/node.exe',
         'claude-cli/bin/claude.exe',
+        'AgentWeb/index.html',
         'AGENT-RUNTIME-VERSIONS.txt',
         'BUILD-INFO.txt'
-    )) {
+    )
+    if ($PackageType -eq 'X64Compiler') {
+        $requiredEntries += @(
+            'MinGW64/bin/g++.exe',
+            'MinGW64/bin/gcc.exe',
+            'MinGW64/bin/gdb.exe',
+            'MinGW64/bin/mingw32-make.exe'
+        )
+    }
+    foreach ($requiredEntry in $requiredEntries) {
         if (-not $archiveEntries.ContainsKey($requiredEntry)) {
             throw "Portable archive is missing: $requiredEntry"
         }
@@ -218,8 +241,10 @@ if ($SelfExtracting) {
     )
     foreach ($requiredEntry in @(
         'devcpp.exe',
+        'AgentWebHost.dll',
         'nodejs\node.exe',
         'claude-cli\bin\claude.exe',
+        'AgentWeb\index.html',
         'AGENT-RUNTIME-VERSIONS.txt',
         'BUILD-INFO.txt',
         '7-ZIP-LICENSE.txt'

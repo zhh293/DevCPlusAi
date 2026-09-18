@@ -6,7 +6,14 @@ type
     Decision: Integer;
     Seen: Boolean;
     procedure Tick(Sender: TObject);
+    procedure Failure(Sender: TObject; E: Exception);
   end;
+procedure TApprovalProbe.Failure(Sender: TObject; E: Exception);
+begin
+  Writeln('Unhandled VCL exception: ' + E.ClassName + ': ' + E.Message);
+  Flush(Output);
+  Halt(1);
+end;
 procedure TApprovalProbe.Tick(Sender: TObject);
 var I: Integer;
 begin
@@ -22,27 +29,33 @@ begin
     Application.Initialize;
     Application.ShowMainForm := False;
     Probe := TApprovalProbe.Create;
+    Application.OnException := Probe.Failure;
     Timer := TTimer.Create(nil);
     try
       Timer.Interval := 50;
       Timer.OnTimer := Probe.Tick;
       Probe.Decision := mrYes;
+      Writeln('Agent integration: checking allow dialog'); Flush(Output);
       if not RequestAgentApproval('Bash', 'test workspace', '{"command":"echo test"}') or not Probe.Seen then
         raise Exception.Create('Approval allow dialog failed');
       Probe.Seen := False;
       Probe.Decision := mrNo;
+      Writeln('Agent integration: checking deny dialog'); Flush(Output);
       if RequestAgentApproval('Bash', 'test workspace', '{"command":"echo test"}') or not Probe.Seen then
         raise Exception.Create('Approval deny dialog failed');
       Writeln('Agent integration: approval allow and deny dialogs passed');
+      Flush(Output);
     finally
       Timer.Free;
-      Probe.Free;
     end;
     Host := TMainForm.CreateNew(nil);
+    Writeln('Agent integration: checking IDE actions'); Flush(Output);
     try
       Host.RunAgentInteractionChecks(ParamStr(1), ParamStr(2));
     finally
       Host.Free;
+      Application.OnException := nil;
+      Probe.Free;
     end;
     Writeln('Agent main integration smoke test passed.');
   except

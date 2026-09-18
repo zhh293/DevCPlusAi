@@ -11,6 +11,8 @@ type
     fWheelRemainder: Integer;
     fPalette: TAgentUiPalette;
     fGeneration: Integer;
+    fRevision: Integer;
+    fClearing, fLayoutActive: Boolean;
     procedure TimelineMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure ToggleBlock(Sender: TObject);
     procedure LayoutBlocks;
@@ -32,11 +34,13 @@ type
     function BlockAt(Index: Integer): TControl;
     function WebBlock(Index: Integer): String;
     property Generation: Integer read fGeneration;
+    property Revision: Integer read fRevision;
     property LastText: TRichEdit read fLastText;
     procedure AppendText(const Text: String; TextColor: TColor; Bold: Boolean);
     procedure AppendMarkdown(const Text: String; TextColor: TColor);
     procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
-    procedure AddTool(const Id, Caption, Details: String);
+    procedure AddTool(const Id, Caption, Details: String;
+      const Status: String = ''; IsResult: Boolean = False);
     procedure ApplyAppearance(AEditorColor, ATextColor: TColor;
       const FontName: String; FontSize: Integer);
   end;
@@ -62,6 +66,7 @@ type
   TTimelineTool = class(TPanel)
   public
     ToolId: String;
+    InputText, OutputText, State: String;
     Header: TTimelineButton;
     Body: TMemo;
   end;
@@ -199,7 +204,7 @@ end;
 destructor TAgentTimeline.Destroy;
 begin
   Clear;
-  fBlocks.Free;
+  FreeAndNil(fBlocks);
   inherited;
 end;
 function TAgentTimeline.BlockCount: Integer;
@@ -208,13 +213,17 @@ function TAgentTimeline.BlockAt(Index: Integer): TControl;
 begin Result := TControl(fBlocks[Index]); end;
 
 function TAgentTimeline.WebBlock(Index: Integer): String;
-var Block: TObject; Kind, Text, Name: String; R: TTimelineRichEdit;
+var Block: TObject; Kind, Text, Name, InputText, OutputText, State: String; R: TTimelineRichEdit;
 begin
   Block := TObject(fBlocks[Index]);
   Kind := 'system'; Text := ''; Name := '';
+  InputText := ''; OutputText := ''; State := '';
   if Block is TTimelineTool then begin
     Kind := 'tool'; Name := TTimelineTool(Block).Header.Hint;
     Text := TTimelineTool(Block).Body.Text;
+    InputText := TTimelineTool(Block).InputText;
+    OutputText := TTimelineTool(Block).OutputText;
+    State := TTimelineTool(Block).State;
   end else if Block is TTimelineRichEdit then begin
     R := TTimelineRichEdit(Block); Text := R.Text;
     if R.IsUserMessage then Kind := 'user'
@@ -223,7 +232,8 @@ begin
   Result := '{"version":1,"type":"upsert","item":{"id":' +
     WebQuote(IntToStr(fGeneration) + '-' + IntToStr(Index)) +
     ',"kind":' + WebQuote(Kind) + ',"text":' + WebQuote(Text) +
-    ',"name":' + WebQuote(Name) + ',"status":""}}';
+    ',"name":' + WebQuote(Name) + ',"status":' + WebQuote(State) +
+    ',"input":' + WebQuote(InputText) + ',"output":' + WebQuote(OutputText) + '}}';
 end;
 
 function TAgentTimeline.FocusedEdit: TCustomEdit;
@@ -254,6 +264,14 @@ begin
         Ini.WriteString(Section, 'id', TTimelineTool(Block).ToolId);
         Ini.WriteString(Section, 'title', TTimelineTool(Block).Header.Hint);
         TTimelineTool(Block).Body.Lines.SaveToFile(Path + '.' + Section);
+        Ini.WriteString(Section, 'status', TTimelineTool(Block).State);
+        Lines := TStringList.Create;
+        try
+          Lines.Text := TTimelineTool(Block).InputText;
+          Lines.SaveToFile(Path + '.' + Section + '.input');
+          Lines.Text := TTimelineTool(Block).OutputText;
+          Lines.SaveToFile(Path + '.' + Section + '.output');
+        finally Lines.Free; end;
       end else begin
         Ini.WriteString(Section, 'kind', 'text');
         if (Block is TTimelineRichEdit) and TTimelineRichEdit(Block).IsUserMessage then
@@ -292,8 +310,18 @@ begin
       Section := IntToStr(I);
       Lines.Clear;
       if FileExists(Path + '.' + Section) then Lines.LoadFromFile(Path + '.' + Section);
-      if Ini.ReadString(Section, 'kind', '') = 'tool' then
-        AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text)
+      if Ini.ReadString(Section, 'kind', '') = 'tool' then begin
+        AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text,
+          Ini.ReadString(Section, 'status', ''));
+        if FileExists(Path + '.' + Section + '.input') then begin
+          Lines.LoadFromFile(Path + '.' + Section + '.input');
+          TTimelineTool(fBlocks[fBlocks.Count - 1]).InputText := Lines.Text;
+        end;
+        if FileExists(Path + '.' + Section + '.output') then begin
+          Lines.LoadFromFile(Path + '.' + Section + '.output');
+          TTimelineTool(fBlocks[fBlocks.Count - 1]).OutputText := Lines.Text;
+        end;
+      end
       else if SameText(Ini.ReadString(Section, 'markdown', ''), '1') then
         AppendMarkdown(Lines.Text, Font.Color)
       else if SameText(Ini.ReadString(Section, 'role', ''), 'user') then
@@ -306,12 +334,23 @@ begin
   end;
 end;
 procedure TAgentTimeline.Clear;
-var I: Integer;
+var Block: TObject;
 begin
   if fBlocks = nil then Exit;
-  for I := fBlocks.Count - 1 downto 0 do TObject(fBlocks[I]).Free;
-  fBlocks.Clear;
+  fClearing := True;
+  DisableAlign;
+  try
+    while fBlocks.Count > 0 do begin
+      Block := TObject(fBlocks[fBlocks.Count - 1]);
+      fBlocks.Delete(fBlocks.Count - 1);
+      Block.Free;
+    end;
+  finally
+    EnableAlign;
+    fClearing := False;
+  end;
   Inc(fGeneration);
+  Inc(fRevision);
   fLastText := nil;
   fLastIsMarkdown := False;
 end;
@@ -327,6 +366,11 @@ procedure TAgentTimeline.LayoutBlocks;
 var I, Y, OldPosition, BottomPosition: Integer; Block: TControl;
     KeepAtBottom: Boolean;
 begin
+  if fClearing or fLayoutActive or (fBlocks = nil) or
+    (csDestroying in ComponentState) then Exit;
+  fLayoutActive := True;
+  try
+  Inc(fRevision);
   // TScrollBox moves its child controls when the scrollbar position changes.
   // Do not subtract Position here, otherwise every wheel event moves the
   // content twice and the scrollbar range collapses back to zero.
@@ -359,6 +403,7 @@ begin
     VertScrollBar.Position := BottomPosition
   else
     VertScrollBar.Position := OldPosition;
+  finally fLayoutActive := False; end;
 end;
 
 procedure TAgentTimeline.RenderMarkdown(Edit: TRichEdit; const RawText: String);
@@ -774,7 +819,8 @@ begin
   end;
   LayoutBlocks;
 end;
-procedure TAgentTimeline.AddTool(const Id, Caption, Details: String);
+procedure TAgentTimeline.AddTool(const Id, Caption, Details: String;
+  const Status: String; IsResult: Boolean);
 var I: Integer; Block: TTimelineTool;
 begin
   Block := nil;
@@ -824,6 +870,9 @@ begin
   Block.Header.Hint := Caption;
   Block.Header.Caption := '>  ' + Caption;
   if Details <> '' then Block.Body.Lines.Add(Details);
+  Block.State := Status;
+  if IsResult then Block.OutputText := Details
+  else if Details <> '' then Block.InputText := Details;
   LayoutBlocks;
 end;
 end.

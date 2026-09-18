@@ -147,6 +147,17 @@ begin
     WaitReady;
     Require(fAgentSessionId = Id1, 'continuation changed CLI session');
     Writeln('Agent integration: new, select, restart and continue sessions passed');
+    AgentSessionAction(Self, 'rename-session', Key1, 'Renamed conversation');
+    StopAgent;
+    Data.LoadFromFile(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + Key1 + '.title');
+    Require(Trim(Data.Text) = 'Renamed conversation', 'renamed title overwritten by save');
+    AgentSessionAction(Self, 'delete-session', Key2, '');
+    Require(FileExists(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + Key2 + '.deleted'),
+      'history removal marker missing');
+    Require(fAgentPanelFrame.SessionPicker.Items.Count = 1, 'removed session still listed');
+    RefreshAgentSessions;
+    Require(fAgentPanelFrame.SessionPicker.Items.Count = 1, 'removed session reimported');
+    Writeln('Agent integration: title persistence and history removal passed');
 
     StopAgent;
     SaveAgentSession(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + 'empty-chat.session', '');

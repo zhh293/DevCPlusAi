@@ -204,7 +204,7 @@ function Invoke-ClaudeCompatibilityCheck {
 
     # Exercise the exact non-interactive base flags with an empty, closed stdin.
     # The file form of append-system-prompt is hidden from the short help in
-    # current Claude builds, so this behavior check is its compatibility test.
+    # Current Agent CLI builds use this behavior check.
     # No user prompt is sent and therefore this does not make an API request.
     $promptFile = [System.IO.Path]::GetTempFileName()
     [System.IO.File]::WriteAllText($promptFile, 'verify')
@@ -242,6 +242,7 @@ $requiredFiles = @(
     'PackMaker.exe',
     'ConsolePauser.exe',
     'devcpp.exe.manifest',
+    'AgentWebHost.dll',
     'LICENSE',
     'NEWS.txt',
     'README.md',
@@ -253,13 +254,23 @@ foreach ($file in $requiredFiles) {
     Require-File $file
 }
 
-$requiredDirectories = @('Lang', 'Templates', 'Help', 'Icons', 'contributes')
+$requiredDirectories = @('AgentWeb', 'Lang', 'Templates', 'Help', 'Icons', 'contributes')
 foreach ($directory in $requiredDirectories) {
     Require-Directory $directory
 }
 
 if ($PackageType -eq 'X64Compiler') {
     Require-Directory 'MinGW64'
+    foreach ($compilerFile in @(
+        'MinGW64\bin\gcc.exe',
+        'MinGW64\bin\g++.exe',
+        'MinGW64\bin\gdb.exe',
+        'MinGW64\bin\mingw32-make.exe',
+        'MinGW64\licenses\gcc\COPYING',
+        'MinGW64\licenses\mingw-w64\COPYING'
+    )) {
+        Require-File $compilerFile
+    }
 }
 Warn-OptionalDirectory 'AStyle'
 Warn-OptionalDirectory 'ResEd'

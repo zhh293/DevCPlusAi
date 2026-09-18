@@ -2458,6 +2458,18 @@ begin
     // Activate the current set after everything has been loaded
     DefaultSetIndex := SetToActivate;
 
+    // A portable build may include MinGW64 while an older user configuration
+    // still has an empty CompilerSets section (Current=-1). Rescan the
+    // bundled toolchain automatically so a clean install can compile without
+    // requiring a manual compiler-directory setup.
+    if fList.Count = 0 then begin
+      FindSets;
+      if fList.Count > 0 then begin
+        SaveSets;
+        DefaultSetIndex := fDefaultIndex;
+      end;
+    end;
+
     // Validate and load the current set
     CurrentSet := GetDefaultSet;
 
