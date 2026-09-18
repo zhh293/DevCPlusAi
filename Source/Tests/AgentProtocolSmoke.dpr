@@ -20,7 +20,18 @@ begin
   Require((Count = 1) and (Events[0].EventType = aetPermission), 'approval not recognized');
   Require(Events[0].EventId = 'approve-1', 'approval request id lost');
   Require(Events[0].Command = 'echo test', 'approval command lost');
-  Require(Pos('echo test', Events[0].ToolInput) > 0, 'approval original input lost');  Writeln('AgentProtocol smoke test: reset state');
+  Require(Pos('echo test', Events[0].ToolInput) > 0, 'approval original input lost');
+  Count := ParseLineEvents(
+    '{"type":"control_request","request_id":"question-1",' +
+    '"request":{"subtype":"can_use_tool","tool_name":"AskUserQuestion",' +
+    '"tool_use_id":"question-tool","input":{"questions":[{"question":"Compiler?",' +
+    '"header":"Compiler","options":[{"label":"GCC","description":"GNU"},' +
+    '{"label":"Clang","description":"LLVM"}],"multiSelect":false}]}}}', Events);
+  Require((Count = 1) and (Events[0].EventType = aetPermission) and
+    (Events[0].ToolName = 'AskUserQuestion') and
+    (Pos('"questions"', Events[0].ToolInput) > 0),
+    'AskUserQuestion request was not preserved');
+  Writeln('AgentProtocol smoke test: reset state');
   ResetProtocolState;
 
   Writeln('AgentProtocol smoke test: assistant blocks');

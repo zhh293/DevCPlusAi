@@ -118,6 +118,8 @@ type
     fStreamingText: String;
     fStreamingActive: Boolean;
     fWaitingForResponse: Boolean;
+    fPendingPermissions: TStringList;
+    fPendingPermissionTools: TStringList;
     fOnRequestStarted: TNotifyEvent;
     fOnRequestEnded: TNotifyEvent;
     procedure EditPopupOpen(Sender: TObject);
@@ -150,6 +152,8 @@ type
     procedure ScrollToBottomClick(Sender: TObject);
     procedure ClearChatClick(Sender: TObject);
     procedure PrepareContextClick(Sender: TObject);
+    function BuildQuestionInput(const InputJSON, AnswersJSON: String;
+      out ErrorText: String): String;
   protected
     procedure Resize; override;
   public
@@ -177,6 +181,11 @@ type
     procedure SetModelName(const Name: String);
 
     procedure ClearChat;
+    procedure QueuePermission(const Event: TAgentEvent; const WorkDir: String);
+    function ResolvePermission(const RequestId, Decision,
+      AnswersJSON: String): Boolean;
+    procedure ExpirePendingPermissions;
+    function CanShowInlinePermissions: Boolean;
 
     // Send the current input box content to the agent.
     procedure SendCurrentInput;
@@ -212,7 +221,7 @@ type
   end;
 
 implementation
-uses uLkJSON, AgentWebProtocol, devcfg;
+uses uLkJSON, AgentWebProtocol, devcfg, Variants;
 
 {$R *.dfm}
 {$I AgentPanelWeb.inc}
@@ -237,6 +246,8 @@ begin
   fStreamingText := '';
   fStreamingActive := False;
   fWaitingForResponse := False;
+  fPendingPermissions := TStringList.Create;
+  fPendingPermissionTools := TStringList.Create;
   fOnRequestStarted := nil;
   fOnRequestEnded := nil;
   fOnSettings := nil;
@@ -382,6 +393,8 @@ begin
   if Assigned(fWeb) then fWeb.Stop;
   fWebCache.Free;
   fWebQueue.Free;
+  fPendingPermissions.Free;
+  fPendingPermissionTools.Free;
   if fTemporaryAttachments <> nil then
     for I := 0 to fTemporaryAttachments.Count - 1 do
       DeleteFile(fTemporaryAttachments[I]);
@@ -502,6 +515,7 @@ end;
 
 procedure TAgentPanelFrame.ClearChat;
 begin
+  ExpirePendingPermissions;
   EndResponseWait;
   reChat.Clear;
   if Assigned(fTimeline) then fTimeline.Clear;
@@ -514,6 +528,190 @@ begin
   ClearAttachments;
   fContextText := '';
   ResetStreamingDisplay;
+end;
+
+function TAgentPanelFrame.CanShowInlinePermissions: Boolean;
+begin
+  Result := Assigned(fWeb) and fWeb.Ready and fWeb.Visible and not fWebFailed;
+end;
+
+procedure TAgentPanelFrame.QueuePermission(const Event: TAgentEvent;
+  const WorkDir: String);
+var InputJSON: String;
+begin
+  if Event.EventId = '' then begin
+    AppendSystemMessage('The CLI sent a permission request without a request ID.');
+    Exit;
+  end;
+  InputJSON := Event.ToolInput;
+  if InputJSON = '' then InputJSON := '{}';
+  fPendingPermissions.Values[Event.EventId] := InputJSON;
+  fPendingPermissionTools.Values[Event.EventId] := Event.ToolName;
+  fTimeline.AddPermission(Event.EventId, Event.ToolName, InputJSON, WorkDir);
+end;
+
+function TAgentPanelFrame.BuildQuestionInput(const InputJSON,
+  AnswersJSON: String; out ErrorText: String): String;
+var InputNode, AnswersNode, QuestionsNode, QuestionNode, AnswerNode,
+    CopyNode, ItemNode: TlkJSONbase;
+    InputObject, AnswersObject, UpdatedObject: TlkJSONobject;
+    I, QuestionCount: Integer; QuestionText, AnswerText: WideString;
+    PropertyName: WideString; JsonText: String;
+begin
+  Result := '';
+  ErrorText := '';
+  InputNode := nil;
+  AnswersNode := nil;
+  UpdatedObject := nil;
+  try
+    try
+      InputNode := TlkJSON.ParseText(UTF8Encode(InputJSON));
+      AnswersNode := TlkJSON.ParseText(UTF8Encode(AnswersJSON));
+    except
+      on E: Exception do begin
+        ErrorText := 'Could not read the question answers: ' + E.Message;
+        Exit;
+      end;
+    end;
+    if not (InputNode is TlkJSONobject) or
+       not (AnswersNode is TlkJSONobject) then begin
+    ErrorText := 'The question or answer data is malformed.';
+      Exit;
+    end;
+    InputObject := TlkJSONobject(InputNode);
+    AnswersObject := TlkJSONobject(AnswersNode);
+    QuestionsNode := InputObject.Field['questions'];
+    if not (QuestionsNode is TlkJSONlist) then begin
+      ErrorText := 'AskUserQuestion did not include a questions list.';
+      Exit;
+    end;
+    QuestionCount := QuestionsNode.Count;
+    if (QuestionCount < 1) or (QuestionCount > 4) or
+       (AnswersObject.Count <> QuestionCount) then begin
+      ErrorText := 'Please answer every question before submitting.';
+      Exit;
+    end;
+    for I := 0 to QuestionCount - 1 do begin
+      ItemNode := QuestionsNode.Child[I];
+      if not (ItemNode is TlkJSONobject) then begin
+        ErrorText := 'A question is malformed.';
+        Exit;
+      end;
+      QuestionNode := ItemNode.Field['question'];
+      if not (QuestionNode is TlkJSONstring) then begin
+        ErrorText := 'A question is missing its question text.';
+        Exit;
+      end;
+      QuestionText := VarToWideStr(QuestionNode.Value);
+      AnswerNode := AnswersObject.Field[QuestionText];
+      if not (AnswerNode is TlkJSONstring) then begin
+        ErrorText := 'Please answer: ' + UTF8Encode(QuestionText);
+        Exit;
+      end;
+      AnswerText := VarToWideStr(AnswerNode.Value);
+      if Trim(UTF8Encode(AnswerText)) = '' then begin
+        ErrorText := 'Please answer: ' + UTF8Encode(QuestionText);
+        Exit;
+      end;
+    end;
+
+    UpdatedObject := TlkJSONobject.Create;
+    for I := 0 to InputObject.Count - 1 do begin
+      PropertyName := InputObject.NameOf[I];
+      if SameText(String(PropertyName), 'answers') then Continue;
+      JsonText := TlkJSON.GenerateText(InputObject.FieldByIndex[I]);
+      CopyNode := TlkJSON.ParseText(JsonText);
+      if CopyNode = nil then begin
+        ErrorText := 'Could not preserve a question field.';
+        Exit;
+      end;
+      UpdatedObject.Add(PropertyName, CopyNode);
+    end;
+    JsonText := TlkJSON.GenerateText(AnswersNode);
+    CopyNode := TlkJSON.ParseText(JsonText);
+    if CopyNode = nil then begin
+      ErrorText := 'Could not encode the question answers.';
+      Exit;
+    end;
+    UpdatedObject.Add('answers', CopyNode);
+    Result := TlkJSON.GenerateText(UpdatedObject);
+  finally
+    UpdatedObject.Free;
+    AnswersNode.Free;
+    InputNode.Free;
+  end;
+end;
+
+function TAgentPanelFrame.ResolvePermission(const RequestId, Decision,
+  AnswersJSON: String): Boolean;
+var Index: Integer; InputJSON, ToolName, UpdatedInput, ErrorText,
+    NewStatus, Summary: String; Allow: Boolean;
+begin
+  Result := False;
+  Index := fPendingPermissions.IndexOfName(RequestId);
+  if (Index < 0) or (RequestId = '') then Exit;
+  InputJSON := fPendingPermissions.ValueFromIndex[Index];
+  ToolName := fPendingPermissionTools.Values[RequestId];
+  UpdatedInput := InputJSON;
+  ErrorText := '';
+  Allow := SameText(Decision, 'allow') or SameText(Decision, 'answer');
+  if SameText(Decision, 'answer') then begin
+    if not SameText(ToolName, 'AskUserQuestion') then begin
+      ErrorText := 'This request is not an AskUserQuestion prompt.';
+      fTimeline.UpdatePermission(RequestId, 'approval', ErrorText);
+      Exit;
+    end;
+    UpdatedInput := BuildQuestionInput(InputJSON, AnswersJSON, ErrorText);
+    if UpdatedInput = '' then begin
+      fTimeline.UpdatePermission(RequestId, 'approval', ErrorText);
+      Exit;
+    end;
+  end else if not SameText(Decision, 'allow') and
+              not SameText(Decision, 'deny') then begin
+    fTimeline.UpdatePermission(RequestId, 'approval', 'Unknown approval action.');
+    Exit;
+  end;
+
+  if not Assigned(fAgentProcess) then
+    ErrorText := 'The AI process is no longer available.'
+  else if not fAgentProcess.SendPermissionResponse(RequestId, UpdatedInput, Allow) then
+    ErrorText := fAgentProcess.LastError;
+  if ErrorText <> '' then begin
+    fTimeline.UpdatePermission(RequestId, 'approval', ErrorText);
+    AppendSystemMessage(ErrorText);
+    Exit;
+  end;
+
+  if SameText(Decision, 'deny') then begin
+    NewStatus := 'denied';
+    Summary := 'Denied';
+  end else if SameText(Decision, 'answer') then begin
+    NewStatus := 'done';
+    Summary := 'Answer submitted; waiting for the tool to continue';
+  end else begin
+    NewStatus := 'done';
+    Summary := 'Allowed once; waiting for the tool to continue';
+  end;
+  fTimeline.UpdatePermission(RequestId, NewStatus, Summary);
+  fPendingPermissions.Delete(Index);
+  Index := fPendingPermissionTools.IndexOfName(RequestId);
+  if Index >= 0 then fPendingPermissionTools.Delete(Index);
+  fWaitingForResponse := True;
+  if Assigned(fOnRequestStarted) then fOnRequestStarted(Self);
+  Result := True;
+end;
+
+procedure TAgentPanelFrame.ExpirePendingPermissions;
+var I: Integer; RequestId: String;
+begin
+  for I := 0 to fPendingPermissions.Count - 1 do begin
+    RequestId := fPendingPermissions.Names[I];
+    if RequestId <> '' then
+      fTimeline.UpdatePermission(RequestId, 'interrupted',
+        'Request ended; this action can no longer be submitted.');
+  end;
+  fPendingPermissions.Clear;
+  fPendingPermissionTools.Clear;
 end;
 
 procedure TAgentPanelFrame.BeginResponseWait;

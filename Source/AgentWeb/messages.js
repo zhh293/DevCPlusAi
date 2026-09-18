@@ -2,6 +2,9 @@
 (() => {
   'use strict';
   const el = (tag, text) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; return n; };
+  function requestPermission(data) {
+    document.dispatchEvent(new CustomEvent('agent-permission', {detail:data}));
+  }
   function inline(tokens, parent) {
     for (const t of tokens || []) {
       let n;
@@ -60,6 +63,94 @@
     }
   }
   function markdown(text) { const n = document.createDocumentFragment(); blocks(marked.lexer(text, {gfm:true}), n); return n; }
+  function displayCode(text, language) {
+    const pre=el('pre');
+    pre.append(window.AgentHighlight ? AgentHighlight(String(text||''),language||'') : el('code',String(text||'')));
+    return pre;
+  }
+  function permissionMeta(item, data) {
+    const card=el('section');card.className='permission-card';
+    const tool=String(item.name||'工具操作');
+    card.append(el('strong',({Write:'写入文件',Edit:'修改文件',Bash:'执行命令'}[tool]||('需要批准：'+tool))));
+    const path=String(data.file_path||data.path||'');
+    if(path){
+      const target=el('div');target.className='permission-target';target.append(el('span','目标文件'),el('code',path));card.append(target);
+      if(item.workDir){
+        const norm=value=>String(value).replace(/\//g,'\\').replace(/\\+$/,'').toLocaleLowerCase();
+        const base=norm(item.workDir),file=norm(path),inside=file===base||file.startsWith(base+'\\');
+        const where=el('div',inside?'位于当前工作目录':'目标位于工作目录之外');
+        where.className='permission-scope '+(inside?'inside':'outside');card.append(where);
+      }
+    }
+    if(data.command){const command=el('pre');command.className='permission-command';command.textContent=String(data.command);card.append(el('h4','将执行的命令'),command);}
+    if(tool==='Write'&&data.content!==undefined){
+      const language=(path.split('.').pop()||'').toLowerCase();card.append(el('h4','将写入的内容'),displayCode(data.content,language));
+    } else if(tool==='Edit'){
+      if(data.old_string!==undefined){card.append(el('h4','原内容'),displayCode(data.old_string,''));}
+      if(data.new_string!==undefined){card.append(el('h4','替换为'),displayCode(data.new_string,''));}
+    }
+    const extra=el('details');extra.className='permission-raw';extra.append(el('summary','查看完整参数'),displayCode(JSON.stringify(data,null,2),'json'));card.append(extra);
+    return card;
+  }
+  function answerQuestion(item, body, data) {
+    const questions=Array.isArray(data.questions)?data.questions:null;
+    const heading=el('section');heading.className='permission-card';heading.append(el('strong','需要你补充信息'));body.append(heading);
+    if(!questions||questions.length<1||questions.length>4||questions.some(q=>!q||typeof q.question!=='string'||!Array.isArray(q.options)||q.options.length<2||q.options.length>4)){
+      body.append(el('p','问题格式无效，无法安全提交答案。'));
+      const raw=el('details');raw.append(el('summary','查看收到的内容'),displayCode(item.input,'json'));body.append(raw);
+      const deny=el('button','取消问题');deny.type='button';deny.className='permission-deny';deny.onclick=()=>requestPermission({requestId:item.requestId,decision:'deny'});body.append(deny);return;
+    }
+    const form=el('form');form.className='question-form';const controls=[];
+    questions.forEach((q,index)=>{
+      const field=el('fieldset');field.append(el('legend',q.header||('问题 '+(index+1))),el('p',q.question));
+      const name='question-'+item.requestId+'-'+index;const choices=[];
+      for(const option of q.options){
+        const label=el('label');const input=el('input');input.type=q.multiSelect?'checkbox':'radio';input.name=name;input.value=String(option.label||'');
+        label.append(input,el('span',String(option.label||'选项')));
+        if(option.description)label.append(el('small',String(option.description)));
+        field.append(label);choices.push({input,value:String(option.label||'')});
+      }
+      const otherLabel=el('label');const other=el('input');other.type=q.multiSelect?'checkbox':'radio';other.name=name;other.value='__other__';otherLabel.append(other,el('span','其他'));field.append(otherLabel);
+      const custom=el('input');custom.type='text';custom.className='question-other';custom.placeholder='填写自定义回答';custom.setAttribute('aria-label','自定义回答');custom.hidden=true;field.append(custom);
+      controls.push({question:q.question,choices,other,custom});
+      field.addEventListener('change',()=>{custom.hidden=!other.checked;validate();});custom.addEventListener('input',validate);form.append(field);
+    });
+    const errorBox=el('p');errorBox.className='permission-error';errorBox.textContent=item.output||'';form.append(errorBox);
+    const actions=el('div');actions.className='permission-actions';
+    const deny=el('button','取消');deny.type='button';deny.className='permission-deny';
+    const submit=el('button','提交回答');submit.type='submit';submit.className='permission-allow';submit.disabled=true;actions.append(deny,submit);form.append(actions);
+    function values(){
+      const result={};
+      for(const c of controls){
+        const picked=c.choices.filter(o=>o.input.checked).map(o=>o.value);
+        if(c.other.checked){const custom=c.custom.value.trim();if(!custom)return null;picked.push(custom);}
+        if(!picked.length)return null;
+        result[c.question]=picked.join(', ');
+      }
+      return result;
+    }
+    function validate(){submit.disabled=!values();}
+    deny.onclick=()=>requestPermission({requestId:item.requestId,decision:'deny'});
+    form.onsubmit=e=>{e.preventDefault();const answers=values();if(!answers)return;requestPermission({requestId:item.requestId,decision:'answer',answers:JSON.stringify(answers)});form.classList.add('submitting');for(const control of form.elements)control.disabled=true;};
+    body.append(form);
+  }
+  function approvalCard(item, body) {
+    let data={};try{data=JSON.parse(item.input||'{}');}catch{}
+    body.append(permissionMeta(item,data));
+    const error=el('p');error.className='permission-error';error.textContent=item.output||'';body.append(error);
+    const actions=el('div');actions.className='permission-actions';
+    const deny=el('button','拒绝');deny.type='button';deny.className='permission-deny';
+    const allow=el('button','允许一次');allow.type='button';allow.className='permission-allow';
+    deny.onclick=()=>requestPermission({requestId:item.requestId,decision:'deny'});
+    allow.onclick=()=>requestPermission({requestId:item.requestId,decision:'allow'});
+    actions.append(deny,allow);body.append(actions);
+  }
+  function renderPermission(item, body) {
+    if(item.name==='AskUserQuestion'){
+      let data={};try{data=JSON.parse(item.input||'{}');}catch{}
+      answerQuestion(item,body,data);
+    } else approvalCard(item,body);
+  }
   function reconcile(parent, fresh) {
     const incoming=[...fresh.childNodes];
     incoming.forEach((next,index)=>{
@@ -109,23 +200,32 @@
         if (entry && entry.kind !== item.kind) continue;
         if (!entry) {
           const node = el(item.kind === 'tool' ? 'details' : 'article'); node.className = item.kind; node.dataset.id = id;
+          if(item.kind==='tool'&&item.status==='approval')node.open=true;
           const body = el('div'); body.className = 'body';
           let title;
           if (item.kind === 'tool') { title = el('summary'); node.append(title); }
           node.append(body); this.root.append(node); entry = {node,body,title,kind:item.kind,text:null}; this.items.set(id,entry);
         }
         if (entry.title) {
-          const states={running:'执行中',done:'已完成',failed:'失败',approval:'等待审批',denied:'已拒绝'};
+          const states={running:'执行中',done:'已完成',failed:'失败',approval:'等待处理',denied:'已拒绝',interrupted:'请求已失效'};
           entry.title.textContent = (item.name || '工具调用').replace(/\s*\[(Done|Failed)\]/g,'') + (item.status ? ' · ' + (states[item.status]||item.status) : '');
           entry.node.classList.toggle('failed',item.status==='failed');
+          entry.node.classList.toggle('approval',item.status==='approval');
         }
-        const text = item.kind==='tool' ? JSON.stringify([item.text,item.input,item.output]) : String(item.text || '');
+        const text = item.kind==='tool' ? JSON.stringify([item.text,item.input,item.output,item.requestId,item.workDir,item.status,item.name]) : String(item.text || '');
         const selection=document.getSelection();
         if (entry.text!==text && !selection.isCollapsed && selection.containsNode(entry.body,true)) continue;
         if (entry.text !== text) {
           entry.text = text;
           if (item.kind === 'assistant') reconcile(entry.body,markdown(text));
-          else if (item.kind === 'tool') {
+          else if (item.kind === 'tool' && item.status==='approval' && item.requestId) {
+            if(entry.permissionRequestId===item.requestId){
+              const error=entry.body.querySelector('.permission-error');if(error)error.textContent=item.output||'';
+            } else {
+              entry.body.replaceChildren();renderPermission(item,entry.body);entry.permissionRequestId=item.requestId;
+            }
+          } else if (item.kind === 'tool') {
+            entry.permissionRequestId='';
             const content=document.createDocumentFragment();
             if (item.input) content.append(el('h4','输入'),el('pre',item.input));
             if (item.output) content.append(el('h4','输出'),el('pre',item.output));

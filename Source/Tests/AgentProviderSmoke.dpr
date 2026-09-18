@@ -61,6 +61,11 @@ end;
 var
   SavedConfig: TdevAgentConfig;
   SavedModel, SavedKey, SavedBaseUrl: String;
+  SavedCompilerSets: TdevCompilerSets;
+  TestCompiler: TdevCompilerSet;
+  TestCompilerRoot, TestCompilerBin, SearchPath: String;
+  TempPath: array[0..MAX_PATH] of Char;
+  TestCompilerEnvironment: PChar;
 begin
   try
     Writeln('Agent provider smoke test: default and legacy models');
@@ -115,6 +120,42 @@ begin
       SetEnvironmentVariable('ANTHROPIC_DEFAULT_OPUS_MODEL', PChar(SavedModel));
       SetEnvironmentVariable('ANTHROPIC_API_KEY', PChar(SavedKey));
       SetEnvironmentVariable('ANTHROPIC_BASE_URL', PChar(SavedBaseUrl));
+    end;
+
+    Writeln('Agent provider smoke test: selected compiler search path');
+    SavedCompilerSets := devCompilerSets;
+    TestCompilerRoot := '';
+    TestCompilerBin := '';
+    devCompilerSets := TdevCompilerSets.Create;
+    try
+      TestCompiler := devCompilerSets.AddSet;
+      TestCompiler.Name := 'Selected compiler test';
+      if GetTempPath(Length(TempPath), TempPath) = 0 then
+        raise Exception.Create('could not locate the temporary directory');
+      TestCompilerRoot := IncludeTrailingPathDelimiter(String(TempPath)) +
+        'devcpp-agent-provider-' + IntToStr(GetCurrentProcessId);
+      TestCompilerBin := IncludeTrailingPathDelimiter(TestCompilerRoot) + 'bin';
+      if not ForceDirectories(TestCompilerBin) then
+        raise Exception.Create('could not create a temporary compiler directory');
+      TestCompiler.BinDir.Add(TestCompilerBin);
+      devCompilerSets.DefaultSetIndex := 0;
+      TestCompilerEnvironment := BuildEnvironmentBlock('');
+      try
+        SearchPath := EnvironmentValue(TestCompilerEnvironment, 'PATH');
+        Require(Copy(SearchPath, 1, Length(TestCompilerBin) + 1) =
+          TestCompilerBin + ';', 'PATH does not start with the selected compiler');
+        Require(EnvironmentValue(TestCompilerEnvironment, 'DEVCPP_COMPILER_NAME') =
+          TestCompiler.Name, 'active compiler name was not exposed to the child');
+        Require(EnvironmentValue(TestCompilerEnvironment, 'DEVCPP_COMPILER_BINS') =
+          TestCompilerBin, 'active compiler directory was not exposed to the child');
+      finally
+        FreeMem(TestCompilerEnvironment);
+      end;
+    finally
+      devCompilerSets.Free;
+      devCompilerSets := SavedCompilerSets;
+      RemoveDir(TestCompilerBin);
+      RemoveDir(TestCompilerRoot);
     end;
     Writeln('Agent provider smoke test passed.');
   except

@@ -1150,6 +1150,7 @@ type
     procedure AgentRequestEnded(Sender: TObject);
     procedure AgentResponseTimerTick(Sender: TObject);
     function AgentSessionFileName(const WorkDir: String): String;
+    function AgentWorkspaceDir: String;
     function LoadAgentSession(const FileName: String): String;
     procedure SaveAgentSession(const FileName, SessionId: String);
     function ParseToolParams(s: AnsiString): AnsiString;
@@ -9337,7 +9338,7 @@ const
     'Add clear, beginner-friendly comments to the selected C/C++ code.');
 var
   E: TEditor;
-  Selection, Prompt: AnsiString;
+  Prompt: AnsiString;
   ActionIndex: Integer;
 begin
   E := fEditorList.GetEditor;
@@ -9346,14 +9347,11 @@ begin
     Exit;
   end;
 
-  if E.Text.SelAvail then Selection := E.Text.SelText
-  else Selection := E.Text.Lines.Text;
-  if Length(Selection) > 16000 then
-    Selection := Copy(Selection, 1, 16000) + #13#10 + '[Selection truncated]';
   ActionIndex := TAction(Sender).Tag;
   Prompt := Prompts[ActionIndex] + #13#10#13#10 +
     'File: ' + E.FileName + #13#10 +
-    'Selected code:' + #13#10 + Selection;
+    'Use the current editor context attached by the IDE, including the ' +
+    'selection, cursor location, and whether the buffer has unsaved changes.';
 
   fAgentPanel.Visible := True;
   fAgentSplitter.Visible := True;
@@ -9390,6 +9388,24 @@ begin
   if Length(Key) > 100 then
     Key := Copy(Key, Length(Key) - 99, 100);
   Result := IncludeTrailingPathDelimiter(BaseDir) + Key + '_' + HashText + '.session';
+end;
+
+function TMainForm.AgentWorkspaceDir: String;
+var
+  E: TEditor;
+begin
+  Result := '';
+  if Assigned(fProject) and (fProject.FileName <> '') then
+    Result := ExtractFilePath(fProject.FileName);
+  if (Result = '') and Assigned(fEditorList) then begin
+    E := fEditorList.GetEditor;
+    if Assigned(E) and (E.FileName <> '') then
+      Result := ExtractFilePath(E.FileName);
+  end;
+  if Result = '' then
+    Result := devDirs.Exec;
+  if Result <> '' then
+    Result := IncludeTrailingPathDelimiter(ExpandFileName(Result));
 end;
 
 function TMainForm.LoadAgentSession(const FileName: String): String;
@@ -9639,8 +9655,7 @@ var
   SessionGuid: TGUID;
 begin
   if fAgentSessionFile = '' then begin
-    if Assigned(fProject) then fAgentWorkDir := ExtractFilePath(fProject.FileName)
-    else fAgentWorkDir := devDirs.Exec;
+    fAgentWorkDir := AgentWorkspaceDir;
     fAgentSessionFile := AgentSessionFileName(fAgentWorkDir);
   end;  Key := fAgentPanelFrame.SelectedSession;
   if (Key <> '') and (Key = fAgentChatKey) then Exit;
@@ -9675,43 +9690,100 @@ begin
 end;
 procedure TMainForm.AgentPrepareContext(Sender: TObject);
 begin
+  if (fAgentWorkDir <> '') and
+     not SameFileName(AgentWorkspaceDir, fAgentWorkDir) then
+    RestartAgentForCurrentProject;
   UpdateAgentCompileContext;
 end;
 
 procedure TMainForm.UpdateAgentCompileContext;
 var
-  I: Integer;
-  Context, MessageText, EditorContext: AnsiString;
+  I, StartLine, EndLine, CaretLine, SnapshotLength: Integer;
+  Context, Diagnostics, MessageText, EditorContext, LineText,
+    FileName, BufferState: AnsiString;
   E: TEditor;
+  Snapshot: TStringList;
+  Truncated: Boolean;
 begin
   if not Assigned(fAgentPanelFrame) then
     Exit;
 
-  Context := '';
+  Diagnostics := '';
   for I := 0 to CompilerOutput.Items.Count - 1 do begin
     if CompilerOutput.Items[I].SubItems.Count < 3 then
       Continue;
     MessageText := CompilerOutput.Items[I].SubItems[2];
     if StartsStr('[Error]', MessageText) or StartsStr('[Warning]', MessageText) then begin
-      Context := Context + CompilerOutput.Items[I].SubItems[1] + ':' +
+      LineText := CompilerOutput.Items[I].SubItems[1] + ':' +
         CompilerOutput.Items[I].Caption + ':' +
         CompilerOutput.Items[I].SubItems[0] + ' ' + MessageText + #13#10;
-      if Length(Context) >= 12000 then begin
-        Context := Copy(Context, 1, 12000) + '[Build context truncated]' + #13#10;
+      if Length(Diagnostics) + Length(LineText) > 12000 then begin
+        Diagnostics := Diagnostics + '[More diagnostics omitted]' + #13#10;
         Break;
       end;
+      Diagnostics := Diagnostics + LineText;
     end;
   end;
-  if Context <> '' then
-    Context := 'Latest build errors/warnings:' + #13#10 + Context;
+  Context := '';
   E := fEditorList.GetEditor;
   if Assigned(E) then begin
-    if E.Text.SelAvail then EditorContext := E.Text.SelText
-    else EditorContext := E.Text.Lines.Text;
-    if Length(EditorContext) > 24000 then
-      EditorContext := Copy(EditorContext, 1, 24000) + #13#10 + '[Editor context truncated]';
-    Context := 'Current editor buffer (may contain unsaved changes): ' + E.FileName +
-      #13#10 + EditorContext + #13#10#13#10 + Context;
+    Snapshot := TStringList.Create;
+    try
+      FileName := E.FileName;
+      if FileName = '' then FileName := 'Untitled editor buffer';
+      if E.Text.Modified then BufferState := 'unsaved changes'
+      else BufferState := 'saved';
+      CaretLine := E.Text.CaretY;
+      if CaretLine < 1 then CaretLine := 1;
+
+      if E.Text.SelAvail then begin
+        StartLine := E.Text.BlockBegin.Line;
+        EndLine := E.Text.BlockEnd.Line;
+        EditorContext := E.Text.SelText;
+        if Length(EditorContext) > 24000 then
+          EditorContext := Copy(EditorContext, 1, 24000) +
+            #13#10 + '[Selection truncated at 24000 bytes]';
+        LineText := 'Selected lines ' + IntToStr(StartLine) + '-' +
+          IntToStr(EndLine) + '; cursor at ' + IntToStr(CaretLine) + ':' +
+          IntToStr(E.Text.CaretX) + '.';
+      end else begin
+        StartLine := CaretLine - 80;
+        if StartLine < 1 then StartLine := 1;
+        EndLine := CaretLine + 80;
+        if EndLine > E.Text.Lines.Count then EndLine := E.Text.Lines.Count;
+        Truncated := False;
+        if StartLine > 1 then Snapshot.Add('[Earlier lines omitted]');
+        SnapshotLength := Length(Snapshot.Text);
+        for I := StartLine to EndLine do begin
+          LineText := IntToStr(I) + ': ' + E.Text.Lines[I - 1];
+          if SnapshotLength + Length(LineText) + 2 > 24000 then begin
+            Truncated := True;
+            Break;
+          end;
+          Snapshot.Add(LineText);
+          Inc(SnapshotLength, Length(LineText) + 2);
+        end;
+        if (EndLine < E.Text.Lines.Count) or Truncated then
+          Snapshot.Add('[Later lines omitted]');
+        EditorContext := Snapshot.Text;
+        LineText := 'Context window lines ' + IntToStr(StartLine) + '-' +
+          IntToStr(EndLine) + '; cursor at ' + IntToStr(CaretLine) + ':' +
+          IntToStr(E.Text.CaretX) + '.';
+      end;
+
+      Context := 'Active editor: ' + FileName + ' (' + BufferState + '). ' +
+        LineText + #13#10 +
+        'The snapshot below is from the live IDE buffer. It can differ from ' +
+        'the saved file on disk.' + #13#10 + EditorContext;
+    finally
+      Snapshot.Free;
+    end;
+  end;
+  if Diagnostics <> '' then begin
+    if Context <> '' then Context := Context + #13#10#13#10;
+    Context := Context +
+      'Compiler diagnostics currently visible in the IDE (check that they ' +
+      'match this revision):' + #13#10 + Diagnostics;
   end;
   fAgentPanelFrame.SetContext(Context);
 end;
@@ -9725,11 +9797,9 @@ begin
   if Assigned(fAgentProcess) and fAgentProcess.IsRunning then
     Exit;
 
-  // Determine the working directory: project dir if open, else exec dir.
-  if Assigned(fProject) then
-    workDir := ExtractFilePath(fProject.FileName)
-  else
-    workDir := devDirs.Exec;
+  // Keep the CLI rooted in the project, or the active saved source directory
+  // when working without a project.
+  workDir := AgentWorkspaceDir;
 
   sessionFile := AgentSessionFileName(workDir);
   if (fAgentSessionFile <> '') and
@@ -9838,6 +9908,8 @@ begin
     fAgentReader.WaitFor;
     FreeAndNil(fAgentReader);
   end;
+  if Assigned(fAgentPanelFrame) then
+    fAgentPanelFrame.ExpirePendingPermissions;
   if Assigned(fAgentPanelFrame) and (fAgentChatKey <> '') and (fAgentSessionFile <> '') then
     try
       fAgentPanelFrame.SaveConversation(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + fAgentChatKey);
@@ -9862,7 +9934,7 @@ var
   ev: TAgentEvent;
   I, MapIndex: Integer;
   Allowed: Boolean;
-  Path: String;
+  Path, AnswersJSON: String;
 begin
   // TThread.WaitFor pumps synchronized callbacks while the IDE is closing.
   // Ignore late pipe lines during teardown so no panel/control is touched
@@ -9877,20 +9949,34 @@ begin
     for I := 0 to Length(Events) - 1 do begin
       ev := Events[I];
       if ev.EventType = aetPermission then begin
-        fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-          ev.ToolName, ev.ToolInput, 'approval', False);
         if Assigned(fAgentResponseTimer) then fAgentResponseTimer.Enabled := False;
-        Allowed := False;
-        if ev.Subtype = 'can_use_tool' then
-          Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
-        if Allowed then
-          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-            ev.ToolName, 'Allowed once', 'done', True)
-        else
-          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-            ev.ToolName, 'Denied', 'denied', True);
-        if Assigned(fAgentProcess) and not fAgentProcess.SendPermissionResponse(ev.EventId, ev.ToolInput, Allowed) then
-          fAgentPanelFrame.AppendSystemMessage('Failed to deliver approval decision. Stop and retry the request.');
+        if ev.EventId = '' then begin
+          fAgentPanelFrame.AppendSystemMessage('The CLI sent an approval request without a request ID; stopping this turn.');
+          if Assigned(fAgentProcess) then fAgentProcess.SendInterrupt;
+          Continue;
+        end;
+        if SameText(ev.Subtype, 'can_use_tool') then begin
+          fAgentPanelFrame.QueuePermission(ev, fAgentWorkDir);
+          if not fAgentPanelFrame.CanShowInlinePermissions then begin
+            if SameText(ev.ToolName, 'AskUserQuestion') then begin
+              AnswersJSON := '';
+              if RequestAgentQuestion(ev.ToolInput, AnswersJSON) then
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'answer', AnswersJSON)
+              else
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'deny', '');
+            end else begin
+              Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
+              if Allowed then
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'allow', '')
+              else
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'deny', '');
+            end;
+          end;
+        end else begin
+          fAgentPanelFrame.AppendSystemMessage('Unsupported permission request: ' + ev.Subtype);
+          if Assigned(fAgentProcess) then
+            fAgentProcess.SendPermissionResponse(ev.EventId, '{}', False);
+        end;
         Continue;
       end;
       if ev.SessionId <> '' then begin
@@ -9964,6 +10050,8 @@ begin
     fAgentResponseTimer.Enabled := False;
   if fAgentExpectedStop or fQuitting then
     Exit;
+  if Assigned(fAgentPanelFrame) then
+    fAgentPanelFrame.ExpirePendingPermissions;
   if fAgentResumeAttempted and not fAgentIgnoreSavedSession then begin
     // A stale session id can make Claude exit before it emits system.init.
     // Retry once with a fresh session; never call Stop/WaitFor from this

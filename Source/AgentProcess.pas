@@ -476,9 +476,11 @@ end;
 function BuildEnvironmentBlock(const WorkDir: String): PChar;
 var
   EnvList: TStringList;
-  InstallDir, OldPath, NewPath, CompilerBinDir: String;
-  i, Total, Pos: Integer;
+  InstallDir, OldPath, NewPath, CompilerBinDir, ConfiguredCompilerPath,
+    CompilerName: String;
+  i, j, Total, Pos: Integer;
   Provider, ApiKey, BaseUrl, Model: String;
+  CompilerSet: TdevCompilerSet;
 
   procedure SetVar(const Name, Value: String);
   var
@@ -532,17 +534,40 @@ begin
     InstallDir := ExtractFilePath(ParamStr(0));
     InstallDir := ExcludeTrailingBackslash(InstallDir);
 
-    // Prepend the bundled toolchain folders to PATH
+    // Use the compiler selected in Dev-C++ first. This keeps CLI build tools
+    // aligned with the compiler used by the IDE for the current target.
     OldPath := GetVar('PATH');
+    ConfiguredCompilerPath := '';
+    CompilerName := '';
+    CompilerSet := nil;
+    if Assigned(devCompilerSets) then begin
+      CompilerSet := devCompilerSets.CompilationSet;
+      if not Assigned(CompilerSet) then
+        CompilerSet := devCompilerSets.DefaultSet;
+    end;
+    if Assigned(CompilerSet) then begin
+      CompilerName := CompilerSet.Name;
+      for j := 0 to CompilerSet.BinDir.Count - 1 do
+        if DirectoryExists(CompilerSet.BinDir[j]) then begin
+          if ConfiguredCompilerPath <> '' then
+            ConfiguredCompilerPath := ConfiguredCompilerPath + ';';
+          ConfiguredCompilerPath := ConfiguredCompilerPath +
+            ExcludeTrailingPathDelimiter(CompilerSet.BinDir[j]);
+        end;
+    end;
+
     CompilerBinDir := InstallDir + '\MinGW64\bin';
     if not DirectoryExists(CompilerBinDir) then
       CompilerBinDir := InstallDir + '\MinGW32\bin';
-    NewPath := InstallDir + '\nodejs;' +
-               InstallDir + '\claude-cli\bin;' +
-               CompilerBinDir;
+    NewPath := ConfiguredCompilerPath;
+    if NewPath <> '' then NewPath := NewPath + ';';
+    NewPath := NewPath + InstallDir + '\nodejs;' +
+               InstallDir + '\claude-cli\bin;' + CompilerBinDir;
     if OldPath <> '' then
       NewPath := NewPath + ';' + OldPath;
     SetVar('PATH', NewPath);
+    SetVar('DEVCPP_COMPILER_NAME', CompilerName);
+    SetVar('DEVCPP_COMPILER_BINS', ConfiguredCompilerPath);
 
     // Inject the API key according to the configured provider.
     if Assigned(devAgentConfig) then begin
@@ -690,11 +715,12 @@ var
   si: TStartupInfo;
   pi: TProcessInformation;
   CmdLine, CommandShell, Model, ModelArg, PermissionArg, ResumeArg: String;
-  SystemPromptArg: String;
+  SystemPromptArg, SystemPromptText, CompilerName: String;
   McpArg, PluginArg: String;
   EnvBlock: PChar;
   WorkDirPtr: PChar;
   JobHandle: THandle;
+  CompilerSet: TdevCompilerSet;
 begin
   Result := False;
   fLastError := '';
@@ -806,25 +832,47 @@ begin
   McpArg := '';
   PluginArg := '';
   SystemPromptArg := '';
+  CompilerName := '';
+  CompilerSet := nil;
+  if Assigned(devCompilerSets) then begin
+    CompilerSet := devCompilerSets.CompilationSet;
+    if not Assigned(CompilerSet) then
+      CompilerSet := devCompilerSets.DefaultSet;
+  end;
+  if Assigned(CompilerSet) then
+    CompilerName := CompilerSet.Name;
+  SystemPromptText :=
+    'You are Claude Code running inside the Dev-C++ IDE. The process working ' +
+    'directory is the active project workspace. Prefer paths relative to this ' +
+    'workspace and inspect relevant files before changing them. The IDE may ' +
+    'attach the active editor buffer, including unsaved edits; treat that ' +
+    'snapshot as newer than the file on disk and do not overwrite unsaved IDE ' +
+    'content based on stale disk data. Use the compiler available first on ' +
+    'PATH when building so your checks match the IDE toolchain. Explain which ' +
+    'files you change and report the exact build or test result.';
+  if CompilerName <> '' then
+    SystemPromptText := SystemPromptText + #13#10 +
+      'The active Dev-C++ compiler set is: ' + CompilerName + '.';
   if Assigned(devAgentConfig) then begin
     McpArg := BuildPathOption('--mcp-config', devAgentConfig.McpConfigFiles,
       WorkDir, False);
     PluginArg := BuildPathOption('--plugin-dir', devAgentConfig.PluginDirs,
       WorkDir, True);
-    if Trim(devAgentConfig.SystemPrompt) <> '' then begin
-      if not CreateSystemPromptFile(devAgentConfig.SystemPrompt) then begin
-        fLastError := 'Could not create the temporary system prompt file.';
-        LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
-        CloseAgentHandle(fOutputRead);
-        CloseAgentHandle(fOutputWrite);
-        CloseAgentHandle(fInputRead);
-        CloseAgentHandle(fInputWrite);
-        Exit;
-      end;
-      SystemPromptArg := ' --append-system-prompt-file "' +
-        fSystemPromptFile + '"';
-    end;
+    if Trim(devAgentConfig.SystemPrompt) <> '' then
+      SystemPromptText := SystemPromptText + #13#10#13#10 +
+        'Additional user instructions:' + #13#10 + devAgentConfig.SystemPrompt;
   end;
+  if not CreateSystemPromptFile(SystemPromptText) then begin
+    fLastError := 'Could not create the temporary system prompt file.';
+    LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
+    CloseAgentHandle(fOutputRead);
+    CloseAgentHandle(fOutputWrite);
+    CloseAgentHandle(fInputRead);
+    CloseAgentHandle(fInputWrite);
+    Exit;
+  end;
+  SystemPromptArg := ' --append-system-prompt-file "' +
+    fSystemPromptFile + '"';
 
   // CreateProcess cannot execute .cmd/.bat files directly. Route launcher
   // scripts through the user's command shell while keeping the CLI path

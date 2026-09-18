@@ -81,6 +81,7 @@
       updateSend();
     }
     if (message.type === 'draft') { $('input').value = message.text || ''; resizeInput(); }
+    if (message.type === 'permission-error') $('status').textContent=message.message||'此请求已失效';
   }
   function send() {
     if (!ready || busy || pending) return;
@@ -93,6 +94,7 @@
   $('input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && (!ctrlEnter || e.ctrlKey)) { e.preventDefault(); send(); } };
   $('input').oninput=()=>{resizeInput();post('draft',{text:$('input').value});};
   document.addEventListener('agent-open-code', e=>post('open-code-block',{text:e.detail}));
+  document.addEventListener('agent-permission', e=>post('permission',e.detail||{}));
   $('history').onclick=()=>{const open=$('history-panel').hidden;closePopups();$('history-panel').hidden=!open;$('history').setAttribute('aria-expanded',String(open));if(open)$('session-search').focus();};
   $('more').onclick=()=>{const open=$('menu').hidden;closePopups();$('menu').hidden=!open;$('more').setAttribute('aria-expanded',String(open));};
   $('session-search').oninput=renderSessions;

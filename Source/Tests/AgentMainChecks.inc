@@ -1,6 +1,8 @@
 procedure TMainForm.RunAgentInteractionChecks(const Root, Cli: String);
 var
   Key1, Key2, Id1, SavedCliHome, Expected: String;
+  PermissionSnapshot, AnswersJSON: String;
+  PermissionEvent: TAgentEvent;
   Data: TStringList;
   KeyMessage: TWMKey;
   Keyboard, SavedKeyboard: TKeyboardState;
@@ -107,6 +109,39 @@ begin
 
     StartAgent;
     CheckResume('');
+    FillChar(PermissionEvent, SizeOf(PermissionEvent), 0);
+    PermissionEvent.EventType := aetPermission;
+    PermissionEvent.Subtype := 'can_use_tool';
+    PermissionEvent.EventId := 'ask-answer';
+    PermissionEvent.ToolName := 'AskUserQuestion';
+    PermissionEvent.ToolInput := '{"questions":[{"question":"Which compiler?","header":"Compiler","multiSelect":false,' +
+      '"options":[{"label":"GCC","description":"GNU"},{"label":"Clang","description":"LLVM"}]}]}';
+    fAgentPanelFrame.QueuePermission(PermissionEvent, 'C:\work');
+    PermissionSnapshot := fAgentPanelFrame.Timeline.WebBlock(fAgentPanelFrame.Timeline.BlockCount - 1);
+    Require(Pos('"requestId":"ask-answer"', PermissionSnapshot) > 0,
+      'inline approval request id missing');
+    Require((Pos('"workDir":', PermissionSnapshot) > 0) and
+      (Pos('work', PermissionSnapshot) > 0),
+      'inline approval working directory missing');
+    Require(fAgentPanelFrame.ResolvePermission('ask-answer', 'answer',
+      '{"Which compiler?":"GCC"}'), 'AskUserQuestion answer was rejected');
+    Sleep(100);
+    Data.LoadFromFile(IncludeTrailingPathDelimiter(devDirs.Exec) + 'fixture-decision.txt');
+    Require(Pos('"request_id":"ask-answer"', Data.Text) > 0,
+      'AskUserQuestion response request id missing');
+    Require(Pos('"answers":{"Which compiler?":"GCC"}', Data.Text) > 0,
+      'AskUserQuestion answer was not returned as updated input');
+    PermissionEvent.EventId := 'ask-invalid';
+    fAgentPanelFrame.QueuePermission(PermissionEvent, 'C:\work');
+    Require(not fAgentPanelFrame.ResolvePermission('ask-invalid', 'answer', '{}'),
+      'incomplete question answers must be rejected');
+    fAgentPanelFrame.ExpirePendingPermissions;
+    PermissionSnapshot := fAgentPanelFrame.Timeline.WebBlock(fAgentPanelFrame.Timeline.BlockCount - 1);
+    Require(Pos('"status":"interrupted"', PermissionSnapshot) > 0,
+      'expired permission was not marked stale');
+    Require(not fAgentPanelFrame.ResolvePermission('ask-invalid', 'answer',
+      '{"Which compiler?":"GCC"}'), 'expired permission was accepted');
+    Writeln('Agent integration: inline request lifecycle and AskUserQuestion response passed');
     Require(fAgentProcess.SendPermissionResponse('allow-request', '{"command":"echo sample"}', True), 'approval write failed');
     Sleep(100);
     Data.LoadFromFile(IncludeTrailingPathDelimiter(devDirs.Exec) + 'fixture-decision.txt');

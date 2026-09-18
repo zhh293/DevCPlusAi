@@ -155,6 +155,11 @@ begin
     else if Action = 'context' then PrepareContextClick(Self)
     else if Action = 'clear' then begin
       if not (fStatus in [asThinking, asExecuting]) then ClearChatClick(Self);
+    end else if Action = 'permission' then begin
+      if not ResolvePermission(String(Value('requestId')), String(Value('decision')),
+        String(Value('answers'))) then
+        fWeb.PostJSON(WideString('{"version":1,"type":"permission-error","message":' +
+          WebQuote('This request expired or the answers are incomplete. Review the form and try again.') + '}'));
     end else if Action = 'logs' then fDetails.Checked := not fDetails.Checked
     else if Action = 'quick' then begin
       I := StrToIntDef(String(Value('index')), -1);

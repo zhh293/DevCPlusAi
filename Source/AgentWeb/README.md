@@ -12,7 +12,7 @@ Run `tools/build-windows.ps1 -SkipConsolePauser` for the application and integra
 
 Delphi owns the WebView parent. The bridge synchronizes controller visibility and bounds with that window. Closing a view suppresses asynchronous callbacks into Delphi. The DLL remains loaded until process exit because queued COM callbacks can retain its code pointers.
 
-Tool input, output and status are stored with the timeline. Approvals are decided by the IDE approval dialog and recorded inline. The renderer cannot approve commands. Session removal hides the conversation with a `.deleted` marker while retaining its local records; the history scanner excludes those records from automatic import.
+Tool input, output and status are stored with the timeline. Permission requests appear inline at their chronological position. File approvals show the resolved target path, working directory scope and a code preview; command approvals show the exact command. AskUserQuestion renders single-choice, multi-choice and custom-answer controls and returns a validated `answers` object through the CLI permission response. The IDE checks the active request ID before sending a decision, marks unanswered requests expired when the process ends, and loads historical approvals as non-actionable. The renderer cannot directly execute tools. Session removal hides the conversation with a `.deleted` marker while retaining its local records; the history scanner excludes those records from automatic import.
 
 ## Protocol
 
@@ -26,7 +26,7 @@ Host packets:
 - `draft`: restores the input draft.
 - `accepted` / `rejected`: acknowledges `requestId`. Acceptance clears only the submitted draft, preserving edits typed while sending.
 
-Browser actions: `draft`, `send`, `stop`, `session`, `new`, `rename-session`, `delete-session`, `settings`, `attach`, `paste-image`, `remove`, `copy`, `open-code`, `open-code-block`, `context`, `clear`, `logs`, `quick`.
+Browser actions: `draft`, `send`, `stop`, `session`, `new`, `rename-session`, `delete-session`, `settings`, `attach`, `paste-image`, `remove`, `copy`, `open-code`, `open-code-block`, `context`, `clear`, `logs`, `quick`, and `permission` (`requestId`, `decision`, and optional serialized `answers`).
 
 ## Rendering and tests
 

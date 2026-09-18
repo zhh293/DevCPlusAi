@@ -41,6 +41,8 @@ type
     procedure AppendMessage(const Text: String; TextColor: TColor; IsUser: Boolean);
     procedure AddTool(const Id, Caption, Details: String;
       const Status: String = ''; IsResult: Boolean = False);
+    procedure AddPermission(const Id, Caption, InputJSON, WorkDir: String);
+    procedure UpdatePermission(const Id, Status, Details: String);
     procedure ApplyAppearance(AEditorColor, ATextColor: TColor;
       const FontName: String; FontSize: Integer);
   end;
@@ -67,6 +69,7 @@ type
   public
     ToolId: String;
     InputText, OutputText, State: String;
+    PermissionRequestId, PermissionWorkDir: String;
     Header: TTimelineButton;
     Body: TMemo;
   end;
@@ -213,17 +216,20 @@ function TAgentTimeline.BlockAt(Index: Integer): TControl;
 begin Result := TControl(fBlocks[Index]); end;
 
 function TAgentTimeline.WebBlock(Index: Integer): String;
-var Block: TObject; Kind, Text, Name, InputText, OutputText, State: String; R: TTimelineRichEdit;
+var Block: TObject; Kind, Text, Name, InputText, OutputText, State,
+  RequestId, WorkDir: String; R: TTimelineRichEdit;
 begin
   Block := TObject(fBlocks[Index]);
   Kind := 'system'; Text := ''; Name := '';
-  InputText := ''; OutputText := ''; State := '';
+  InputText := ''; OutputText := ''; State := ''; RequestId := ''; WorkDir := '';
   if Block is TTimelineTool then begin
     Kind := 'tool'; Name := TTimelineTool(Block).Header.Hint;
     Text := TTimelineTool(Block).Body.Text;
     InputText := TTimelineTool(Block).InputText;
     OutputText := TTimelineTool(Block).OutputText;
     State := TTimelineTool(Block).State;
+    RequestId := TTimelineTool(Block).PermissionRequestId;
+    WorkDir := TTimelineTool(Block).PermissionWorkDir;
   end else if Block is TTimelineRichEdit then begin
     R := TTimelineRichEdit(Block); Text := R.Text;
     if R.IsUserMessage then Kind := 'user'
@@ -233,7 +239,9 @@ begin
     WebQuote(IntToStr(fGeneration) + '-' + IntToStr(Index)) +
     ',"kind":' + WebQuote(Kind) + ',"text":' + WebQuote(Text) +
     ',"name":' + WebQuote(Name) + ',"status":' + WebQuote(State) +
-    ',"input":' + WebQuote(InputText) + ',"output":' + WebQuote(OutputText) + '}}';
+    ',"input":' + WebQuote(InputText) + ',"output":' + WebQuote(OutputText) +
+    ',"requestId":' + WebQuote(RequestId) +
+    ',"workDir":' + WebQuote(WorkDir) + '}}';
 end;
 
 function TAgentTimeline.FocusedEdit: TCustomEdit;
@@ -313,6 +321,8 @@ begin
       if Ini.ReadString(Section, 'kind', '') = 'tool' then begin
         AddTool(Ini.ReadString(Section, 'id', ''), Ini.ReadString(Section, 'title', ''), Lines.Text,
           Ini.ReadString(Section, 'status', ''));
+        if SameText(TTimelineTool(fBlocks[fBlocks.Count - 1]).State, 'approval') then
+          TTimelineTool(fBlocks[fBlocks.Count - 1]).State := 'interrupted';
         if FileExists(Path + '.' + Section + '.input') then begin
           Lines.LoadFromFile(Path + '.' + Section + '.input');
           TTimelineTool(fBlocks[fBlocks.Count - 1]).InputText := Lines.Text;
@@ -821,7 +831,7 @@ begin
 end;
 procedure TAgentTimeline.AddTool(const Id, Caption, Details: String;
   const Status: String; IsResult: Boolean);
-var I: Integer; Block: TTimelineTool;
+var I: Integer; Block: TTimelineTool; OldText: String;
 begin
   Block := nil;
   for I := 0 to fBlocks.Count - 1 do
@@ -868,11 +878,60 @@ begin
   end;
   ApplyBlockAppearance(Block, Font.Name, Font.Size);
   Block.Header.Hint := Caption;
-  Block.Header.Caption := '>  ' + Caption;
-  if Details <> '' then Block.Body.Lines.Add(Details);
+  if Block.Body.Visible then Block.Header.Caption := 'v  ' + Caption
+  else Block.Header.Caption := '>  ' + Caption;
   Block.State := Status;
   if IsResult then Block.OutputText := Details
   else if Details <> '' then Block.InputText := Details;
+  OldText := Block.Body.Lines.Text;
+  if Block.InputText <> '' then
+    Block.Body.Lines.Text := Block.InputText
+  else if Block.OutputText <> '' then
+    Block.Body.Lines.Text := Block.OutputText
+  else
+    Block.Body.Clear;
+  if IsResult and (Block.InputText <> '') and (Block.OutputText <> '') then
+    Block.Body.Lines.Text := Block.InputText + #13#10 + Block.OutputText;
+  if OldText <> Block.Body.Lines.Text then
+    Block.Body.SelStart := 0;
   LayoutBlocks;
+end;
+
+procedure TAgentTimeline.AddPermission(const Id, Caption, InputJSON,
+  WorkDir: String);
+var I: Integer; Block: TTimelineTool;
+begin
+  AddTool('permission-' + Id, Caption, InputJSON, 'approval', False);
+  for I := 0 to fBlocks.Count - 1 do
+    if TObject(fBlocks[I]) is TTimelineTool then
+      if TTimelineTool(fBlocks[I]).ToolId = 'permission-' + Id then begin
+        Block := TTimelineTool(fBlocks[I]);
+        Block.PermissionRequestId := Id;
+        Block.PermissionWorkDir := WorkDir;
+        Inc(fRevision);
+        Break;
+      end;
+end;
+
+procedure TAgentTimeline.UpdatePermission(const Id, Status, Details: String);
+var I: Integer; Block: TTimelineTool;
+begin
+  for I := 0 to fBlocks.Count - 1 do
+    if TObject(fBlocks[I]) is TTimelineTool then
+      if TTimelineTool(fBlocks[I]).PermissionRequestId = Id then begin
+        Block := TTimelineTool(fBlocks[I]);
+        Block.State := Status;
+        Block.OutputText := Details;
+        if Details <> '' then begin
+          if Block.InputText <> '' then
+            Block.Body.Lines.Text := Block.InputText + #13#10 + Details
+          else
+            Block.Body.Lines.Text := Details;
+        end;
+        if Status <> 'approval' then Block.PermissionRequestId := '';
+        Inc(fRevision);
+        LayoutBlocks;
+        Break;
+      end;
 end;
 end.
