@@ -289,6 +289,31 @@ if (-not $SkipConsolePauser) {
 }
 
 & (Join-Path $PSScriptRoot 'deploy-agent-web.ps1') -Destination $RepoRoot
+$unicodeWebRoot = Join-Path $RepoRoot ('.tools\webview-unicode-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+try {
+    New-Item -ItemType Directory -Force -Path $unicodeWebRoot | Out-Null
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'AgentWeb') -Destination (Join-Path $unicodeWebRoot 'AgentWeb') -Recurse -Force
+    $unicodePage = [Uri]::new((Join-Path $unicodeWebRoot 'AgentWeb\index.html')).AbsoluteUri
+    $unicodeProfile = Join-Path $unicodeWebRoot 'profile'
+    Push-Location $protocolTestRoot
+    try {
+        Invoke-NativeBuild $Dcc32Path @(
+            '-B',
+            'AgentWebNavigationSmoke.dpr',
+            '-N.\dcu',
+            ('-U' + $SourceRoot)
+        ) 'Compile WebView Unicode-path smoke test'
+    }
+    finally {
+        Pop-Location
+    }
+    Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentWebNavigationSmoke.exe') -TimeoutMilliseconds 20000 -Arguments ('"' + (Join-Path $RepoRoot 'AgentWebHost.dll') + '" "' + $unicodePage + '" "' + $unicodeProfile + '"')
+}
+finally {
+    if (Test-Path -LiteralPath $unicodeWebRoot) {
+        Remove-Item -LiteralPath $unicodeWebRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 $devCppOutput = 'devcpp.exe'
 if ($SkipRootDevCppCopy) { $devCppOutput = 'Source\devcpp.exe' }
 $requiredOutputs = @($devCppOutput, 'Packman.exe', 'PackMaker.exe', 'AgentWebHost.dll')

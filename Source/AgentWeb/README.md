@@ -2,6 +2,8 @@
 
 `AgentPanel` loads `AgentWeb/index.html` through the x86 `AgentWebHost.dll` bridge. Keep the DLL and the complete `AgentWeb` folder beside `devcpp.exe`. Microsoft Edge WebView2 Runtime must be installed. Missing assets, initialization timeout and browser process failure expose a retry button in the native panel.
 
+The bridge compares the local page by its Windows file path instead of the raw URL string, so extracting the IDE under a path containing Chinese characters or spaces does not fall back to the native renderer.
+
 ## Build and deployment
 
 Run `tools/build-windows.ps1 -SkipConsolePauser` for the application and integration checks. `tools/deploy-agent-web.ps1` builds the bridge and copies the web assets. The native build uses MSVC x86 and Microsoft.Web.WebView2 SDK 1.0.4191.47 at `.tools/webview-sdk/extracted`.
