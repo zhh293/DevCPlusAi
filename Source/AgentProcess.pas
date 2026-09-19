@@ -73,7 +73,8 @@ type
     // Write a UTF-8 encoded message to the child's stdin, terminated by LF.
     // Returns False and sets LastError if no complete JSONL record was sent.
     function SendMessage(const Text: String): Boolean;
-    function SendPermissionResponse(const RequestId, InputJSON: String; Allow: Boolean): Boolean;
+    function SendPermissionResponse(const RequestId, InputJSON: String;
+      Allow: Boolean; const DenyMessage: String = ''): Boolean;
 
     // Send a user message whose content may contain local image resources.
     // Non-image attachments are sent as path references so Claude can read
@@ -100,11 +101,39 @@ type
 //   - injects the provider API key environment variables
 // Returns a freshly allocated block; caller must FreeMem it after use.
 function BuildEnvironmentBlock(const WorkDir: String): PChar;
+function BuildAgentSystemPrompt(const CompilerName,
+  AdditionalInstructions: String): String;
 
 implementation
 
 uses
   Utils, devCFG, AgentPipeIO, AgentConfig;
+
+function BuildAgentSystemPrompt(const CompilerName,
+  AdditionalInstructions: String): String;
+begin
+  Result :=
+    'You are Claude Code running inside the Dev-C++ IDE. The process working ' +
+    'directory is the active project workspace. Prefer paths relative to this ' +
+    'workspace and inspect relevant files before changing them. The IDE may ' +
+    'attach the active editor buffer, including unsaved edits; treat that ' +
+    'snapshot as newer than the file on disk and do not overwrite unsaved IDE ' +
+    'content based on stale disk data. Use the compiler available first on ' +
+    'PATH when building so your checks match the IDE toolchain. Preserve each ' +
+    'source file''s existing encoding and line endings when editing; do not ' +
+    're-encode unrelated content. Keep existing Chinese text readable and ' +
+    'never introduce mojibake or garbled comments. Reply in the user''s language. ' +
+    'For code examples requested as a complete program, include the required ' +
+    'headers and entry point, and make the result buildable with the active ' +
+    'Dev-C++ compiler. Explain which files you change and report the exact ' +
+    'build or test result.';
+  if CompilerName <> '' then
+    Result := Result + #13#10 +
+      'The active Dev-C++ compiler set is: ' + CompilerName + '.';
+  if Trim(AdditionalInstructions) <> '' then
+    Result := Result + #13#10#13#10 +
+      'Additional user instructions:' + #13#10 + AdditionalInstructions;
+end;
 
 type
   TCreateJobObjectFunc = function(lpJobAttributes: Pointer;
@@ -476,9 +505,11 @@ end;
 function BuildEnvironmentBlock(const WorkDir: String): PChar;
 var
   EnvList: TStringList;
-  InstallDir, OldPath, NewPath, CompilerBinDir: String;
-  i, Total, Pos: Integer;
+  InstallDir, OldPath, NewPath, CompilerBinDir, ConfiguredCompilerPath,
+    CompilerName: String;
+  i, j, Total, Pos: Integer;
   Provider, ApiKey, BaseUrl, Model: String;
+  CompilerSet: TdevCompilerSet;
 
   procedure SetVar(const Name, Value: String);
   var
@@ -532,17 +563,40 @@ begin
     InstallDir := ExtractFilePath(ParamStr(0));
     InstallDir := ExcludeTrailingBackslash(InstallDir);
 
-    // Prepend the bundled toolchain folders to PATH
+    // Use the compiler selected in Dev-C++ first. This keeps CLI build tools
+    // aligned with the compiler used by the IDE for the current target.
     OldPath := GetVar('PATH');
+    ConfiguredCompilerPath := '';
+    CompilerName := '';
+    CompilerSet := nil;
+    if Assigned(devCompilerSets) then begin
+      CompilerSet := devCompilerSets.CompilationSet;
+      if not Assigned(CompilerSet) then
+        CompilerSet := devCompilerSets.DefaultSet;
+    end;
+    if Assigned(CompilerSet) then begin
+      CompilerName := CompilerSet.Name;
+      for j := 0 to CompilerSet.BinDir.Count - 1 do
+        if DirectoryExists(CompilerSet.BinDir[j]) then begin
+          if ConfiguredCompilerPath <> '' then
+            ConfiguredCompilerPath := ConfiguredCompilerPath + ';';
+          ConfiguredCompilerPath := ConfiguredCompilerPath +
+            ExcludeTrailingPathDelimiter(CompilerSet.BinDir[j]);
+        end;
+    end;
+
     CompilerBinDir := InstallDir + '\MinGW64\bin';
     if not DirectoryExists(CompilerBinDir) then
       CompilerBinDir := InstallDir + '\MinGW32\bin';
-    NewPath := InstallDir + '\nodejs;' +
-               InstallDir + '\claude-cli\bin;' +
-               CompilerBinDir;
+    NewPath := ConfiguredCompilerPath;
+    if NewPath <> '' then NewPath := NewPath + ';';
+    NewPath := NewPath + InstallDir + '\nodejs;' +
+               InstallDir + '\claude-cli\bin;' + CompilerBinDir;
     if OldPath <> '' then
       NewPath := NewPath + ';' + OldPath;
     SetVar('PATH', NewPath);
+    SetVar('DEVCPP_COMPILER_NAME', CompilerName);
+    SetVar('DEVCPP_COMPILER_BINS', ConfiguredCompilerPath);
 
     // Inject the API key according to the configured provider.
     if Assigned(devAgentConfig) then begin
@@ -690,11 +744,12 @@ var
   si: TStartupInfo;
   pi: TProcessInformation;
   CmdLine, CommandShell, Model, ModelArg, PermissionArg, ResumeArg: String;
-  SystemPromptArg: String;
+  SystemPromptArg, SystemPromptText, CompilerName: String;
   McpArg, PluginArg: String;
   EnvBlock: PChar;
   WorkDirPtr: PChar;
   JobHandle: THandle;
+  CompilerSet: TdevCompilerSet;
 begin
   Result := False;
   fLastError := '';
@@ -806,25 +861,37 @@ begin
   McpArg := '';
   PluginArg := '';
   SystemPromptArg := '';
+  CompilerName := '';
+  CompilerSet := nil;
+  if Assigned(devCompilerSets) then begin
+    CompilerSet := devCompilerSets.CompilationSet;
+    if not Assigned(CompilerSet) then
+      CompilerSet := devCompilerSets.DefaultSet;
+  end;
+  if Assigned(CompilerSet) then
+    CompilerName := CompilerSet.Name;
+  SystemPromptText :=
+    BuildAgentSystemPrompt(CompilerName, '');
   if Assigned(devAgentConfig) then begin
     McpArg := BuildPathOption('--mcp-config', devAgentConfig.McpConfigFiles,
       WorkDir, False);
     PluginArg := BuildPathOption('--plugin-dir', devAgentConfig.PluginDirs,
       WorkDir, True);
-    if Trim(devAgentConfig.SystemPrompt) <> '' then begin
-      if not CreateSystemPromptFile(devAgentConfig.SystemPrompt) then begin
-        fLastError := 'Could not create the temporary system prompt file.';
-        LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
-        CloseAgentHandle(fOutputRead);
-        CloseAgentHandle(fOutputWrite);
-        CloseAgentHandle(fInputRead);
-        CloseAgentHandle(fInputWrite);
-        Exit;
-      end;
-      SystemPromptArg := ' --append-system-prompt-file "' +
-        fSystemPromptFile + '"';
-    end;
+    if Trim(devAgentConfig.SystemPrompt) <> '' then
+      SystemPromptText := BuildAgentSystemPrompt(CompilerName,
+        devAgentConfig.SystemPrompt);
   end;
+  if not CreateSystemPromptFile(SystemPromptText) then begin
+    fLastError := 'Could not create the temporary system prompt file.';
+    LogError('AgentProcess.pas TAgentProcess.Start', fLastError);
+    CloseAgentHandle(fOutputRead);
+    CloseAgentHandle(fOutputWrite);
+    CloseAgentHandle(fInputRead);
+    CloseAgentHandle(fInputWrite);
+    Exit;
+  end;
+  SystemPromptArg := ' --append-system-prompt-file "' +
+    fSystemPromptFile + '"';
 
   // CreateProcess cannot execute .cmd/.bat files directly. Route launcher
   // scripts through the user's command shell while keeping the CLI path
@@ -952,10 +1019,10 @@ begin
 end;
 
 function TAgentProcess.SendPermissionResponse(const RequestId, InputJSON: String;
-  Allow: Boolean): Boolean;
+  Allow: Boolean; const DenyMessage: String): Boolean;
 var
   Data, Decision: AnsiString;
-  PipeError: String;
+  PipeError, MessageText: String;
 begin
   Result := False;
   if not IsRunning or (fInputWrite = 0) or (RequestId = '') then Exit;
@@ -963,7 +1030,13 @@ begin
     Decision := '{"behavior":"allow"';
     if InputJSON <> '' then Decision := Decision + ',"updatedInput":' + InputJSON;
     Decision := Decision + '}';
-  end else Decision := '{"behavior":"deny","message":"The user denied this tool operation."}';
+  end else begin
+    MessageText := DenyMessage;
+    if MessageText = '' then
+      MessageText := 'The user denied this tool operation.';
+    Decision := '{"behavior":"deny","message":' +
+      JsonQuoteUtf8(MessageText) + '}';
+  end;
   Data := '{"type":"control_response","response":{"subtype":"success","request_id":' +
     JsonQuoteUtf8(RequestId) + ',"response":' + Decision + '}}' + #10;
   Result := WriteAgentPipeData(fInputWrite, Data, PipeError);

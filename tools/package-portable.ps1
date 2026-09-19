@@ -4,7 +4,8 @@ param(
     [string]$Version = 'dev',
     [ValidateSet('NoCompiler', 'X64Compiler')]
     [string]$PackageType = 'NoCompiler',
-    [switch]$SelfExtracting
+    [switch]$SelfExtracting,
+    [string]$DevCppExePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,12 +14,12 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 & (Join-Path $PSScriptRoot 'verify-release.ps1') -PackageType $PackageType
 
 $distRoot = Join-Path $RepoRoot 'dist'
-$packageRoot = Join-Path $distRoot 'DevCPlusAi'
 $packageLabel = if ($PackageType -eq 'X64Compiler') {
     'windows-x64-gcc'
 } else {
     'windows-no-compiler'
 }
+$packageRoot = Join-Path $distRoot ("DevCPlusAi-{0}-{1}" -f $Version, $packageLabel)
 $zipPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-{1}.zip" -f $Version, $packageLabel)
 $sfxPath = Join-Path $RepoRoot ("DevCPlusAi-{0}-{1}-self-extracting.exe" -f $Version, $packageLabel)
 
@@ -46,7 +47,14 @@ $files = @(
     'AGENT-RUNTIME-VERSIONS.txt'
 )
 foreach ($file in $files) {
-    Copy-Item -LiteralPath (Join-Path $RepoRoot $file) -Destination $packageRoot -Force
+    $sourceFile = Join-Path $RepoRoot $file
+    if (($file -eq 'devcpp.exe') -and $DevCppExePath) {
+        $sourceFile = [System.IO.Path]::GetFullPath($DevCppExePath)
+        if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) {
+            throw "Dev-C++ executable not found: $sourceFile"
+        }
+    }
+    Copy-Item -LiteralPath $sourceFile -Destination $packageRoot -Force
 }
 
 $directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
@@ -71,7 +79,16 @@ if ($gitCommand) {
     $sourceCommitOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot rev-parse HEAD 2>$null
     if ($LASTEXITCODE -eq 0) {
         $sourceCommit = ($sourceCommitOutput | Out-String).Trim()
-        $dirtyOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot status --porcelain 2>$null
+        $releaseInputs = @(
+            'devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe',
+            'devcpp.exe.manifest', 'AgentWebHost.dll', 'RedPanda.ico', 'LICENSE',
+            'NEWS.txt', 'README.md', 'AGENT-RUNTIME-VERSIONS.txt', 'AgentWeb',
+            'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs',
+            'claude-cli', 'MinGW64', 'AStyle', 'ResEd', 'Source',
+            ':(exclude)Source/Tests/dcu-agent-main',
+            ':(exclude)Source/Tests/ui-compile.log'
+        )
+        $dirtyOutput = & $gitCommand.Source -c core.excludesFile= -C $RepoRoot status --porcelain --untracked-files=normal -- $releaseInputs 2>$null
         if ($LASTEXITCODE -eq 0) {
             if ($dirtyOutput) {
                 $sourceDirty = 'true'

@@ -78,10 +78,9 @@ jobs:
         run: |
           tools\build-windows.cmd
 
-      - name: Verify release resources
+      - name: Verify release resources (with bundled x64 GCC)
         shell: cmd
-        run: |
-          tools\verify-release.cmd -PackageType NoCompiler
+        run: tools\verify-release.cmd -PackageType X64Compiler
 
       # ----------------------------------------------------------------------
       # 4. 使用与本地相同的脚本生成并校验免安装发布包。
@@ -91,12 +90,17 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ steps.ver.outputs.version }}"
-          ./tools/package-portable.ps1 -Version $ver
-          $zip = "DevCPlusAi-$ver-windows-no-compiler.zip"
+          ./tools/package-portable.ps1 -Version $ver -PackageType X64Compiler -SelfExtracting
+          $zip = "DevCPlusAi-$ver-windows-x64-gcc.zip"
+          $sfx = "DevCPlusAi-$ver-windows-x64-gcc-self-extracting.exe"
           if (-not (Test-Path $zip -PathType Leaf)) {
             throw "Portable package was not created: $zip"
           }
+          if (-not (Test-Path $sfx -PathType Leaf)) {
+            throw "Self-extracting package was not created: $sfx"
+          }
           echo "zipname=$zip" >> $env:GITHUB_OUTPUT
+          echo "sfxname=$sfx" >> $env:GITHUB_OUTPUT
           Write-Host "Created portable package: $zip"
 
       # ----------------------------------------------------------------------
@@ -106,7 +110,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DevCPlusAi-${{ steps.ver.outputs.version }}-win
-          path: ${{ steps.zip.outputs.zipname }}
+          path: |
+            ${{ steps.zip.outputs.zipname }}
+            ${{ steps.zip.outputs.sfxname }}
           retention-days: 14
 
       # ----------------------------------------------------------------------
@@ -122,7 +128,9 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}   # 形如 v1.0.0-beta 视为预发布
           generate_release_notes: true                         # 自动根据提交生成发布说明
-          files: ${{ steps.zip.outputs.zipname }}
+          files: |
+            ${{ steps.zip.outputs.zipname }}
+            ${{ steps.zip.outputs.sfxname }}
           body: |
             ## DevCPlusAi ${{ steps.ver.outputs.version }}
 
@@ -131,7 +139,7 @@ jobs:
             ### 下载使用
             下载 `${{ steps.zip.outputs.zipname }}`，解压后运行其中的 `devcpp.exe` 即可。
 
-            > 该包由 Delphi 真实编译产出。AI CLI 运行时目录只有在仓库中提供
+            > 该包由 Delphi 真实编译产出，内置 x64 GCC 编译器。AI CLI 运行时目录只有在仓库中提供
             > `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt` 已通过构建前检查。
 
 # ============================================================================

@@ -3,12 +3,19 @@ program AgentUISmoke;
 {$APPTYPE CONSOLE}
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel, AgentSetupFrm, AgentProtocol;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, AgentPanel,
+  AgentSetupFrm, AgentProtocol, AgentWorkspaceWatch, AgentApprovalFrm,
+  AgentFileUndo;
 
 procedure Require(Condition: Boolean; const Message: String);
 begin
   if not Condition then
     raise Exception.Create('Agent UI smoke test failed: ' + Message);
+end;
+
+function TestUiText(const Utf8Bytes: AnsiString): String;
+begin
+  Result := String(UTF8Decode(Utf8Bytes));
 end;
 
 procedure CheckLayout(Panel: TAgentPanelFrame);
@@ -30,24 +37,233 @@ begin
     'send and stop do not share the same position');
 end;
 
+procedure CheckWorkspaceWatcher(const Root: String);
+var
+  Watcher: TAgentWorkspaceWatcher;
+  Changed, States, Lines: TStringList;
+  I: Integer;
+  SawCreated, SawModified, SawRenamedFrom, SawRenamedTo,
+    SawDeleted, SawEphemeral, SawGitMetadata: Boolean;
+  CreatedAdded, ModifiedState, RenamedFromState, RenamedToState,
+    DeletedState: Boolean;
+  procedure WriteText(const FileName, Text: String);
+  begin
+    Lines.Text := Text;
+    Lines.SaveToFile(IncludeTrailingPathDelimiter(Root) + FileName);
+  end;
+begin
+  ForceDirectories(Root + '\.git');
+  Lines := TStringList.Create;
+  Changed := TStringList.Create;
+  States := TStringList.Create;
+  Watcher := nil;
+  try
+    WriteText('modify.cpp', 'before');
+    WriteText('rename-from.cpp', 'rename');
+    WriteText('deleted.cpp', 'delete');
+    ForceDirectories(Root + '\.git');
+    Watcher := TAgentWorkspaceWatcher.Create(Root);
+    Require(Watcher.Available, 'workspace watcher did not start');
+    WriteText('created.cpp', 'created');
+    WriteText('modify.cpp', 'after with different content');
+    Require(RenameFile(Root + '\rename-from.cpp', Root + '\rename-to.cpp'),
+      'workspace watcher rename fixture failed');
+    Require(DeleteFile(Root + '\deleted.cpp'),
+      'workspace watcher delete fixture failed');
+    WriteText('ephemeral.cpp', 'temporary');
+    DeleteFile(Root + '\ephemeral.cpp');
+    WriteText('.git\config', 'internal');
+    Sleep(100);
+    Watcher.Finish(Changed, States);
+    Require(States.Count = Changed.Count,
+      'workspace watcher returned mismatched file states');
+    SawCreated := False;
+    SawModified := False;
+    SawRenamedFrom := False;
+    SawRenamedTo := False;
+    SawDeleted := False;
+    SawEphemeral := False;
+    SawGitMetadata := False;
+    CreatedAdded := False;
+    ModifiedState := False;
+    RenamedFromState := False;
+    RenamedToState := False;
+    DeletedState := False;
+    for I := 0 to Changed.Count - 1 do begin
+      if Pos('created.cpp', LowerCase(Changed[I])) > 0 then begin
+        SawCreated := True;
+        CreatedAdded := SameText(States[I], 'Added');
+      end;
+      if Pos('modify.cpp', LowerCase(Changed[I])) > 0 then begin
+        SawModified := True;
+        ModifiedState := SameText(States[I], 'Modified');
+      end;
+      if Pos('rename-from.cpp', LowerCase(Changed[I])) > 0 then begin
+        SawRenamedFrom := True;
+        RenamedFromState := SameText(States[I], 'Renamed');
+      end;
+      if Pos('rename-to.cpp', LowerCase(Changed[I])) > 0 then begin
+        SawRenamedTo := True;
+        RenamedToState := SameText(States[I], 'Renamed');
+      end;
+      if Pos('deleted.cpp', LowerCase(Changed[I])) > 0 then begin
+        SawDeleted := True;
+        DeletedState := SameText(States[I], 'Deleted');
+      end;
+      if Pos('ephemeral.cpp', LowerCase(Changed[I])) > 0 then SawEphemeral := True;
+      if Pos('\.git\', LowerCase(Changed[I])) > 0 then SawGitMetadata := True;
+    end;
+    Require(SawCreated, 'workspace watcher missed a created file');
+    Require(SawModified, 'workspace watcher missed a modified file');
+    Require(SawRenamedFrom and SawRenamedTo, 'workspace watcher missed a rename');
+    Require(SawDeleted, 'workspace watcher missed a deleted file');
+    Require(CreatedAdded and ModifiedState and RenamedFromState and
+      RenamedToState and DeletedState,
+      'workspace watcher returned the wrong change state');
+    Require(not SawEphemeral, 'workspace watcher reported a transient file');
+    Require(not SawGitMetadata, 'workspace watcher reported Git internals');
+  finally
+    if Assigned(Watcher) then Watcher.Free;
+    States.Free;
+    Changed.Free;
+    Lines.Free;
+    DeleteFile(Root + '\created.cpp');
+    DeleteFile(Root + '\modify.cpp');
+    DeleteFile(Root + '\rename-from.cpp');
+    DeleteFile(Root + '\rename-to.cpp');
+    DeleteFile(Root + '\deleted.cpp');
+    DeleteFile(Root + '\ephemeral.cpp');
+    DeleteFile(Root + '\.git\config');
+    RemoveDir(Root + '\.git');
+    RemoveDir(Root);
+  end;
+end;
+
+procedure CheckFileUndo(const Root: String);
+var Manager: TAgentFileUndoManager; Token, ErrorCode, Path: String;
+  CanUndo, Stale: Boolean;
+  procedure WriteBytes(const FileName, Value: String);
+  var Output: TFileStream;
+  begin
+    Output := TFileStream.Create(FileName, fmCreate);
+    try
+      if Value <> '' then Output.WriteBuffer(Value[1], Length(Value));
+    finally
+      Output.Free;
+    end;
+  end;
+  function ReadBytes(const FileName: String): String;
+  var Input: TFileStream;
+  begin
+    Input := TFileStream.Create(FileName, fmOpenRead or fmShareDenyNone);
+    try
+      SetLength(Result, Integer(Input.Size));
+      if Result <> '' then Input.ReadBuffer(Result[1], Length(Result));
+    finally
+      Input.Free;
+    end;
+  end;
+begin
+  ForceDirectories(Root);
+  Manager := TAgentFileUndoManager.Create;
+  try
+    Path := IncludeTrailingPathDelimiter(Root) + 'encoding.cpp';
+    WriteBytes(Path, #$EF#$BB#$BF + 'int value = 1;' + #13#10);
+    Require(Manager.BeginChange(Path, Root, Token, ErrorCode),
+      'undo snapshot should capture an existing source file');
+    WriteBytes(Path, #$EF#$BB#$BF + 'int value = 2;' + #13#10);
+    Require(Manager.CompleteChange(Token, CanUndo, ErrorCode) and CanUndo,
+      'a changed file should receive an undo action');
+    Require(Manager.UndoChange(Token, ErrorCode, Stale) and not Stale,
+      'guarded undo should restore an unchanged AI result');
+    Require(ReadBytes(Path) = #$EF#$BB#$BF + 'int value = 1;' + #13#10,
+      'undo did not preserve the original BOM and line endings');
+
+    Require(Manager.BeginChange(Path, Root, Token, ErrorCode),
+      'a later turn should create a fresh undo snapshot');
+    WriteBytes(Path, 'int value = 3;' + #13#10);
+    Require(Manager.CompleteChange(Token, CanUndo, ErrorCode) and CanUndo,
+      'second file change should receive an undo action');
+    WriteBytes(Path, 'int value = 99;' + #13#10);
+    Require(not Manager.UndoChange(Token, ErrorCode, Stale) and Stale,
+      'undo must refuse to overwrite edits made after the AI change');
+    Require(ReadBytes(Path) = 'int value = 99;' + #13#10,
+      'stale undo changed the newer file contents');
+
+    Path := IncludeTrailingPathDelimiter(Root) + 'new-file.cpp';
+    DeleteFile(Path);
+    Require(Manager.BeginChange(Path, Root, Token, ErrorCode),
+      'undo snapshot should record that a file did not exist before');
+    WriteBytes(Path, 'int main() {}' + #13#10);
+    Require(Manager.CompleteChange(Token, CanUndo, ErrorCode) and CanUndo,
+      'a newly created file should receive an undo action');
+    Require(Manager.UndoChange(Token, ErrorCode, Stale) and not FileExists(Path),
+      'undo of a new file should remove it when its contents still match');
+
+    Path := ExcludeTrailingPathDelimiter(Root) + '-outside.cpp';
+    Require(not Manager.BeginChange(Path, Root, Token, ErrorCode),
+      'undo must reject files outside the active workspace');
+  finally
+    Manager.Free;
+    DeleteFile(IncludeTrailingPathDelimiter(Root) + 'encoding.cpp');
+    DeleteFile(IncludeTrailingPathDelimiter(Root) + 'new-file.cpp');
+    RemoveDir(Root);
+  end;
+end;
+
 var
   Host: TForm;
   Panel: TAgentPanelFrame;
   Setup: TAgentSetupForm;
   I: Integer;
   Events: TAgentEventArray;
-  ReplyText, Snapshot, BeforeTools: String;
+  FinalEvent: TAgentEvent;
+  ReplyText, Snapshot, BeforeTools, WatchRoot, UndoRoot, DiffText,
+    DiffSummary: String;
   Histories: TStringList;
 begin
   try
+    DiffText := BuildAgentFileDiffText('int main() { return 1; }' + #13#10,
+      'int main() { return 0; }' + #13#10, DiffSummary);
+    Require((Pos('- int main() { return 1; }', DiffText) > 0) and
+      (Pos('+ int main() { return 0; }', DiffText) > 0),
+      'file change diff did not mark removed and added lines');
+    Require(Pos('+1 / -1 lines', DiffSummary) > 0,
+      'file change diff summary did not count lines');
     Application.Initialize;
     Application.ShowMainForm := False;
+    WatchRoot := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
+      'DevCPlusAi-watch-' + IntToStr(GetCurrentProcessId);
+    Writeln('Agent UI smoke test: workspace file change capture');
+    CheckWorkspaceWatcher(WatchRoot);
+    UndoRoot := WatchRoot + '-undo';
+    Writeln('Agent UI smoke test: guarded file undo');
+    CheckFileUndo(UndoRoot);
     Host := TForm.CreateNew(nil);
     try
       Writeln('Agent UI smoke test: load chat frame DFM');
       Panel := TAgentPanelFrame.Create(Host);
       Panel.Parent := Host;
       Panel.Align := alClient;
+      Require(Panel.StatusBar.Panels[0].Text =
+        TestUiText(#$E6#$9C#$AA#$E8#$BF#$9E#$E6#$8E#$A5),
+        'native fallback should start with a localized disconnected status');
+      Panel.SetStatus(asReady);
+      Require(Panel.StatusBar.Panels[0].Text =
+        TestUiText(#$E5#$B0#$B1#$E7#$BB#$AA),
+        'native fallback ready status should be localized');
+      Panel.SetStatus(asExecuting);
+      Require(Panel.StatusBar.Panels[0].Text =
+        TestUiText(#$E6#$AD#$A3#$E5#$9C#$A8#$E6#$89#$A7#$E8#$A1#$8C#$E5#$B7#$A5#$E5#$85#$B7#$E2#$80#$A6),
+        'native fallback tool status should be localized');
+      Panel.SetStatus(asError);
+      Require(Panel.StatusBar.Panels[0].Text =
+        TestUiText(#$E5#$8F#$91#$E7#$94#$9F#$E9#$94#$99#$E8#$AF#$AF),
+        'native fallback error status should be localized');
+      Panel.SetStatus(asDisconnected);
+      Require(Panel.StatusBar.Panels[0].Text =
+        TestUiText(#$E6#$9C#$AA#$E8#$BF#$9E#$E6#$8E#$A5),
+        'native fallback disconnected status should be localized');
       for I := 0 to 2 do begin
         Host.ClientWidth := 280 + I * 200;
         Host.ClientHeight := 600;
@@ -57,6 +273,9 @@ begin
         Require(not Panel.pnlAttachments.Visible, 'empty attachment area is visible');
         Require(not Panel.btnRemoveAttachment.Enabled, 'remove enabled without attachments');
         Panel.SetStatus(asThinking);
+        Require(Panel.StatusBar.Panels[0].Text =
+          TestUiText(#$E6#$AD#$A3#$E5#$9C#$A8#$E6#$80#$9D#$E8#$80#$83#$E2#$80#$A6),
+          'native fallback thinking status should be localized');
         Require(Panel.btnStop.Visible and not Panel.btnSend.Visible,
           'send and stop do not swap while thinking');
         CheckLayout(Panel);
@@ -138,9 +357,26 @@ begin
         (Pos('Worst', Panel.Timeline.LastText.Text) > 0),
         'markdown table columns were not rendered');
       Panel.ClearChat;
-      Panel.AppendUserMessage('User bubble');
+      Snapshot := ExpandFileName(ExtractFilePath(ParamStr(0)) +
+        '..\\..\\.tools\\ui-history-' + IntToStr(GetCurrentProcessId) +
+        '\\chat');
+      Require(ForceDirectories(ExtractFilePath(Snapshot)),
+        'could not create conversation snapshot test directory');
+      Panel.AppendUserMessage('User bubble', 'test.cpp | unsaved | cursor L9',
+        #13#10 + 'Context snapshot marker: intact' + #13#10);
       Require(Panel.Timeline.BlockCount = 1, 'user message did not become a card');
       Require(Panel.Timeline.BlockAt(0).Left > 12, 'user message is not right aligned');
+      ReplyText := Panel.Timeline.WebBlock(0);
+      Require(Pos('Context snapshot marker: intact', ReplyText) > 0,
+        'the user message did not expose its context snapshot');
+      Panel.SaveConversation(Snapshot);
+      Panel.ClearChat;
+      Panel.LoadConversation(Snapshot);
+      ReplyText := Panel.Timeline.WebBlock(0);
+      Require(Pos('\u000D\u000AContext snapshot marker: intact\u000D\u000A',
+        ReplyText) > 0,
+        'the exact context snapshot did not survive conversation reload');
+      Panel.ClearChat;
       Writeln('Agent UI smoke test: collapsed tool activity and persistence');
       Panel.AppendAIText('Visible answer');
       BeforeTools := Panel.reChat.Text;
@@ -170,6 +406,61 @@ begin
       Require(Panel.ToolTree.Items.GetFirstNode <> nil, 'snapshot lost tools');
       Require(not Panel.ToolTree.Visible and not Panel.ToolTree.Items.GetFirstNode.Expanded,
         'restored tool activity should start collapsed');
+      Panel.ClearChat;
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"write-1","name":"Write","input":{"file_path":"C:\\work\\hello.cpp","content":"int main() {}"}}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Require(Pos('Files handled by file tools', Panel.reChat.Text) = 0,
+        'pending write was reported before its result');
+      ParseLineEvents('{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"write-1","content":"File written"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"edit-1","name":"Edit","input":{"file_path":"C:\\work\\hello.cpp","old_string":"old","new_string":"new"}}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      ParseLineEvents('{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"edit-1","content":"File edited"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      FillChar(FinalEvent, SizeOf(FinalEvent), 0);
+      FinalEvent.EventType := aetResult;
+      FinalEvent.Content := 'Done.';
+      Panel.HandleAgentEvent(FinalEvent);
+      Require(Pos('Files handled by file tools (1)', Panel.reChat.Text) > 0,
+        'completed file operations were not summarized');
+      Require(Pos('Expand a file below', Panel.reChat.Text) > 0,
+        'file operation summary did not explain how to review changes');
+      ReplyText := '';
+      for I := 0 to Panel.Timeline.BlockCount - 1 do begin
+        ReplyText := Panel.Timeline.WebBlock(I);
+        if Pos('"kind":"file-change"', ReplyText) > 0 then Break;
+      end;
+      Require((Pos('"path":', ReplyText) > 0) and
+        (Pos('hello.cpp', ReplyText) > 0),
+        'file change card omitted the path: ' + ReplyText);
+      Require(Pos('"fileState":"Written/edited"', ReplyText) > 0,
+        'file change card omitted its state');
+      Require(Pos('"diffSummary":"Diff unavailable"', ReplyText) > 0,
+        'shell/file fallback did not explain that the diff is unavailable');
+      Panel.SaveConversation(Snapshot);
+      Panel.ClearChat;
+      Panel.LoadConversation(Snapshot);
+      ReplyText := '';
+      for I := 0 to Panel.Timeline.BlockCount - 1 do begin
+        ReplyText := Panel.Timeline.WebBlock(I);
+        if Pos('"kind":"file-change"', ReplyText) > 0 then Break;
+      end;
+      Require((Pos('"path":', ReplyText) > 0) and
+        (Pos('hello.cpp', ReplyText) > 0),
+        'conversation history did not preserve file change cards');
+      ReplyText := Panel.reChat.Text;
+      Require(Pos('C:\work\hello.cpp', Copy(ReplyText,
+        Pos('C:\work\hello.cpp', ReplyText) + Length('C:\work\hello.cpp'), MaxInt)) = 0,
+        'duplicate file paths were not deduplicated');
+      Panel.ClearChat;
+      ParseLineEvents('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"write-fail","name":"Write","input":{"file_path":"C:\\work\\failed.cpp","content":"broken"}}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      ParseLineEvents('{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"write-fail","is_error":true,"content":"write failed"}]}}', Events);
+      Panel.HandleAgentEvent(Events[0]);
+      Panel.HandleAgentEvent(FinalEvent);
+      Require(Pos('failed.cpp', Panel.reChat.Text) = 0,
+        'failed file tool was reported as a completed change');
+      Panel.ClearChat;
       Histories := TStringList.Create;
       try
         Histories.Add('id-one=First question');

@@ -42,6 +42,7 @@ type
     fFontSize: Integer;
     fSendKey: String;
     fPermissionMode: String;
+    fAttachIdeContext: Boolean;
     fMcpConfigFiles: String;
     fPluginDirs: String;
     // Kept for reading older configurations. New code uses PermissionMode,
@@ -67,6 +68,7 @@ type
     property FontSize: Integer read fFontSize write fFontSize;
     property SendKey: String read fSendKey write fSendKey;
     property PermissionMode: String read fPermissionMode write fPermissionMode;
+    property AttachIdeContext: Boolean read fAttachIdeContext write fAttachIdeContext;
     // Optional project/session-scoped Claude CLI extension inputs. Values are
     // semicolon-separated paths and are passed only to the Agent child.
     property McpConfigFiles: String read fMcpConfigFiles write fMcpConfigFiles;
@@ -281,6 +283,7 @@ begin
   fFontSize := 10;
   fSendKey := 'enter';
   fPermissionMode := 'manual';
+  fAttachIdeContext := True;
   fMcpConfigFiles := '';
   fPluginDirs := '';
   fAutoAllowRead := True;     // reading is non-destructive, allow by default

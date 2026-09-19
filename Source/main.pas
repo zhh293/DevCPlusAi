@@ -1130,11 +1130,15 @@ type
     procedure RestartAgentForCurrentProject;
     procedure ActAIAssistantExecute(Sender: TObject);
     procedure AgentSettingsExecute(Sender: TObject);
+    function AgentPermissionModeChange(Sender: TObject; const Mode: String;
+      out ErrorText: String): Boolean;
     procedure AgentFocusExecute(Sender: TObject);
     procedure AgentSelectionActionExecute(Sender: TObject);
     procedure AgentLineReady(const Line: String);
     procedure AgentProcessExit;
     procedure RefreshAgentFile(const FileName: String);
+    function AgentCodeActionPrompt(ActionIndex: Integer;
+      HasSelection: Boolean): String;
     procedure UpdateAgentCompileContext;
     procedure AgentPrepareContext(Sender: TObject);
     procedure AgentSessionChange(Sender: TObject);
@@ -1145,11 +1149,17 @@ type
     procedure LoadAgentConversation(const Key: String);
     procedure AgentQuickAction(Sender: TObject);
     procedure AgentOpenCode(Sender: TObject);
+    procedure AgentOpenFile(Sender: TObject; const FileName: String);
+    function AgentCanUndoFileChange(Sender: TObject;
+      const FileName: String): Boolean;
+    procedure AgentFileRestored(Sender: TObject; const FileName: String);
+    procedure AgentInsertCode(Sender: TObject; const Code: String);
     procedure AgentRestartTimerTick(Sender: TObject);
     procedure AgentRequestStarted(Sender: TObject);
     procedure AgentRequestEnded(Sender: TObject);
     procedure AgentResponseTimerTick(Sender: TObject);
     function AgentSessionFileName(const WorkDir: String): String;
+    function AgentWorkspaceDir: String;
     function LoadAgentSession(const FileName: String): String;
     procedure SaveAgentSession(const FileName, SessionId: String);
     function ParseToolParams(s: AnsiString): AnsiString;
@@ -3613,13 +3623,13 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(2, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CutToClipboard;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(2, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3636,10 +3646,6 @@ procedure TMainForm.actCopyExecute(Sender: TObject);
 var
   e: TEditor;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(0, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.CopyToClipboard;
@@ -3647,6 +3653,10 @@ begin
     end;
     if fAgentPanelFrame.reChat.Focused then begin
       fAgentPanelFrame.reChat.CopyToClipboard;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(0, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3660,13 +3670,17 @@ var
   e: TEditor;
   oldbottomline: integer;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
-    if fAgentPanelFrame.memoInput.Focused or fAgentPanelFrame.reChat.Focused then begin
+    if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.memoInput);
+      Exit;
+    end;
+    if fAgentPanelFrame.reChat.Focused then begin
+      fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.reChat);
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(1, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -3683,10 +3697,6 @@ procedure TMainForm.actSelectAllExecute(Sender: TObject);
 var
   e: TEditor;
 begin
-  if Assigned(fAgentPanelFrame) and (fAgentPanelFrame.Timeline.FocusedEdit <> nil) then begin
-    fAgentPanelFrame.ExecuteEditCommand(3, fAgentPanelFrame.Timeline.FocusedEdit);
-    Exit;
-  end;
   if Assigned(fAgentPanelFrame) then begin
     if fAgentPanelFrame.memoInput.Focused then begin
       fAgentPanelFrame.memoInput.SelectAll;
@@ -3694,6 +3704,10 @@ begin
     end;
     if fAgentPanelFrame.reChat.Focused then begin
       fAgentPanelFrame.reChat.SelectAll;
+      Exit;
+    end;
+    if fAgentPanelFrame.Timeline.FocusedEdit <> nil then begin
+      fAgentPanelFrame.ExecuteEditCommand(3, fAgentPanelFrame.Timeline.FocusedEdit);
       Exit;
     end;
   end;
@@ -9229,10 +9243,15 @@ begin
   fAgentPanelFrame.OnPrepareContext := AgentPrepareContext;
   fAgentPanelFrame.OnQuickAction := AgentQuickAction;
   fAgentPanelFrame.OnOpenCode := AgentOpenCode;
+  fAgentPanelFrame.OnOpenFile := AgentOpenFile;
+  fAgentPanelFrame.OnUndoFileCheck := AgentCanUndoFileChange;
+  fAgentPanelFrame.OnFileRestored := AgentFileRestored;
+  fAgentPanelFrame.OnInsertCode := AgentInsertCode;
   fAgentPanelFrame.OnSessionChange := AgentSessionChange;
   fAgentPanelFrame.OnSessionAction := AgentSessionAction;
   fAgentPanelFrame.OnRequestEnded := AgentRequestEnded;
   fAgentPanelFrame.OnSettings := AgentSettingsExecute;
+  fAgentPanelFrame.OnPermissionModeChange := AgentPermissionModeChange;
   fAgentPanelFrame.ApplyAppearance(Color, Font.Color,
     dmMain.Cpp.WhitespaceAttribute.Background,
     dmMain.Cpp.IdentifierAttri.Foreground, devData.InterfaceFont,
@@ -9319,6 +9338,40 @@ begin
   end;
 end;
 
+function TMainForm.AgentPermissionModeChange(Sender: TObject;
+  const Mode: String; out ErrorText: String): Boolean;
+var OldMode: String;
+begin
+  Result := False;
+  ErrorText := '';
+  if not Assigned(devAgentConfig) then begin
+    ErrorText := 'Agent settings are unavailable.';
+    Exit;
+  end;
+  if not SameText(Mode, 'manual') and not SameText(Mode, 'plan') and
+     not SameText(Mode, 'acceptEdits') then begin
+    ErrorText := 'Unsupported permission mode.';
+    Exit;
+  end;
+  OldMode := devAgentConfig.PermissionMode;
+  if SameText(OldMode, Mode) then begin
+    Result := True;
+    Exit;
+  end;
+  devAgentConfig.PermissionMode := Mode;
+  try
+    devAgentConfig.SaveSettings;
+    RestartAgentForCurrentProject;
+    Result := True;
+  except
+    on E: Exception do begin
+      devAgentConfig.PermissionMode := OldMode;
+      try devAgentConfig.SaveSettings; except end;
+      ErrorText := E.Message;
+    end;
+  end;
+end;
+
 procedure TMainForm.AgentFocusExecute(Sender: TObject);
 begin
   if not Assigned(fAgentPanelFrame) then
@@ -9328,32 +9381,48 @@ begin
   fAgentPanelFrame.memoInput.SetFocus;
 end;
 
-procedure TMainForm.AgentSelectionActionExecute(Sender: TObject);
+function TMainForm.AgentCodeActionPrompt(ActionIndex: Integer;
+  HasSelection: Boolean): String;
 const
-  Prompts: array[0..3] of String = (
+  SelectedPrompts: array[0..3] of String = (
     'Explain the selected C/C++ code, including its purpose, key steps, and possible issues.',
     'Review and fix the selected C/C++ code. Suggest changes or edit the project files directly.',
     'Improve the selected C/C++ code for readability, correctness, and beginner-friendly style.',
     'Add clear, beginner-friendly comments to the selected C/C++ code.');
+  CurrentPrompts: array[0..3] of String = (
+    'Explain the relevant C/C++ code in the current editor context around the caret, including its purpose, key steps, and possible issues.',
+    'Review and fix the relevant C/C++ code in the current editor context around the caret. Suggest minimal changes or edit the project files directly.',
+    'Improve the relevant C/C++ code in the current editor context around the caret for readability, correctness, and beginner-friendly style.',
+    'Add clear, beginner-friendly comments to the relevant C/C++ code in the current editor context around the caret.');
+begin
+  if (ActionIndex < 0) or (ActionIndex > 3) then
+    raise Exception.Create('Invalid AI code action');
+  if HasSelection then Result := SelectedPrompts[ActionIndex]
+  else Result := CurrentPrompts[ActionIndex];
+end;
+
+procedure TMainForm.AgentSelectionActionExecute(Sender: TObject);
 var
   E: TEditor;
-  Selection, Prompt: AnsiString;
+  Prompt: AnsiString;
   ActionIndex: Integer;
 begin
-  E := fEditorList.GetEditor;
+  E := nil;
+  if Assigned(fEditorList) then E := fEditorList.GetEditor;
   if not Assigned(E) then begin
     MessageDlg('Open a source file in the editor first.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
-  if E.Text.SelAvail then Selection := E.Text.SelText
-  else Selection := E.Text.Lines.Text;
-  if Length(Selection) > 16000 then
-    Selection := Copy(Selection, 1, 16000) + #13#10 + '[Selection truncated]';
   ActionIndex := TAction(Sender).Tag;
-  Prompt := Prompts[ActionIndex] + #13#10#13#10 +
+  if (ActionIndex < 0) or (ActionIndex > 3) then Exit;
+  Prompt := AgentCodeActionPrompt(ActionIndex, E.Text.SelAvail) + #13#10#13#10 +
     'File: ' + E.FileName + #13#10 +
-    'Selected code:' + #13#10 + Selection;
+    'Use the live editor context attached by the IDE. If text is selected, ' +
+    'treat that selection as the primary scope. If nothing is selected, use ' +
+    'only the bounded context around the caret; do not describe it as a ' +
+    'selection. If required code is outside that context, ask the student ' +
+    'for it instead of guessing.';
 
   fAgentPanel.Visible := True;
   fAgentSplitter.Visible := True;
@@ -9390,6 +9459,24 @@ begin
   if Length(Key) > 100 then
     Key := Copy(Key, Length(Key) - 99, 100);
   Result := IncludeTrailingPathDelimiter(BaseDir) + Key + '_' + HashText + '.session';
+end;
+
+function TMainForm.AgentWorkspaceDir: String;
+var
+  E: TEditor;
+begin
+  Result := '';
+  if Assigned(fProject) and (fProject.FileName <> '') then
+    Result := ExtractFilePath(fProject.FileName);
+  if (Result = '') and Assigned(fEditorList) then begin
+    E := fEditorList.GetEditor;
+    if Assigned(E) and (E.FileName <> '') then
+      Result := ExtractFilePath(E.FileName);
+  end;
+  if Result = '' then
+    Result := devDirs.Exec;
+  if Result <> '' then
+    Result := IncludeTrailingPathDelimiter(ExpandFileName(Result));
 end;
 
 function TMainForm.LoadAgentSession(const FileName: String): String;
@@ -9508,10 +9595,79 @@ begin
   end;
 end;
 
+procedure TMainForm.AgentOpenFile(Sender: TObject; const FileName: String);
+begin
+  if FileExists(FileName) then
+    OpenFile(FileName, etAuto);
+end;
+
+function TMainForm.AgentCanUndoFileChange(Sender: TObject;
+  const FileName: String): Boolean;
+var E: TEditor;
+begin
+  E := fEditorList.GetEditorFromFileName(FileName);
+  Result := not Assigned(E) or not E.Text.Modified;
+end;
+
+procedure TMainForm.AgentFileRestored(Sender: TObject;
+  const FileName: String);
+begin
+  RefreshAgentFile(FileName);
+end;
+
+procedure TMainForm.AgentInsertCode(Sender: TObject; const Code: String);
+var E: TEditor; TargetName, Prompt: String;
+begin
+  if Code = '' then Exit;
+  E := fEditorList.GetEditor;
+  if not Assigned(E) then begin
+    MessageDlg('请先打开或选择一个源文件，再插入 AI 生成的代码。',
+      mtInformation, [mbOK], 0);
+    Exit;
+  end;
+  if E.Text.ReadOnly then begin
+    MessageDlg('当前文件为只读，无法插入代码。', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+  TargetName := E.FileName;
+  if TargetName = '' then TargetName := '当前未命名文件';
+  if E.Text.SelText <> '' then begin
+    Prompt := '将用 AI 生成的代码替换当前选区。' + #13#10 + #13#10 +
+      TargetName + #13#10 + #13#10 + '继续吗？可用 Ctrl+Z 撤销。';
+    if MessageDlg(Prompt, mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+      Exit;
+  end;
+  E.Activate;
+  E.Text.SetFocus;
+  E.Text.SelText := Code;
+  E.Text.Modified := True;
+  E.UpdateCaption;
+  fAgentPanelFrame.AppendSystemMessage('已将生成的代码插入到 ' + TargetName + '；可用 Ctrl+Z 撤销。');
+end;
+
 procedure TMainForm.AgentQuickAction(Sender: TObject);
 begin
+  if TComponent(Sender).Tag = 5 then begin
+    fAgentPanelFrame.SendPrompt(
+      'Teach the current code or concept step by step for an undergraduate ' +
+      'software engineering student. Use the attached editor selection or ' +
+      'current file when available. Explain the core idea and prerequisites, ' +
+      'walk through the important variables and control flow, trace a small ' +
+      'example, then give time and space complexity plus key edge cases. End ' +
+      'with one short self-check question. Keep the explanation focused and ' +
+      'beginner-friendly. Do not edit files or run commands for this action. ' +
+      'If no code or topic is attached, ask the user what to explain. Reply ' +
+      'in the language of the user.');
+    Exit;
+  end;
   if TComponent(Sender).Tag = 4 then begin
-    fAgentPanelFrame.SendPrompt('Diagnose the attached build errors. Explain the root cause and provide a concrete fix. Respond in the language of the user.');
+    fAgentPanelFrame.SendPrompt(
+      'Diagnose the current C/C++ compilation. Use any attached compiler or ' +
+      'linker output when available. If no recent build output is attached, ' +
+      'inspect the live editor buffer, identify likely compile errors, and ' +
+      'say clearly that the IDE has no recent diagnostics. Explain the root ' +
+      'cause and give a concrete, beginner-friendly fix. Respond in the ' +
+      'language of the user.');
     Exit;
   end;
   AgentSelectionActionExecute(fAgentSelectionActions[TComponent(Sender).Tag]);
@@ -9639,8 +9795,7 @@ var
   SessionGuid: TGUID;
 begin
   if fAgentSessionFile = '' then begin
-    if Assigned(fProject) then fAgentWorkDir := ExtractFilePath(fProject.FileName)
-    else fAgentWorkDir := devDirs.Exec;
+    fAgentWorkDir := AgentWorkspaceDir;
     fAgentSessionFile := AgentSessionFileName(fAgentWorkDir);
   end;  Key := fAgentPanelFrame.SelectedSession;
   if (Key <> '') and (Key = fAgentChatKey) then Exit;
@@ -9675,45 +9830,160 @@ begin
 end;
 procedure TMainForm.AgentPrepareContext(Sender: TObject);
 begin
+  if (fAgentWorkDir <> '') and
+     not SameFileName(AgentWorkspaceDir, fAgentWorkDir) then
+    RestartAgentForCurrentProject;
   UpdateAgentCompileContext;
 end;
 
 procedure TMainForm.UpdateAgentCompileContext;
 var
-  I: Integer;
-  Context, MessageText, EditorContext: AnsiString;
+  I, StartLine, EndLine, CaretLine, SnapshotLength, RawCount,
+    StructuredCount: Integer;
+  Context, Diagnostics, MessageText, EditorContext, LineText,
+    FileName, BufferState, RawDiagnostics, ContextSummary: AnsiString;
   E: TEditor;
+  Snapshot: TStringList;
+  Truncated: Boolean;
+  function IsBuildDiagnosticLine(const Value: AnsiString): Boolean;
+  var Lowered: AnsiString;
+  begin
+    Lowered := LowerCase(Value);
+    Result := (Pos('[error]', Lowered) > 0) or
+      (Pos('error:', Lowered) > 0) or (Pos('fatal error', Lowered) > 0) or
+      (Pos('warning:', Lowered) > 0) or
+      (Pos('undefined reference', Lowered) > 0) or
+      (Pos('undefined symbol', Lowered) > 0) or
+      (Pos('cannot find', Lowered) > 0) or
+      (Pos('no such file or directory', Lowered) > 0) or
+      (Pos('file not found', Lowered) > 0) or
+      (Pos('ld returned', Lowered) > 0) or
+      (Pos('compilation terminated', Lowered) > 0) or
+      (Pos('build failed', Lowered) > 0) or
+      (Pos('make: ***', Lowered) > 0) or
+      (Pos('gmake: ***', Lowered) > 0);
+  end;
 begin
   if not Assigned(fAgentPanelFrame) then
     Exit;
 
-  Context := '';
-  for I := 0 to CompilerOutput.Items.Count - 1 do begin
-    if CompilerOutput.Items[I].SubItems.Count < 3 then
-      Continue;
-    MessageText := CompilerOutput.Items[I].SubItems[2];
-    if StartsStr('[Error]', MessageText) or StartsStr('[Warning]', MessageText) then begin
-      Context := Context + CompilerOutput.Items[I].SubItems[1] + ':' +
-        CompilerOutput.Items[I].Caption + ':' +
-        CompilerOutput.Items[I].SubItems[0] + ' ' + MessageText + #13#10;
-      if Length(Context) >= 12000 then begin
-        Context := Copy(Context, 1, 12000) + '[Build context truncated]' + #13#10;
-        Break;
+  Diagnostics := '';
+  StructuredCount := 0;
+  if Assigned(CompilerOutput) then
+    for I := 0 to CompilerOutput.Items.Count - 1 do begin
+      if CompilerOutput.Items[I].SubItems.Count < 3 then
+        Continue;
+      MessageText := CompilerOutput.Items[I].SubItems[2];
+      if StartsStr('[Error]', MessageText) or StartsStr('[Warning]', MessageText) then begin
+        Inc(StructuredCount);
+        LineText := CompilerOutput.Items[I].SubItems[1] + ':' +
+          CompilerOutput.Items[I].Caption + ':' +
+          CompilerOutput.Items[I].SubItems[0] + ' ' + MessageText + #13#10;
+        if Length(Diagnostics) + Length(LineText) > 12000 then begin
+          Diagnostics := Diagnostics + '[More diagnostics omitted]' + #13#10;
+          Break;
+        end;
+        Diagnostics := Diagnostics + LineText;
+      end;
+  end;
+  RawDiagnostics := '';
+  RawCount := 0;
+  if Assigned(fLogOutputRawData) then
+    for I := fLogOutputRawData.Count - 1 downto 0 do begin
+      if IsBuildDiagnosticLine(fLogOutputRawData[I]) then begin
+        LineText := fLogOutputRawData[I];
+        if Length(LineText) > 6000 then LineText := Copy(LineText, 1, 6000);
+        if Length(RawDiagnostics) + Length(LineText) + 2 > 6000 then Break;
+        RawDiagnostics := LineText + #13#10 + RawDiagnostics;
+        Inc(RawCount);
+        if RawCount >= 80 then Break;
       end;
     end;
+  if RawDiagnostics <> '' then begin
+    if Diagnostics <> '' then Diagnostics := Diagnostics + #13#10;
+    Diagnostics := Diagnostics +
+      'Relevant raw compiler/linker output from the latest build:' + #13#10 +
+      RawDiagnostics;
   end;
-  if Context <> '' then
-    Context := 'Latest build errors/warnings:' + #13#10 + Context;
-  E := fEditorList.GetEditor;
+  Context := '';
+  ContextSummary := '';
+  E := nil;
+  if Assigned(fEditorList) then E := fEditorList.GetEditor;
   if Assigned(E) then begin
-    if E.Text.SelAvail then EditorContext := E.Text.SelText
-    else EditorContext := E.Text.Lines.Text;
-    if Length(EditorContext) > 24000 then
-      EditorContext := Copy(EditorContext, 1, 24000) + #13#10 + '[Editor context truncated]';
-    Context := 'Current editor buffer (may contain unsaved changes): ' + E.FileName +
-      #13#10 + EditorContext + #13#10#13#10 + Context;
+    Snapshot := TStringList.Create;
+    try
+      FileName := E.FileName;
+      if FileName = '' then FileName := 'Untitled editor buffer';
+      ContextSummary := ExtractFileName(FileName);
+      if ContextSummary = '' then ContextSummary := 'untitled file';
+      if E.Text.Modified then BufferState := 'unsaved changes'
+      else BufferState := 'saved';
+      if E.Text.Modified then ContextSummary := ContextSummary + ' | unsaved'
+      else ContextSummary := ContextSummary + ' | saved';
+      CaretLine := E.Text.CaretY;
+      if CaretLine < 1 then CaretLine := 1;
+
+      if E.Text.SelAvail then begin
+        StartLine := E.Text.BlockBegin.Line;
+        EndLine := E.Text.BlockEnd.Line;
+        EditorContext := E.Text.SelText;
+        if Length(EditorContext) > 24000 then
+          EditorContext := Copy(EditorContext, 1, 24000) +
+            #13#10 + '[Selection truncated at 24000 bytes]';
+        LineText := 'Selected lines ' + IntToStr(StartLine) + '-' +
+          IntToStr(EndLine) + '; cursor at ' + IntToStr(CaretLine) + ':' +
+          IntToStr(E.Text.CaretX) + '.';
+        ContextSummary := ContextSummary + ' | selection L' +
+          IntToStr(StartLine) + '-L' + IntToStr(EndLine);
+      end else begin
+        StartLine := CaretLine - 80;
+        if StartLine < 1 then StartLine := 1;
+        EndLine := CaretLine + 80;
+        if EndLine > E.Text.Lines.Count then EndLine := E.Text.Lines.Count;
+        Truncated := False;
+        if StartLine > 1 then Snapshot.Add('[Earlier lines omitted]');
+        SnapshotLength := Length(Snapshot.Text);
+        for I := StartLine to EndLine do begin
+          LineText := IntToStr(I) + ': ' + E.Text.Lines[I - 1];
+          if SnapshotLength + Length(LineText) + 2 > 24000 then begin
+            Truncated := True;
+            Break;
+          end;
+          Snapshot.Add(LineText);
+          Inc(SnapshotLength, Length(LineText) + 2);
+        end;
+        if (EndLine < E.Text.Lines.Count) or Truncated then
+          Snapshot.Add('[Later lines omitted]');
+        EditorContext := Snapshot.Text;
+        LineText := 'Context window lines ' + IntToStr(StartLine) + '-' +
+          IntToStr(EndLine) + '; cursor at ' + IntToStr(CaretLine) + ':' +
+          IntToStr(E.Text.CaretX) + '.';
+        ContextSummary := ContextSummary + ' | cursor L' + IntToStr(CaretLine);
+      end;
+
+      Context := 'Active editor: ' + FileName + ' (' + BufferState + '). ' +
+        LineText + #13#10 +
+        'The snapshot below is from the live IDE buffer. It can differ from ' +
+        'the saved file on disk.' + #13#10 + EditorContext;
+    finally
+      Snapshot.Free;
+    end;
   end;
-  fAgentPanelFrame.SetContext(Context);
+  if Diagnostics <> '' then begin
+    if Context <> '' then Context := Context + #13#10#13#10;
+    Context := Context +
+      'Compiler diagnostics currently visible in the IDE (check that they ' +
+      'match this revision):' + #13#10 + Diagnostics;
+  end;
+  if StructuredCount > 0 then
+    ContextSummary := ContextSummary + ' | ' + IntToStr(StructuredCount) +
+      ' compiler diagnostics'
+  else if RawCount > 0 then
+    ContextSummary := ContextSummary + ' | ' + IntToStr(RawCount) +
+      ' raw build lines';
+  if (ContextSummary = '') and (Diagnostics <> '') then
+    ContextSummary := 'compiler diagnostics';
+  fAgentPanelFrame.SetContext(Context, ContextSummary);
 end;
 
 procedure TMainForm.StartAgent;
@@ -9725,11 +9995,9 @@ begin
   if Assigned(fAgentProcess) and fAgentProcess.IsRunning then
     Exit;
 
-  // Determine the working directory: project dir if open, else exec dir.
-  if Assigned(fProject) then
-    workDir := ExtractFilePath(fProject.FileName)
-  else
-    workDir := devDirs.Exec;
+  // Keep the CLI rooted in the project, or the active saved source directory
+  // when working without a project.
+  workDir := AgentWorkspaceDir;
 
   sessionFile := AgentSessionFileName(workDir);
   if (fAgentSessionFile <> '') and
@@ -9838,6 +10106,8 @@ begin
     fAgentReader.WaitFor;
     FreeAndNil(fAgentReader);
   end;
+  if Assigned(fAgentPanelFrame) then
+    fAgentPanelFrame.ExpirePendingPermissions;
   if Assigned(fAgentPanelFrame) and (fAgentChatKey <> '') and (fAgentSessionFile <> '') then
     try
       fAgentPanelFrame.SaveConversation(IncludeTrailingPathDelimiter(AgentHistoryPath(fAgentSessionFile)) + fAgentChatKey);
@@ -9862,7 +10132,7 @@ var
   ev: TAgentEvent;
   I, MapIndex: Integer;
   Allowed: Boolean;
-  Path: String;
+  Path, AnswersJSON: String;
 begin
   // TThread.WaitFor pumps synchronized callbacks while the IDE is closing.
   // Ignore late pipe lines during teardown so no panel/control is touched
@@ -9877,20 +10147,34 @@ begin
     for I := 0 to Length(Events) - 1 do begin
       ev := Events[I];
       if ev.EventType = aetPermission then begin
-        fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-          ev.ToolName, ev.ToolInput, 'approval', False);
         if Assigned(fAgentResponseTimer) then fAgentResponseTimer.Enabled := False;
-        Allowed := False;
-        if ev.Subtype = 'can_use_tool' then
-          Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
-        if Allowed then
-          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-            ev.ToolName, 'Allowed once', 'done', True)
-        else
-          fAgentPanelFrame.Timeline.AddTool('permission-' + ev.EventId,
-            ev.ToolName, 'Denied', 'denied', True);
-        if Assigned(fAgentProcess) and not fAgentProcess.SendPermissionResponse(ev.EventId, ev.ToolInput, Allowed) then
-          fAgentPanelFrame.AppendSystemMessage('Failed to deliver approval decision. Stop and retry the request.');
+        if ev.EventId = '' then begin
+          fAgentPanelFrame.AppendSystemMessage('The CLI sent an approval request without a request ID; stopping this turn.');
+          if Assigned(fAgentProcess) then fAgentProcess.SendInterrupt;
+          Continue;
+        end;
+        if SameText(ev.Subtype, 'can_use_tool') then begin
+          fAgentPanelFrame.QueuePermission(ev, fAgentWorkDir);
+          if not fAgentPanelFrame.CanShowInlinePermissions then begin
+            if SameText(ev.ToolName, 'AskUserQuestion') then begin
+              AnswersJSON := '';
+              if RequestAgentQuestion(ev.ToolInput, AnswersJSON) then
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'answer', AnswersJSON)
+              else
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'deny', '');
+            end else begin
+              Allowed := RequestAgentApproval(ev.ToolName, fAgentWorkDir, ev.ToolInput);
+              if Allowed then
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'allow', '')
+              else
+                fAgentPanelFrame.ResolvePermission(ev.EventId, 'deny', '');
+            end;
+          end;
+        end else begin
+          fAgentPanelFrame.AppendSystemMessage('Unsupported permission request: ' + ev.Subtype);
+          if Assigned(fAgentProcess) then
+            fAgentProcess.SendPermissionResponse(ev.EventId, '{}', False);
+        end;
         Continue;
       end;
       if ev.SessionId <> '' then begin
@@ -9964,6 +10248,8 @@ begin
     fAgentResponseTimer.Enabled := False;
   if fAgentExpectedStop or fQuitting then
     Exit;
+  if Assigned(fAgentPanelFrame) then
+    fAgentPanelFrame.ExpirePendingPermissions;
   if fAgentResumeAttempted and not fAgentIgnoreSavedSession then begin
     // A stale session id can make Claude exit before it emits system.init.
     // Retry once with a fresh session; never call Stop/WaitFor from this
