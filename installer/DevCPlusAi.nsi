@@ -21,8 +21,9 @@ InstallDir "$LOCALAPPDATA\Programs\DevCPlusAi"
 InstallDirRegKey HKCU "Software\${PRODUCT_KEY}" "InstallDir"
 RequestExecutionLevel user
 ManifestDPIAware true
-SetCompressor /SOLID lzma
-SetCompressorDictSize 32
+; Separate Deflate blocks let machines with WebView2 skip the large offline
+; runtime payload without decompressing it before extracting the application.
+SetCompressor /FINAL zlib
 ShowInstDetails show
 ShowUninstDetails show
 VIProductVersion "${VERSION}.0"
