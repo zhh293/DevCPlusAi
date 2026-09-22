@@ -224,6 +224,7 @@
     if (message.type === 'upsert') {$('empty').hidden=true;view.upsert(message.item);}
     if (message.type === 'reset') {$('empty').hidden=false;view.reset();}
     if (message.type === 'state') {
+      const firstState = !ready;
       ready = true; busy = !!message.busy;
       window.AgentBusy = busy;
       view.setBusy(busy);
@@ -284,6 +285,7 @@
           return b;
         }));
       }
+      if(firstState) post('app-ready');
     }
     if ((message.type === 'accepted' || message.type === 'rejected') && pending && message.requestId === pending.id) {
       if (message.type === 'accepted' && $('input').value === pending.text) $('input').value = '';

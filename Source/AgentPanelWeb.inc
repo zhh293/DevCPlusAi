@@ -1,9 +1,7 @@
-function AgentUrlFromPath(Path: PWideChar; Url: PWideChar;
-  var Length: DWORD; Flags: DWORD): HRESULT; stdcall;
-  external 'shlwapi.dll' name 'UrlCreateFromPathW';
-
 procedure TAgentPanelFrame.WebTick(Sender: TObject);
-var Root, Page, Command: String; Url: array[0..4095] of WideChar; N: DWORD;
+const Assets: array[0..7] of String = ('index.html', 'panel.js', 'panel.css',
+  'messages.js', 'highlight.js', 'highlight.css', 'layout.css', 'vendor\marked.umd.js');
+var Root, Page, Command: String; I: Integer;
 begin
   if (csDestroying in ComponentState) or (Parent = nil) then Exit;
   fWebTimer.Enabled := False;
@@ -17,6 +15,10 @@ begin
         WebError(Self, 'Missing AgentWeb assets or AgentWebHost.dll beside devcpp.exe');
         Exit;
       end;
+      for I := Low(Assets) to High(Assets) do
+        if not FileExists(Root + 'AgentWeb\' + Assets[I]) then begin
+          WebError(Self, 'Missing chat asset: AgentWeb\' + Assets[I]); Exit;
+        end;
       fWeb := TAgentWebView.Create(Self);
       fWeb.Parent := Self;
       fWeb.Visible := False;
@@ -24,26 +26,24 @@ begin
       fWeb.OnReady := WebReady;
       fWeb.OnMessage := WebMessage;
       fWeb.OnError := WebError;
-      N := Length(Url);
-      if AgentUrlFromPath(PWideChar(WideString(Page)), Url, N, 0) < 0 then begin
-        WebError(Self, 'Could not resolve the chat page path'); Exit;
-      end;
       Root := GetEnvironmentVariable('LOCALAPPDATA') + '\DevCPlusAi\WebView';
       ForceDirectories(Root);
       if not fWeb.Start(ExtractFilePath(Application.ExeName) + 'AgentWebHost.dll',
-        WideString(Url), WideString(Root)) and not fWebFailed then
+        WideString(Page), WideString(Root)) and not fWebFailed then
         WebError(Self, 'Could not initialize the browser runtime');
     end;
     while fWebQueue.Count > 0 do begin
       Command := fWebQueue[0]; fWebQueue.Delete(0);
       WebDispatch(UTF8Decode(Command));
     end;
-    if Assigned(fWeb) and fWeb.Ready and not fWebFailed then begin
+    if Assigned(fWeb) and fWeb.Ready and fWebScriptReady and not fWebFailed then begin
       fWeb.SetBounds(0, 0, ClientWidth, ClientHeight);
       fWeb.SyncWindow;
       WebSync;
-    end else if not fWebFailed and (GetTickCount - fWebStartTick > 15000) then
-      WebError(Self, 'Chat renderer initialization timed out');
+    end;
+    if not fWebAppReady and not fWebFailed and (GetTickCount - fWebStartTick > 15000) then
+      WebError(Self, 'Chat startup handshake timed out (scripts=' +
+        BoolToStr(fWebScriptReady, True) + ', app=' + BoolToStr(fWebAppReady, True) + ')');
   finally
     if not (csDestroying in ComponentState) then fWebTimer.Enabled := True;
   end;
@@ -52,21 +52,19 @@ end;
 procedure TAgentPanelFrame.WebReady(Sender: TObject);
 begin
   if fWebFailed then Exit;
-  if Assigned(fWebRetry) then fWebRetry.Visible := False;
   fWebCache.Clear;
   fWebGeneration := -1;
   fWebTimelineRevision := -1;
   fWebState := '';
   fWebDraft := #1;
-  fWeb.Visible := True;
-  fWeb.BringToFront;
-  fWeb.SyncWindow;
 end;
 
 procedure TAgentPanelFrame.WebError(Sender: TObject; const Text: WideString);
 begin
   if fWebFailed then Exit;
   fWebFailed := True;
+  fWebAppReady := False;
+  fWebErrorText := String(Text);
   if Assigned(fWeb) then fWeb.Visible := False;
   if not Assigned(fWebRetry) then begin
     fWebRetry := TButton.Create(Self);
@@ -77,6 +75,15 @@ begin
   end;
   fWebRetry.Visible := True;
   fWebRetry.BringToFront;
+  if not Assigned(fWebDiagnostics) then begin
+    fWebDiagnostics := TButton.Create(Self);
+    fWebDiagnostics.Parent := Self;
+    fWebDiagnostics.SetBounds(8, 36, 180, 28);
+    fWebDiagnostics.Caption := 'Copy UI diagnostics';
+    fWebDiagnostics.OnClick := CopyWebDiagnostics;
+  end;
+  fWebDiagnostics.Visible := True;
+  fWebDiagnostics.BringToFront;
   AppendSystemMessage('Chat renderer unavailable: ' + String(Text));
 end;
 
@@ -85,8 +92,42 @@ begin
   FreeAndNil(fWeb);
   fWebQueue.Clear;
   fWebFailed := False;
+  fWebScriptReady := False;
+  fWebAppReady := False;
+  fWebErrorText := '';
   fWebStarted := False;
   fWebRetry.Visible := False;
+  if Assigned(fWebDiagnostics) then fWebDiagnostics.Visible := False;
+end;
+
+procedure TAgentPanelFrame.CopyWebDiagnostics(Sender: TObject);
+var Lines, Build: TStringList; Root, S: String; I: Integer;
+begin
+  Lines := TStringList.Create; Build := TStringList.Create;
+  try
+    Root := ExtractFilePath(Application.ExeName);
+    Lines.Add('DevCPlusAi ' + DEVCPP_VERSION);
+    Lines.Add('Base IDE: Red Panda Dev-C++ ' + DEVCPP_BASE_VERSION);
+    Lines.Add('Executable: ' + Application.ExeName);
+    Lines.Add('Renderer: WebView2 / local virtual host');
+    if Assigned(fWeb) then Lines.Add('WebView2 runtime: ' + String(fWeb.RuntimeVersion));
+    Lines.Add('Page scripts ready: ' + BoolToStr(fWebScriptReady, True));
+    Lines.Add('UI handshake ready: ' + BoolToStr(fWebAppReady, True));
+    Lines.Add('Last renderer error: ' + fWebErrorText);
+    Lines.Add('AgentWebHost.dll present: ' + BoolToStr(FileExists(Root + 'AgentWebHost.dll'), True));
+    Lines.Add('Chat page present: ' + BoolToStr(FileExists(Root + 'AgentWeb\index.html'), True));
+    if FileExists(Root + 'BUILD-INFO.txt') then begin
+      Build.LoadFromFile(Root + 'BUILD-INFO.txt');
+      for I := 0 to Build.Count - 1 do begin
+        S := Build[I];
+        if (Pos('Package-Version:', S) = 1) or (Pos('Source-Commit:', S) = 1) or
+           (Pos('Generated-UTC:', S) = 1) then Lines.Add(S);
+      end;
+    end;
+    { Deliberately do not read configuration, environment credentials or chat logs. }
+    Clipboard.AsText := Lines.Text;
+    if Sender = fWebDiagnostics then fWebDiagnostics.Caption := 'Diagnostics copied';
+  finally Build.Free; Lines.Free; end;
 end;
 
 procedure TAgentPanelFrame.WebMessage(Sender: TObject; const Text: WideString);
@@ -117,7 +158,16 @@ begin
     if Field = nil then Exit;
     if Field.Value <> 1 then Exit;
     Action := String(Value('action'));
-    if Action = 'draft' then begin
+    if Action = 'ready' then fWebScriptReady := True
+    else if Action = 'app-ready' then begin
+      if fWebScriptReady and Assigned(fWeb) and fWeb.Ready and not fWebFailed then begin
+        fWebAppReady := True;
+        if Assigned(fWebRetry) then fWebRetry.Visible := False;
+        if Assigned(fWebDiagnostics) then fWebDiagnostics.Visible := False;
+        fWeb.Visible := True; fWeb.BringToFront; fWeb.SyncWindow;
+      end;
+    end else if Action = 'diagnostics' then CopyWebDiagnostics(Self)
+    else if Action = 'draft' then begin
       memoInput.Text := String(Value('text')); fWebDraft := memoInput.Text;
     end else if Action = 'send' then begin
       if IsAgentBusy then begin

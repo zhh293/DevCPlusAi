@@ -38,6 +38,8 @@
 *.dcu
 /Source/manifest.RES
 /Source/spin.RES
+/Source/*.generated.res
+/Source/*.generated.rc
 /Source/Tests/AgentProtocolSmoke.exe
 /Source/Tests/AgentReaderSmoke.exe
 /Source/Tests/AgentPipeIOSmoke.exe
@@ -45,6 +47,8 @@
 /Source/Tests/AgentProviderSmoke.exe
 /Source/Tests/AgentFixtureCli.exe
 /Source/Tests/AgentMainSmoke.exe
+/Source/Tests/AgentWebNavigationSmoke.exe
+/Source/Tests/AgentWebPanelSmoke.exe
 *.lib
 *.ddp
 
@@ -101,6 +105,8 @@ package-lock.json
 /DevCPlusAi-*-windows-no-compiler.zip
 /DevCPlusAi-*-windows-no-compiler-self-extracting.exe
 /DevCPlusAi-*-windows-x64-gcc-self-extracting.exe
+/DevCPlusAi-*-windows-x64-gcc-setup.exe
+/DevCPlusAi-*-installer-test.exe
 
 # Local sample build output
 /test1.exe

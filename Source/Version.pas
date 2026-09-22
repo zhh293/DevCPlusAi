@@ -31,8 +31,9 @@ const
 {$ENDIF}
 
   // exe properties
-  DEVCPP = 'Red Panda Dev-C++';
-  DEVCPP_VERSION = '6.7.5';
+  DEVCPP = 'DevCPlusAi';
+  DEVCPP_VERSION = '1.0.2';
+  DEVCPP_BASE_VERSION = '6.7.5';
 
   // delimiters
   DEV_INTERNAL_OPEN = '$__DEV_INTERNAL_OPEN';

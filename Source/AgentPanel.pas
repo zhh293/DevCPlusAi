@@ -77,8 +77,11 @@ type
     fWebCache, fWebQueue: TStringList;
     fWebStarted: Boolean;
     fWebFailed: Boolean;
+    fWebScriptReady, fWebAppReady: Boolean;
+    fWebErrorText: String;
     fWebStartTick: DWORD;
     fWebRetry: TButton;
+    fWebDiagnostics: TButton;
     fWebGeneration: Integer;
     fWebTimelineRevision: Integer;
     fWebState, fWebDraft: String;
@@ -91,6 +94,7 @@ type
     procedure WebDispatch(const Text: WideString);
     procedure WebSync;
     procedure RetryWeb(Sender: TObject);
+    procedure CopyWebDiagnostics(Sender: TObject);
   private
     fOnPrepareContext: TNotifyEvent;
     fOnQuickAction: TNotifyEvent;
@@ -236,6 +240,7 @@ type
     function ExecuteEditCommand(Command: Integer; Target: TWinControl): Boolean;
     property Timeline: TAgentTimeline read fTimeline;
     property WebView: TAgentWebView read fWeb;
+    property WebAppReady: Boolean read fWebAppReady;
     property ToolTree: TTreeView read fTools;
     property ToolToggle: TButton read fToolToggle;
     property SessionPicker: TComboBox read fSessions;
@@ -267,7 +272,7 @@ type
   end;
 
 implementation
-uses uLkJSON, AgentWebProtocol, AgentApprovalFrm, AgentWebLinks, ShellAPI, devcfg, Variants;
+uses uLkJSON, AgentWebProtocol, AgentApprovalFrm, AgentWebLinks, ShellAPI, devcfg, Variants, Version;
 
 function AgentPanelUiText(const Utf8Bytes: AnsiString): String;
 begin

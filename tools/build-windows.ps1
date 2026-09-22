@@ -143,6 +143,7 @@ Push-Location $SourceRoot
 try {
     New-Item -ItemType Directory -Force -Path 'dcu' | Out-Null
     Invoke-NativeBuild $Brcc32Path @('manifest.rc') 'Compile application manifest'
+    & (Join-Path $PSScriptRoot 'write-product-resource.ps1') -Brcc32Path $Brcc32Path
     [IO.File]::WriteAllBytes($spinUpBmp,
         [Convert]::FromBase64String((Get-Content -Raw -LiteralPath 'spinup.bmp.b64').Trim()))
     [IO.File]::WriteAllBytes($spinDownBmp,
@@ -289,11 +290,12 @@ if (-not $SkipConsolePauser) {
 }
 
 & (Join-Path $PSScriptRoot 'deploy-agent-web.ps1') -Destination $RepoRoot
-$unicodeWebRoot = Join-Path $RepoRoot ('.tools\webview-unicode-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+$unicodeName = -join [char[]](0x4e2d,0x6587,0x8def,0x5f84)
+$unicodeWebRoot = Join-Path $RepoRoot ('.tools\' + $unicodeName + ' WebView # % & ' + [Guid]::NewGuid().ToString('N').Substring(0,8))
 try {
     New-Item -ItemType Directory -Force -Path $unicodeWebRoot | Out-Null
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'AgentWeb') -Destination (Join-Path $unicodeWebRoot 'AgentWeb') -Recurse -Force
-    $unicodePage = [Uri]::new((Join-Path $unicodeWebRoot 'AgentWeb\index.html')).AbsoluteUri
+    $unicodePage = Join-Path $unicodeWebRoot 'AgentWeb\index.html'
     $unicodeProfile = Join-Path $unicodeWebRoot 'profile'
     Push-Location $protocolTestRoot
     try {
@@ -303,14 +305,22 @@ try {
             '-N.\dcu',
             ('-U' + $SourceRoot)
         ) 'Compile WebView Unicode-path smoke test'
+        Invoke-NativeBuild $Dcc32Path @(
+            '-B', 'AgentWebPanelSmoke.dpr', '-N.\dcu', ('-R' + $SourceRoot),
+            ('-U' + $SourceRoot + ';' + ($mainUnitPaths -join ';'))
+        ) 'Compile real AgentPanel WebView smoke test'
     }
     finally {
         Pop-Location
     }
     Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentWebNavigationSmoke.exe') -TimeoutMilliseconds 20000 -Arguments ('"' + (Join-Path $RepoRoot 'AgentWebHost.dll') + '" "' + $unicodePage + '" "' + $unicodeProfile + '"')
+    # A successful navigation is not sufficient when a required script is absent.
+    Remove-Item -LiteralPath (Join-Path $unicodeWebRoot 'AgentWeb\panel.js')
+    Invoke-SmokeTest (Join-Path $protocolTestRoot 'AgentWebNavigationSmoke.exe') -TimeoutMilliseconds 20000 -Arguments ('"' + (Join-Path $RepoRoot 'AgentWebHost.dll') + '" "' + $unicodePage + '" "' + $unicodeProfile + '-negative" expect-failure')
 }
 finally {
     if (Test-Path -LiteralPath $unicodeWebRoot) {
+        if (-not [IO.Path]::GetFullPath($unicodeWebRoot).StartsWith((Join-Path $RepoRoot '.tools\'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe smoke cleanup path' }
         Remove-Item -LiteralPath $unicodeWebRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

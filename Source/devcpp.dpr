@@ -102,7 +102,7 @@ uses
   AgentPanel in 'AgentPanel.pas' {AgentPanelFrame: TFrame},
   AgentSetupFrm in 'AgentSetupFrm.pas' {AgentSetupForm};
 
-{$R *.res}
+{$R Product.generated.res}
 
 var
   AppData, INIFileName, ExeFolder: AnsiString;

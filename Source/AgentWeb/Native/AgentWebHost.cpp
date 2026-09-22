@@ -22,20 +22,12 @@ static std::wstring FilePathFromUri(const wchar_t* uri) {
     return std::wstring(buffer.data());
 }
 
-static bool SameLocalUri(const std::wstring& expected, const wchar_t* actual) {
-    if (!actual) return false;
-    std::wstring expectedPath = FilePathFromUri(expected.c_str());
-    std::wstring actualPath = FilePathFromUri(actual);
-    if (!expectedPath.empty() && !actualPath.empty())
-        return _wcsicmp(expectedPath.c_str(), actualPath.c_str()) == 0;
-    return _wcsicmp(expected.c_str(), actual) == 0;
-}
-
 struct State {
     HWND parent{};
     Notify notify{};
     void* context{};
     std::wstring uri;
+    std::wstring folder;
     bool closed{};
     bool pageLoaded{};
     ComPtr<ICoreWebView2Controller> controller;
@@ -43,25 +35,49 @@ struct State {
     void emit(int kind, const wchar_t* text) {
         if (!closed && notify && IsWindow(parent)) notify(context, kind, text);
     }
+    void error(const wchar_t* stage, HRESULT result) {
+        wchar_t text[256]{};
+        swprintf_s(text, L"%s (HRESULT 0x%08X)", stage, static_cast<unsigned>(result));
+        emit(2, text);
+    }
 };
 using Handle = std::shared_ptr<State>;
 extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
     const wchar_t* uri, const wchar_t* data, Notify notify, void* context) {
     if (!IsWindow(parent) || !uri || !data) return nullptr;
     auto s = std::make_shared<State>();
-    s->parent = parent; s->uri = uri; s->notify = notify; s->context = context;
+    s->parent = parent; s->notify = notify; s->context = context;
+    // Map the Unicode filesystem path directly. Do not round-trip it through
+    // ANSI file URLs or compare differently percent-encoded file: addresses.
+    std::wstring path = _wcsnicmp(uri, L"file:", 5) == 0 ? FilePathFromUri(uri) : uri;
+    const auto slash = path.find_last_of(L"\\/");
+    if (slash == std::wstring::npos || GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
+        return nullptr;
+    s->folder = path.substr(0, slash);
+    const auto filename = path.substr(slash + 1);
+    // Only a plain HTML entry point is accepted; assets are served from folder.
+    if (filename.find_first_of(L"%?#/\\") != std::wstring::npos) return nullptr;
+    s->uri = L"https://devcplusai.local/" + filename;
     auto hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, data, nullptr,
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
         [s](HRESULT result, ICoreWebView2Environment* env)->HRESULT {
             if (s->closed) return S_OK;
-            if (FAILED(result) || !env) {s->emit(2, L"WebView environment failed"); return S_OK;}
+            if (FAILED(result) || !env) {s->error(L"WebView environment failed", result); return S_OK;}
+            LPWSTR runtimeVersion{};
+            if (SUCCEEDED(env->get_BrowserVersionString(&runtimeVersion))) s->emit(3, runtimeVersion);
+            CoTaskMemFree(runtimeVersion);
             auto started = env->CreateCoreWebView2Controller(s->parent,
                 Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                 [s](HRESULT result, ICoreWebView2Controller* controller)->HRESULT {
                     if (s->closed) {if (controller) controller->Close(); return S_OK;}
-                    if (FAILED(result) || !controller) {s->emit(2, L"WebView controller failed"); return S_OK;}
+                    if (FAILED(result) || !controller) {s->error(L"WebView controller failed", result); return S_OK;}
                     s->controller = controller;
                     controller->get_CoreWebView2(&s->view);
+                    ComPtr<ICoreWebView2_3> view3;
+                    HRESULT mapped = s->view.As(&view3);
+                    if (SUCCEEDED(mapped)) mapped = view3->SetVirtualHostNameToFolderMapping(
+                        L"devcplusai.local", s->folder.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY);
+                    if (FAILED(mapped)) {s->error(L"Local web assets mapping failed", mapped); return S_OK;}
                     RECT bounds{}; GetClientRect(s->parent, &bounds); controller->put_Bounds(bounds);
                     controller->put_IsVisible(IsWindowVisible(s->parent));
                     ComPtr<ICoreWebView2Settings> settings;
@@ -77,7 +93,7 @@ extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
                     s->view->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>(
                         [s](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args)->HRESULT {
                             LPWSTR uri{}; args->get_Uri(&uri);
-                            if (s->closed || !SameLocalUri(s->uri, uri)) args->put_Cancel(TRUE);
+                            if (s->closed || !uri || s->uri != uri) args->put_Cancel(TRUE);
                             CoTaskMemFree(uri); return S_OK;
                         }).Get(), &token);
                     s->view->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>(
@@ -87,12 +103,9 @@ extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
                     s->view->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(
                         [s](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args)->HRESULT {
                             LPWSTR source{}, text{}; args->get_Source(&source);
-                            // WebView2 may expose the same file URL with a different
-                            // percent-encoding after a Unicode path is normalized. The
-                            // initial navigation is already restricted to s->uri; after
-                            // that succeeds, accept messages only from a local file page.
-                            if (s->pageLoaded && source &&
-                                _wcsnicmp(source, L"file:", 5) == 0 &&
+                            // DOM startup can post before NavigationCompleted. Queue
+                            // trusted-page messages immediately so ready is not lost.
+                            if (source && s->uri == source &&
                                 SUCCEEDED(args->TryGetWebMessageAsString(&text)))
                                 s->emit(1, text);
                             CoTaskMemFree(source); CoTaskMemFree(text); return S_OK;
@@ -100,13 +113,21 @@ extern "C" __declspec(dllexport) void* __cdecl ABCreate(HWND parent,
                     s->view->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>(
                         [s](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs* args)->HRESULT {
                             BOOL ok{}; args->get_IsSuccess(&ok); s->pageLoaded = ok != FALSE;
-                            s->emit(ok ? 0 : 2, ok ? L"ready" : L"Navigation failed");
+                            if (ok) s->emit(0, L"ready");
+                            else {
+                                COREWEBVIEW2_WEB_ERROR_STATUS status{};
+                                args->get_WebErrorStatus(&status);
+                                wchar_t text[128]{};
+                                swprintf_s(text, L"Local chat navigation failed (WebErrorStatus %d)", static_cast<int>(status));
+                                s->emit(2, text);
+                            }
                             return S_OK;
                         }).Get(), &token);
-                    s->view->Navigate(s->uri.c_str());
+                    HRESULT navigated = s->view->Navigate(s->uri.c_str());
+                    if (FAILED(navigated)) s->error(L"Navigate failed", navigated);
                     return S_OK;
                 }).Get());
-            if (FAILED(started)) s->emit(2, L"Controller initialization failed");
+            if (FAILED(started)) s->error(L"Controller initialization failed", started);
             return S_OK;
         }).Get());
     if (FAILED(hr)) return nullptr;

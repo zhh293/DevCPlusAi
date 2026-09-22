@@ -56,6 +56,13 @@ foreach ($file in $files) {
     }
     Copy-Item -LiteralPath $sourceFile -Destination $packageRoot -Force
 }
+$exeVersion = (Get-Item -LiteralPath (Join-Path $packageRoot 'devcpp.exe')).VersionInfo.ProductVersion
+if ($Version -match '^\d+\.\d+\.\d+$' -and $exeVersion -ne $Version) {
+    throw "Executable version $exeVersion does not match package $Version. Rebuild first."
+}
+foreach ($notes in Get-ChildItem -LiteralPath $RepoRoot -File -Filter 'RELEASE-*.md') {
+    Copy-Item -LiteralPath $notes.FullName -Destination $packageRoot
+}
 
 $directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
 if ($PackageType -eq 'X64Compiler') {
@@ -63,6 +70,17 @@ if ($PackageType -eq 'X64Compiler') {
 }
 foreach ($directory in $directories) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot $directory) -Destination $packageRoot -Recurse -Force
+}
+# Refuse a stale deployed web surface even if the executable has a new version.
+$webSource = Join-Path $RepoRoot 'Source\AgentWeb'
+foreach ($asset in @(Get-ChildItem -LiteralPath $webSource -File) + @(Get-ChildItem -LiteralPath (Join-Path $webSource 'vendor') -File)) {
+    if ($asset.Name -eq 'README.md') { continue }
+    $relative = $asset.FullName.Substring($webSource.Length + 1)
+    $deployed = Join-Path $packageRoot ('AgentWeb\' + $relative)
+    if (-not (Test-Path -LiteralPath $deployed) -or
+        (Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath $deployed).Hash) {
+        throw "Stale or missing web asset: $relative. Run build-windows.ps1 first."
+    }
 }
 
 foreach ($optionalDirectory in @('AStyle', 'ResEd')) {
@@ -85,6 +103,7 @@ if ($gitCommand) {
             'NEWS.txt', 'README.md', 'AGENT-RUNTIME-VERSIONS.txt', 'AgentWeb',
             'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs',
             'claude-cli', 'MinGW64', 'AStyle', 'ResEd', 'Source',
+            'tools', 'installer', 'RELEASE-*.md', '.gitignore',
             ':(exclude)Source/Tests/dcu-agent-main',
             ':(exclude)Source/Tests/ui-compile.log'
         )
@@ -103,12 +122,13 @@ $buildInfo = New-Object System.Collections.Generic.List[string]
 $buildInfo.Add('DevCPlusAi portable build')
 $buildInfo.Add("Package-Version: $Version")
 $buildInfo.Add("Package-Type: $PackageType")
+$buildInfo.Add("Executable-Version: $exeVersion")
 $buildInfo.Add("Source-Commit: $sourceCommit")
 $buildInfo.Add("Source-Dirty: $sourceDirty")
 $buildInfo.Add("Generated-UTC: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
 $buildInfo.Add('')
 $buildInfo.Add('Component SHA256:')
-foreach ($component in @('devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe')) {
+foreach ($component in @('devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe', 'AgentWebHost.dll')) {
     $componentPath = Join-Path $packageRoot $component
     $componentHash = (Get-FileHash -LiteralPath $componentPath -Algorithm SHA256).Hash
     $buildInfo.Add("$componentHash  $component")
@@ -122,22 +142,34 @@ if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
 
-$tar = Get-Command 'tar.exe' -ErrorAction SilentlyContinue
-if ($tar) {
-    & $tar.Source '-a' '-c' '-f' $zipPath '-C' $packageRoot '.'
-    if ($LASTEXITCODE -ne 0) {
-        throw "tar.exe failed with exit code $LASTEXITCODE"
-    }
-} else {
-    Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $zipPath -CompressionLevel Optimal
-}
-
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+# Explicit relative file entries: no './' root entry, Unix attributes, symbolic
+# links, or tar-specific ZIP extras. Windows Compressed Folders must see the same
+# tree as 7-Zip. Deflate is supported by every Windows ZIP extractor.
+$packageFiles = @(Get-ChildItem -LiteralPath $packageRoot -File -Recurse -Force | Sort-Object FullName)
+if ($packageFiles.Count -ge 65535) { throw 'ZIP64 entry count would exceed the portable ZIP contract' }
+$archive = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($file in $packageFiles) {
+        if ($file.Length -ge [uint32]::MaxValue) { throw "ZIP64 file is not supported: $($file.Name)" }
+        if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Package contains a link: $($file.FullName)" }
+        $name = $file.FullName.Substring($packageRoot.Length + 1).Replace('\', '/')
+        if ($name -match '(^|/)\.\.?(/|$)|[:\\]' -or $name.StartsWith('/')) { throw "Invalid ZIP entry: $name" }
+        $entry = [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $archive, $file.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
+        $entry.ExternalAttributes = 32 # DOS archive attribute
+    }
+} finally { $archive.Dispose() }
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 try {
     $archiveEntries = @{}
     foreach ($entry in $archive.Entries) {
-        $normalizedName = $entry.FullName.Replace('\', '/').TrimStart('.', '/')
+        $normalizedName = $entry.FullName
+        if ($normalizedName -match '(^|/)\.\.?(/|$)|[:\\]' -or $normalizedName.StartsWith('/')) {
+            throw "Non-portable ZIP entry: $normalizedName"
+        }
+        if ($archiveEntries.ContainsKey($normalizedName)) { throw "Duplicate ZIP entry: $normalizedName" }
         $archiveEntries[$normalizedName] = $entry
     }
     $requiredEntries = @(
@@ -149,6 +181,13 @@ try {
         'nodejs/node.exe',
         'claude-cli/bin/claude.exe',
         'AgentWeb/index.html',
+        'AgentWeb/panel.js',
+        'AgentWeb/panel.css',
+        'AgentWeb/messages.js',
+        'AgentWeb/highlight.js',
+        'AgentWeb/highlight.css',
+        'AgentWeb/layout.css',
+        'AgentWeb/vendor/marked.umd.js',
         'AGENT-RUNTIME-VERSIONS.txt',
         'BUILD-INFO.txt'
     )
@@ -186,6 +225,17 @@ try {
 finally {
     $archive.Dispose()
 }
+
+# This calls Windows' own compressed-folder handler, not a substitute library.
+$shell = New-Object -ComObject Shell.Application
+$zipFolder = $shell.NameSpace($zipPath)
+if ($null -eq $zipFolder -or $zipFolder.Items().Count -eq 0) {
+    throw 'Windows Compressed Folders could not open the generated ZIP'
+}
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($zipFolder)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)
+Write-Host 'Windows Compressed Folders recognized the ZIP directory.'
+& (Join-Path $PSScriptRoot 'test-portable-release.ps1') -ZipPath $zipPath
 
 $sevenZip = Get-Command '7z.exe' -ErrorAction SilentlyContinue
 if (-not $sevenZip) {

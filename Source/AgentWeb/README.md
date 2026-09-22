@@ -43,6 +43,10 @@ Browser actions: `draft`, `send`, `stop`, `session`, `new`, `rename-session`, `d
 
 ## Rendering and tests
 
+The native host maps the absolute asset directory to `https://devcplusai.local/` with WebView2 virtual-host mapping. It permits navigation and messages only for the configured entry page. The page posts `ready` after script initialization; the host sends initial state and waits for `app-ready` before revealing the modern surface. This separates navigation success from a working application. The diagnostics action copies only allowlisted version, path and renderer status fields.
+
+`tools/build-windows.ps1` exercises the real page in a directory containing Chinese characters, spaces, `#`, `%` and `&`, and rejects a missing-script fixture. `tools/package-portable.ps1` runs `tools/test-portable-release.ps1` against the final ZIP: Windows Shell extraction, every-file SHA256 comparison, real page handshake, native panel integration and bundled C++ compilation. These checks use isolated browser profiles and no model API calls.
+
 Marked 17.0.5 supplies Markdown tokens. Rendering creates fixed DOM nodes with text content; model output never becomes arbitrary HTML or JavaScript. Raw HTML is displayed as text. Links and images are represented as text, and message content cannot initiate network requests. Code blocks support syntax highlighting, soft wrapping, optional visual line numbers and folding; line numbers never enter the copied, opened or inserted source. The bundled Marked license is in `vendor/marked.LICENSE.md`.
 
 - `tools/verify-agent-web-messages.cjs` checks Markdown links, safe external-link dispatch, whole-answer and code copy, quoted text/code follow-ups, draft transactions, cancellable history removal, IME handling, selection retention, font settings, IDE context summaries, exact context previews and opt-out, duplicate attachment disambiguation, approval retry and path scope, composer-aware scrolling, structured tools, safe rendering and responsive layouts. `AgentProtocolSmoke.dpr` also checks native HTTP(S) URL validation against unsafe schemes, credentials, missing hosts and control characters.

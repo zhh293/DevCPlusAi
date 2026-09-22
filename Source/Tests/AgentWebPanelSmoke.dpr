@@ -44,10 +44,11 @@ begin
       repeat
         Pump(20);
         if Assigned(Panel.WebView) then
-          if Panel.WebView.Ready then Break;
+          if Panel.WebAppReady then Break;
       until GetTickCount - Started > 15000;
       if not Assigned(Panel.WebView) then raise Exception.Create('Web renderer not created');
       if not Panel.WebView.Ready then raise Exception.Create('Web renderer not ready');
+      if not Panel.WebAppReady then raise Exception.Create('Real panel startup handshake failed');
       Host.Left := -30000;
       Host.Show;
       Pump(250);

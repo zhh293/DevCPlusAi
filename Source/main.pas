@@ -6701,7 +6701,7 @@ var
   str: String;
   appName : String;
 begin
-  appName := Lang[ID_DEVCPP];
+  appName := DEVCPP;
   e := fEditorList.GetEditor;
   if Assigned(e) and not e.InProject then begin
     if e.Text.Modified then

@@ -10,6 +10,7 @@ type
   private
     fInstance: Pointer;
     fReady: Boolean;
+    fRuntimeVersion: WideString;
     fComInitialized: Boolean;
     fOnReady: TNotifyEvent;
     fOnMessage, fOnError: TAgentWebEvent;
@@ -26,6 +27,7 @@ type
     function BrowserVisible: Boolean;
     function PostJSON(const Json: WideString): Boolean;
     property Ready: Boolean read fReady;
+    property RuntimeVersion: WideString read fRuntimeVersion;
     property OnReady: TNotifyEvent read fOnReady write fOnReady;
     property OnMessage: TAgentWebEvent read fOnMessage write fOnMessage;
     property OnError: TAgentWebEvent read fOnError write fOnError;
@@ -169,6 +171,7 @@ begin
       fReady := False;
       if Assigned(fOnError) then fOnError(Self, Text);
     end;
+    3: fRuntimeVersion := Text;
   end;
 end;
 
