@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('NoCompiler', 'X64Compiler')]
     [string]$PackageType = 'NoCompiler'
@@ -80,10 +80,8 @@ function Invoke-InstallerStaticCheck {
     $requiredFragments = @(
         'Section "AI Agent Runtime"',
         'File "AGENT-RUNTIME-VERSIONS.txt"',
-        'File /r "nodejs\*"',
         'File /r "claude-cli\*"',
         'Delete "$INSTDIR\AGENT-RUNTIME-VERSIONS.txt"',
-        'RMDir /r "$INSTDIR\nodejs"',
         'RMDir /r "$INSTDIR\claude-cli"'
     )
     foreach ($fragment in $requiredFragments) {
@@ -130,6 +128,8 @@ function Invoke-ClaudeArgumentSmoke {
     $startInfo.WorkingDirectory = $RepoRoot
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    # Verify native startup without either bundled or system Node.js on PATH.
+    $startInfo.EnvironmentVariables['PATH'] = "$env:SystemRoot\System32;$env:SystemRoot"
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
@@ -243,11 +243,14 @@ $requiredFiles = @(
     'ConsolePauser.exe',
     'devcpp.exe.manifest',
     'AgentWebHost.dll',
+    'AgentWeb\index.html',
+    'AgentWeb\panel.js',
+    'AgentWeb\messages.js',
+    'AgentWeb\change-review.js',
     'LICENSE',
     'NEWS.txt',
     'README.md',
     'AGENT-RUNTIME-VERSIONS.txt',
-    'nodejs\node.exe',
     'claude-cli\bin\claude.exe'
 )
 foreach ($file in $requiredFiles) {
@@ -283,7 +286,6 @@ foreach ($installerScript in @(
 
 Invoke-AgentAsciiSourceCheck
 
-Invoke-VersionCheck 'nodejs\node.exe' 'v24.18.0'
 Invoke-VersionCheck 'claude-cli\bin\claude.exe' '2.1.211'
 Invoke-ClaudeCompatibilityCheck 'claude-cli\bin\claude.exe'
 

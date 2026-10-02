@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
     [string]$Version = 'dev',
@@ -64,7 +64,7 @@ foreach ($notes in Get-ChildItem -LiteralPath $RepoRoot -File -Filter 'RELEASE-*
     Copy-Item -LiteralPath $notes.FullName -Destination $packageRoot
 }
 
-$directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs', 'claude-cli')
+$directories = @('AgentWeb', 'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'claude-cli')
 if ($PackageType -eq 'X64Compiler') {
     $directories += 'MinGW64'
 }
@@ -101,7 +101,7 @@ if ($gitCommand) {
             'devcpp.exe', 'Packman.exe', 'PackMaker.exe', 'ConsolePauser.exe',
             'devcpp.exe.manifest', 'AgentWebHost.dll', 'RedPanda.ico', 'LICENSE',
             'NEWS.txt', 'README.md', 'AGENT-RUNTIME-VERSIONS.txt', 'AgentWeb',
-            'Lang', 'Templates', 'Icons', 'Help', 'contributes', 'nodejs',
+            'Lang', 'Templates', 'Icons', 'Help', 'contributes',
             'claude-cli', 'MinGW64', 'AStyle', 'ResEd', 'Source',
             'tools', 'installer', 'RELEASE-*.md', '.gitignore',
             ':(exclude)Source/Tests/dcu-agent-main',
@@ -166,6 +166,9 @@ try {
     $archiveEntries = @{}
     foreach ($entry in $archive.Entries) {
         $normalizedName = $entry.FullName
+        if ($normalizedName -match '^nodejs/') {
+            throw 'Native Claude release must not contain the legacy Node.js runtime.'
+        }
         if ($normalizedName -match '(^|/)\.\.?(/|$)|[:\\]' -or $normalizedName.StartsWith('/')) {
             throw "Non-portable ZIP entry: $normalizedName"
         }
@@ -178,12 +181,12 @@ try {
         'PackMaker.exe',
         'ConsolePauser.exe',
         'AgentWebHost.dll',
-        'nodejs/node.exe',
         'claude-cli/bin/claude.exe',
         'AgentWeb/index.html',
         'AgentWeb/panel.js',
         'AgentWeb/panel.css',
         'AgentWeb/messages.js',
+        'AgentWeb/change-review.js',
         'AgentWeb/highlight.js',
         'AgentWeb/highlight.css',
         'AgentWeb/layout.css',
@@ -309,7 +312,6 @@ if ($SelfExtracting) {
     foreach ($requiredEntry in @(
         'devcpp.exe',
         'AgentWebHost.dll',
-        'nodejs\node.exe',
         'claude-cli\bin\claude.exe',
         'AgentWeb\index.html',
         'AGENT-RUNTIME-VERSIONS.txt',

@@ -1,9 +1,9 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$NodeArchive = '',
     [string]$ClaudeCliSource = '',
     [string]$ClaudeCliArchive = '',
-    [string]$OutputRoot = (Join-Path $PSScriptRoot '..'),
+    [string]$OutputRoot = '',
     [string]$NodeVersion = '',
     [string]$ClaudeCliVersion = '',
     [switch]$VerifyOnly
@@ -27,18 +27,15 @@ function RequireDirectory([string]$Path, [string]$Description) {
     }
 }
 
+if (-not $OutputRoot) { $OutputRoot = Join-Path $PSScriptRoot '..' }
 $OutputRoot = (Resolve-Path -LiteralPath $OutputRoot).Path
 $NodeRoot = Join-Path $OutputRoot 'nodejs'
 $ClaudeRoot = Join-Path $OutputRoot 'claude-cli'
 $NodeExe = Join-Path $NodeRoot 'node.exe'
-$ClaudeCmd = Join-Path $ClaudeRoot 'bin\claude.cmd'
 $ClaudeExe = Join-Path $ClaudeRoot 'bin\claude.exe'
 $VersionFile = Join-Path $OutputRoot 'AGENT-RUNTIME-VERSIONS.txt'
 
 if (-not $VerifyOnly) {
-    if (($NodeArchive -eq '') -and (-not (Test-Path -LiteralPath $NodeRoot -PathType Container))) {
-        Fail 'pass -NodeArchive for a portable Node.js zip, or stage nodejs\ before running this script'
-    }
     if (($ClaudeCliSource -ne '') -and ($ClaudeCliArchive -ne '')) {
         Fail 'use only one of -ClaudeCliSource and -ClaudeCliArchive'
     }
@@ -67,10 +64,7 @@ if (-not $VerifyOnly) {
 
     if ($ClaudeCliSource -ne '') {
         RequireDirectory $ClaudeCliSource 'Claude CLI source directory'
-        if (-not (Test-Path -LiteralPath (Join-Path $ClaudeCliSource 'bin\claude.cmd') -PathType Leaf) -and
-            -not (Test-Path -LiteralPath (Join-Path $ClaudeCliSource 'bin\claude.exe') -PathType Leaf)) {
-            Fail 'Claude CLI source directory must contain bin\claude.cmd or bin\claude.exe'
-        }
+        RequireFile (Join-Path $ClaudeCliSource 'bin\claude.exe') 'native Claude CLI source executable'
         New-Item -ItemType Directory -Path $ClaudeRoot -Force | Out-Null
         Copy-Item (Join-Path $ClaudeCliSource '*') $ClaudeRoot -Recurse -Force
     }
@@ -82,16 +76,14 @@ if (-not $VerifyOnly) {
         try {
             Expand-Archive -LiteralPath $ClaudeCliArchive -DestinationPath $TempClaudeRoot -Force
             $ClaudeSourceRoot = Get-Item -LiteralPath $TempClaudeRoot
-            if (-not (Test-Path -LiteralPath (Join-Path $ClaudeSourceRoot.FullName 'bin\claude.exe') -PathType Leaf) -and
-                -not (Test-Path -LiteralPath (Join-Path $ClaudeSourceRoot.FullName 'bin\claude.cmd') -PathType Leaf)) {
+            if (-not (Test-Path -LiteralPath (Join-Path $ClaudeSourceRoot.FullName 'bin\claude.exe') -PathType Leaf)) {
                 $ClaudeSourceRoot = Get-ChildItem -LiteralPath $TempClaudeRoot -Directory |
                     Where-Object {
-                        (Test-Path -LiteralPath (Join-Path $_.FullName 'bin\claude.exe') -PathType Leaf) -or
-                        (Test-Path -LiteralPath (Join-Path $_.FullName 'bin\claude.cmd') -PathType Leaf)
+                        (Test-Path -LiteralPath (Join-Path $_.FullName 'bin\claude.exe') -PathType Leaf)
                     } | Select-Object -First 1
             }
             if ($null -eq $ClaudeSourceRoot) {
-                Fail 'Claude CLI archive has no bin\claude.exe or bin\claude.cmd'
+                Fail 'Claude CLI archive must contain native bin\claude.exe'
             }
             New-Item -ItemType Directory -Path $ClaudeRoot -Force | Out-Null
             Copy-Item (Join-Path $ClaudeSourceRoot.FullName '*') $ClaudeRoot -Recurse -Force
@@ -101,26 +93,19 @@ if (-not $VerifyOnly) {
     }
 }
 
-RequireFile $NodeExe 'bundled Node.js executable'
-$ClaudeLauncher = $ClaudeCmd
-if (-not (Test-Path -LiteralPath $ClaudeLauncher -PathType Leaf)) {
-    $ClaudeLauncher = $ClaudeExe
-}
-RequireFile $ClaudeLauncher 'bundled Claude CLI launcher (claude.cmd or claude.exe)'
+RequireFile $ClaudeExe 'native Claude CLI executable required for the Node-free release'
 
 $OriginalPath = $env:Path
 try {
     $env:Path = "$NodeRoot;$ClaudeRoot\bin;$OriginalPath"
-    $NodeReportedVersion = (& $NodeExe '--version' 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $NodeReportedVersion -eq '') {
-        Fail "node.exe could not be started: $NodeReportedVersion"
+    $NodeReportedVersion = 'not bundled (native Claude CLI)'
+    if ($NodeArchive -ne '' -or $NodeVersion -ne '') {
+        RequireFile $NodeExe 'explicitly requested optional Node.js executable'
+        $NodeReportedVersion = (& $NodeExe '--version' 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) { Fail 'Optional Node.js could not start' }
     }
 
-    if ([System.IO.Path]::GetExtension($ClaudeLauncher) -ieq '.cmd') {
-        $ClaudeReportedVersion = (& $env:ComSpec /d /s /c "call `"$ClaudeLauncher`" --version" 2>&1 | Out-String).Trim()
-    } else {
-        $ClaudeReportedVersion = (& $ClaudeLauncher '--version' 2>&1 | Out-String).Trim()
-    }
+    $ClaudeReportedVersion = (& $ClaudeExe '--version' 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $ClaudeReportedVersion -eq '') {
         Fail "Claude CLI could not be started: $ClaudeReportedVersion"
     }
@@ -130,6 +115,9 @@ try {
 
 if ($NodeVersion -ne '' -and $NodeReportedVersion -ne "v$NodeVersion") {
     Fail "expected Node.js v$NodeVersion but found $NodeReportedVersion"
+}
+if ($ClaudeCliVersion -ne '' -and $ClaudeReportedVersion -notmatch ('^' + [regex]::Escape($ClaudeCliVersion) + '(\s|$)')) {
+    Fail "expected Claude CLI $ClaudeCliVersion but found $ClaudeReportedVersion"
 }
 
 $VersionLines = @(

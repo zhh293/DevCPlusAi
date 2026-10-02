@@ -1,6 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.2',
+    [string]$Version = '1.0.3',
+    [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
+    [string]$PackageVersion = '',
+    [ValidateSet('Offline', 'Online')]
+    [string]$WebViewMode = 'Offline',
     [string]$NsisPath,
     [string]$WebViewInstallerPath,
     [switch]$TestBuild
@@ -8,8 +12,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Installer version must use major.minor.patch' }
-$zip = Join-Path $repo "DevCPlusAi-$Version-windows-x64-gcc.zip"
-$reportFile = Join-Path $repo ".tools\DevCPlusAi-$Version-windows-x64-gcc-acceptance.json"
+if (-not $PackageVersion) { $PackageVersion = $Version }
+$zip = Join-Path $repo "DevCPlusAi-$PackageVersion-windows-x64-gcc.zip"
+$reportFile = Join-Path $repo ".tools\DevCPlusAi-$PackageVersion-windows-x64-gcc-acceptance.json"
 if (-not (Test-Path -LiteralPath $zip) -or -not (Test-Path -LiteralPath $reportFile)) {
     throw 'Build and validate the compiler ZIP with package-portable.ps1 first.'
 }
@@ -22,16 +27,34 @@ if (-not $NsisPath) {
     $NsisPath = Join-Path $repo '.tools\nsis\nsis-3.11\makensis.exe'
     if (-not (Test-Path -LiteralPath $NsisPath)) { $NsisPath = (Get-Command makensis.exe -ErrorAction Stop).Source }
 }
-if (-not $WebViewInstallerPath) { $WebViewInstallerPath = Join-Path $repo '.tools\downloads\MicrosoftEdgeWebView2RuntimeInstallerX64.exe' }
+if (-not $WebViewInstallerPath) {
+    $runtimeName = if ($WebViewMode -eq 'Online') { 'MicrosoftEdgeWebview2Setup.exe' } else { 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe' }
+    $WebViewInstallerPath = Join-Path $repo ('.tools\downloads\' + $runtimeName)
+}
+if (-not (Test-Path -LiteralPath $WebViewInstallerPath)) {
+    throw "Missing WebView2 $WebViewMode installer: $WebViewInstallerPath. See installer/README.md."
+}
 $signature = Get-AuthenticodeSignature -LiteralPath $WebViewInstallerPath
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
-    throw 'The offline WebView2 installer must have a valid Microsoft signature.'
+    throw 'The WebView2 installer must have a valid Microsoft signature.'
+}
+if ($WebViewMode -eq 'Online' -and (Get-Item -LiteralPath $WebViewInstallerPath).Length -gt 10MB) {
+    throw 'Online mode requires the small Evergreen Bootstrapper, not the offline runtime.'
 }
 $buildRoot = Join-Path $repo ('.tools\installer-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
 $payload = Join-Path $buildRoot 'payload'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::ExtractToDirectory($zip, $payload)
+if (Test-Path -LiteralPath (Join-Path $payload 'nodejs')) {
+    throw 'Stale ZIP contains legacy Node.js. Rebuild with package-portable.ps1 first.'
+}
+if (Test-Path -LiteralPath (Join-Path $payload 'nodejs')) {
+    throw 'Stale ZIP contains legacy Node.js. Rebuild with package-portable.ps1 first.'
+}
+if (Test-Path -LiteralPath (Join-Path $payload 'nodejs')) {
+    throw 'Stale ZIP contains the legacy Node.js runtime. Rebuild with package-portable.ps1 first.'
+}
 $files = @(Get-ChildItem -LiteralPath $payload -File -Recurse)
 $manifest = New-Object Collections.Generic.List[string]
 foreach ($file in $files) {
@@ -45,13 +68,15 @@ foreach ($directory in (Get-ChildItem -LiteralPath $payload -Directory -Recurse 
 }
 $manifestPath = Join-Path $buildRoot 'delete-files.nsh'
 [IO.File]::WriteAllLines($manifestPath, $manifest, (New-Object Text.UTF8Encoding($true)))
-$name = "DevCPlusAi-$Version-windows-x64-gcc-setup.exe"
-if ($TestBuild) { $name = "DevCPlusAi-$Version-installer-test.exe" }
+$name = "DevCPlusAi-$PackageVersion-windows-x64-gcc-setup.exe"
+if ($WebViewMode -eq 'Online') { $name = "DevCPlusAi-$PackageVersion-windows-online-setup.exe" }
+if ($TestBuild) { $name = "DevCPlusAi-$PackageVersion-$($WebViewMode.ToLowerInvariant())-installer-test.exe" }
 $output = Join-Path $repo $name
 $arguments = @('/V2', '/INPUTCHARSET', 'UTF8', "/DVERSION=$Version", "/DOUTPUT=$output", "/DPAYLOAD=$payload",
     "/DWEBVIEW_INSTALLER=$WebViewInstallerPath", "/DDELETE_MANIFEST=$manifestPath",
     ('/DINSTALLED_KB=' + [int][Math]::Ceiling(($files | Measure-Object Length -Sum).Sum / 1024)))
-if ($TestBuild) { $arguments += @('/DPRODUCT_KEY=DevCPlusAi.InstallerTest', '/DSHORTCUT_NAME=DevCPlusAi Installer Test') }
+if ($WebViewMode -eq 'Online') { $arguments += '/DONLINE_WEBVIEW' }
+if ($TestBuild) { $arguments += @('/DTEST_BUILD', '/DPRODUCT_KEY=DevCPlusAi.InstallerTest', '/DSHORTCUT_NAME=DevCPlusAi Installer Test') }
 $arguments += (Join-Path $repo 'installer\DevCPlusAi.nsi')
 try {
     & $NsisPath @arguments

@@ -68,9 +68,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/prepare-agent-runtime.ps1 `
-            -NodeArchive "runtime-packages\node-v24.18.0-win-x64.zip" `
             -ClaudeCliArchive "runtime-packages\claude-code-2.1.211-win-x64.zip" `
-            -NodeVersion "24.18.0" `
             -ClaudeCliVersion "2.1.211"
 
       - name: Build with Delphi
@@ -139,8 +137,8 @@ jobs:
             ### 下载使用
             下载 `${{ steps.zip.outputs.zipname }}`，解压后运行其中的 `devcpp.exe` 即可。
 
-            > 该包由 Delphi 真实编译产出，内置 x64 GCC 编译器。AI CLI 运行时目录只有在仓库中提供
-            > `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt` 已通过构建前检查。
+            > 该包由 Delphi 编译产出，内置 x64 GCC 编译器。
+            > 原生 `claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt` 已通过构建前检查，无需独立 Node.js。
 
 # ============================================================================
 #  该工作流不自动安装 Delphi，也不伪造编译产物。若使用 GitHub-hosted

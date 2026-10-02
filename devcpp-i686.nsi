@@ -144,8 +144,6 @@ Section "AI Agent Runtime" SectionAIRuntime
   ; files mandatory here so a release cannot silently omit the Agent runtime.
   SetOutPath $INSTDIR
   File "AGENT-RUNTIME-VERSIONS.txt"
-  SetOutPath $INSTDIR\nodejs
-  File /r "nodejs\*"
   SetOutPath $INSTDIR\claude-cli
   File /r "claude-cli\*"
 SectionEnd

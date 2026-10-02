@@ -7861,7 +7861,8 @@ begin
     actShowTips.Execute;
 
   // AI Agent first-run setup wizard: shown when no API key is configured yet.
-  if Assigned(devAgentConfig) and (Trim(devAgentConfig.ApiKey) = '') then begin
+  if AgentComponentInstalled(ExtractFilePath(ParamStr(0))) and
+    Assigned(devAgentConfig) and (Trim(devAgentConfig.ApiKey) = '') then begin
     with TAgentSetupForm.Create(Self) do begin
       if ShowModal = mrOk then
         StartAgent;
@@ -9201,6 +9202,8 @@ var
   w, I: Integer;
   mi: TMenuItem;
 begin
+  if not AgentComponentInstalled(ExtractFilePath(ParamStr(0))) then
+    Exit;
   fAgentSessionFile := '';
   fAgentSessionId := '';
   fAgentWorkDir := '';

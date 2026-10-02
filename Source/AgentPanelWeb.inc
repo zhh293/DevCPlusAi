@@ -1,6 +1,6 @@
 procedure TAgentPanelFrame.WebTick(Sender: TObject);
-const Assets: array[0..7] of String = ('index.html', 'panel.js', 'panel.css',
-  'messages.js', 'highlight.js', 'highlight.css', 'layout.css', 'vendor\marked.umd.js');
+const Assets: array[0..8] of String = ('index.html', 'panel.js', 'panel.css',
+  'messages.js', 'change-review.js', 'highlight.js', 'highlight.css', 'layout.css', 'vendor\marked.umd.js');
 var Root, Page, Command: String; I: Integer;
 begin
   if (csDestroying in ComponentState) or (Parent = nil) then Exit;

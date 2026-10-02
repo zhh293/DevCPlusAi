@@ -275,10 +275,32 @@
     const prefix=root+(root&&!root.endsWith('\\')?'\\':'');
     return (prefix+normalized.join('\\')).replace(/\\$/,'').toLocaleLowerCase();
   }
+  function parseDiffCounts(value) {
+    const match=/^\+(\d+) \/ -(\d+) lines$/.exec(String(value||''));
+    return match ? {added:Number(match[1]),removed:Number(match[2])} : null;
+  }
+  const fileStateLabels={Added:'新增',Modified:'修改',Renamed:'重命名',Deleted:'删除','Written/edited':'已写入/编辑'};
+  function fileStateLabel(item) {
+    return item.undoState==='restored'?'已撤销':(fileStateLabels[item.fileState]||item.fileState||'文件变更');
+  }
+  function summarizeFileChanges(items) {
+    const files=new Map();let operations=0,added=0,removed=0,knownDiffs=0;
+    for(const item of Array.isArray(items)?items:[]) {
+      if(!item)continue;
+      const path=String(item.path||'').trim();if(!path)continue;
+      const key=canonicalWindowsPath(path);
+      const file=files.get(key)||{key,path,count:0,latest:item};
+      file.count++;file.latest=item;operations++;
+      files.delete(key);files.set(key,file);
+      const counts=parseDiffCounts(item.diffSummary);
+      if(counts){added+=counts.added;removed+=counts.removed;knownDiffs++;}
+    }
+    return {files,operations,added,removed,knownDiffs};
+  }
   function formatFileDiffSummary(value) {
     const summary=String(value||'');
-    const counts=/^\+(\d+) \/ -(\d+) lines$/.exec(summary);
-    if(counts)return '+'+counts[1]+' / -'+counts[2]+' 行';
+    const counts=parseDiffCounts(summary);
+    if(counts)return '+'+counts.added+' / -'+counts.removed+' 行';
     const labels={
       'Diff unavailable':'差异暂不可用',
       'File deleted':'文件已删除',
@@ -451,7 +473,7 @@
     }
     setBusy(value) {
       this.busy=!!value;
-      for(const button of this.root.querySelectorAll('.file-change-undo')) {
+      for(const button of [...this.items.values()].flatMap(entry=>[...entry.body.querySelectorAll('.file-change-undo')])) {
         if(this.busy&&button.dataset.confirm==='yes') {
           clearTimeout(button._confirmTimer);
           delete button.dataset.confirm;
@@ -535,6 +557,9 @@
     }
     upsert(item) {
       if (!item || typeof item.id !== 'string' || !['user','assistant','tool','system','file-change'].includes(item.kind)) return;
+      // Older hosts append this generated footer after the actual answer.
+      // Reviews now have their own panel; keep the answer and its copy clean.
+      if(item.kind==='assistant')item={...item,text:String(item.text||'').replace(/\r?\n\r?\n\*\*(?:Files changed this turn|Files handled by file tools) \(\d+\):\*\* Expand a file below to review its change\.[\s\S]*$/,'')};
       this.pending.set(item.id, {...item});
       this.schedule();
     }
@@ -563,15 +588,16 @@
             copy.onclick=()=>copyText(copy,entry.text,entry.body,'回答');
             actions.append(copy);node.append(actions);entry.copyButton=copy;
           }
-          this.root.append(node); this.items.set(id,entry);
+          // File reviews live in the changes panel, never below the answer.
+          if(item.kind!=='file-change')this.root.append(node);
+          this.items.set(id,entry);
         }
         entry.item={...item};
         if (entry.title && item.kind==='file-change') {
-          const labels={Added:'新增',Modified:'修改',Renamed:'重命名',Deleted:'删除','Written/edited':'已写入/编辑'};
-          const title=el('span',(labels[item.fileState]||item.fileState||'文件变化')+' · '+(item.path||'未知文件'));
+          const title=el('span',fileStateLabel(item)+' · '+(item.path||'未知文件'));
           title.className='file-change-title';
           entry.title.replaceChildren(title);
-          if(item.diffSummary){const summary=el('span',formatFileDiffSummary(item.diffSummary));summary.className='file-change-count';entry.title.append(summary);}
+          if(item.diffSummary&&item.diffSummary!=='Diff unavailable'){const summary=el('span',formatFileDiffSummary(item.diffSummary));summary.className='file-change-count';entry.title.append(summary);}
           entry.node.classList.toggle('failed',item.fileState==='Deleted');
         } else if (entry.title) {
           const states={running:'执行中',done:'已完成',failed:'失败',approval:'等待处理',authorized:'已允许 · 等待执行',answered:'已回答 · 等待继续',denied:'已拒绝',interrupted:'请求已失效'};
@@ -630,8 +656,12 @@
               else if(context){row.dataset.line=String(newLine++);row.title='修改后第'+row.dataset.line+'行';oldLine++;}
               code.append(row,document.createTextNode('\n'));
             }
-            pre.append(code);card.append(meta,pre);
-            if(/^\+\d+ \/ -\d+ lines$/.test(String(item.diffSummary||''))){
+            pre.append(code);
+            if(item.diffSummary==='Diff unavailable') {
+              const note=el('p','未记录修改前的内容，无法逐行比较。可打开当前文件检查；这不代表修改失败。');
+              note.className='file-change-meta';card.append(note);
+            } else card.append(meta,pre);
+            if(parseDiffCounts(item.diffSummary)){
               const copy=el('button','复制差异');copy.type='button';copy.className='file-change-copy';
               copy.onclick=()=>copyText(copy,diffText,code,'差异');card.append(copy);
             }
@@ -708,5 +738,5 @@
       this.publishFileChanges();
     }
   }
-  window.AgentMessages = {markdown, MessageView, formatContextSummary};
+  window.AgentMessages = {markdown, MessageView, formatContextSummary, parseDiffCounts, fileStateLabel, summarizeFileChanges};
 })();

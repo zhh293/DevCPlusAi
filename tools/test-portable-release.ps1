@@ -16,6 +16,7 @@ function Run-Probe([string]$File, [string]$Arguments, [int]$Timeout = 45000) {
     $info.RedirectStandardError = $true
     # Do not share the user's browser profile or application settings.
     $info.EnvironmentVariables['LOCALAPPDATA'] = (Join-Path $testRoot 'test-profile')
+    $info.EnvironmentVariables['PATH'] = "$(Join-Path $testRoot 'MinGW64\bin');$env:SystemRoot\System32;$env:SystemRoot"
     $process = New-Object Diagnostics.Process
     $process.StartInfo = $info
     try {
@@ -73,6 +74,9 @@ try {
         if (-not $verified) { throw "Windows extraction content mismatch: $($entry.FullName)" }
     }
     Write-Host "PASS: Windows extracted all $count files with matching SHA256."
+    if (Test-Path -LiteralPath (Join-Path $testRoot 'nodejs')) { throw 'Unexpected standalone Node.js in native release' }
+    $cliResult = Run-Probe (Join-Path $testRoot 'claude-cli\bin\claude.exe') '--version'
+    if ($cliResult -notmatch 'Claude Code') { throw 'Native Claude CLI failed without Node.js' }
     # Web assets support Unicode/punctuation independently of the legacy GCC
     # toolchain (whose specs treat '%' specially in its installation path).
     $webRoot = Join-Path $testRoot ($unicodeName + ' WebView # % &')
@@ -107,6 +111,7 @@ try {
         web = $webResult
         panel = $panelResult
         compiler = $compilerResult
+        nativeClaudeWithoutNode = $cliResult
         utc = [DateTime]::UtcNow.ToString('o')
     }
     $reportPath = Join-Path $repo ('.tools\' + [IO.Path]::GetFileNameWithoutExtension($ZipPath) + '-acceptance.json')

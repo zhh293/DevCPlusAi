@@ -68,6 +68,12 @@ var
   TestCompilerEnvironment: PChar;
 begin
   try
+    if ParamStr(1) = '--expect-ai' then begin
+      Require(AgentComponentInstalled(ParamStr(2)) = (ParamStr(3) = '1'),
+        'installer component manifest mismatch');
+      Writeln('PASS: installed AI component state');
+      Halt(0);
+    end;
     Writeln('Agent provider smoke test: default and legacy models');
     Require(NormalizeAgentModel('deepseek', '') = 'deepseek-v4-flash',
       'empty DeepSeek model did not select Flash');

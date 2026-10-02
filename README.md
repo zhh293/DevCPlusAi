@@ -1,6 +1,16 @@
 # DevCPlusAi
 
-当前版本：**1.0.2**。推荐下载 `DevCPlusAi-1.0.2-windows-x64-gcc-setup.exe`，包含编译器并自动创建开始菜单入口；也提供可直接解压运行的 ZIP。本版修复 Windows 自带 ZIP 解压器兼容性、特殊路径下 AI 界面加载和启动检测，详见 [v1.0.2 更新说明](RELEASE-v1.0.2.md)。
+当前版本：**1.0.3**。新增在线安装选项和组件选择，详见 [v1.0.3 更新说明](RELEASE-v1.0.3.md)。
+
+| 安装包 | 适用情况 |
+| --- | --- |
+| `DevCPlusAi-1.0.3-windows-online-setup.exe` | 常规使用。内置编辑器、编译器和 AI 组件，按需勾选；缺少 WebView2 时从微软下载安装。 |
+| `DevCPlusAi-1.0.3-windows-x64-gcc-setup.exe` | 离线安装。额外包含完整 WebView2 安装程序，同样支持组件选择。 |
+| `DevCPlusAi-1.0.3-windows-x64-gcc.zip` | 便携使用。完整解压后运行 `devcpp.exe`，不会自动添加开始菜单入口。 |
+
+在安装向导中，可选择“完整安装”“C/C++ 开发（不含 AI）”“AI 助手（使用已有编译器）”或“仅编辑器”。不安装编译器时需自行指定已有编译器；不安装 AI 时不会弹出 AI 设置或加载聊天面板。以后可以重新运行安装包补装组件，未勾选的已有组件和个人配置会保留。
+
+在线版只将 WebView2 改为按需下载；组件勾选影响安装后的磁盘占用，不会改变安装包本身的下载大小。当前所有可选组件仍内置于同一安装包。
 
 DevCPlusAi 是一款**集成了 AI 编程助手的 C/C++ 集成开发环境（IDE）**。它在经典的小熊猫 Dev-C++ 编辑器内核之上，把一个 AI Agent（基于 Claude Code CLI）直接嵌入到 IDE 中，让你在写代码的同时就能与 AI 对话、答疑、生成与修改代码，无需离开编辑器、也无需在浏览器和 IDE 之间来回切换。
 
@@ -127,10 +137,10 @@ DevCPlusAi 是一个 **Windows + Delphi / Object Pascal** 工程，需要在 Win
 
 1. 在 Delphi / RAD Studio 中打开 `Source/devcpp.dpr`。
 2. 编译生成可执行文件。
-3. 发布包会内置 portable Node.js 和锁定版本的 AI CLI（默认路径为程序目录下的 `claude-cli\bin\claude.exe`，也兼容 `claude.cmd`）；开发环境也可以在配置向导中指定外部 CLI。
+3. 发布包内置锁定版本的原生 AI CLI，默认路径为 `claude-cli\bin\claude.exe`，无需独立 Node.js。开发环境仍可在配置向导中指定外部 CLI（包括 `claude.cmd`）。
 4. 首次运行 IDE 时会弹出配置向导，填写服务商、API Key、Base URL 与模型后即可开始使用 AI 对话面板。后续可通过 `工具 → AI Settings...` 修改配置。使用 `视图 → AI Assistant` 或 `Ctrl+Alt+A` 切换 AI 面板，`Ctrl+L` 聚焦输入框；`Ctrl+Shift+A` 保留给原有代码格式化功能。
 
-API Key 只在进程内以明文使用，写入 IDE 配置时会通过 Windows DPAPI 加密；旧版本留下的明文配置会兼容读取，并在下次保存时迁移为密文。发布包必须包含 `nodejs`、`claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt`，不能只发布主程序。Provider 配置只注入 Agent 子进程，不调用 cc-switch，也不修改全局 Claude settings。
+API Key 只在进程内以明文使用，写入 IDE 配置时会通过 Windows DPAPI 加密；旧版本留下的明文配置会兼容读取，并在下次保存时迁移为密文。发布包必须包含 `claude-cli` 和 `AGENT-RUNTIME-VERSIONS.txt`，不能只发布主程序。Provider 配置只注入 Agent 子进程，不调用 cc-switch，也不修改全局 Claude settings。
 
 ### 准备发布包运行时
 
@@ -138,13 +148,11 @@ API Key 只在进程内以明文使用，写入 IDE 配置时会通过 Windows D
 
 ```powershell
 .\tools\prepare-agent-runtime.ps1 `
-  -NodeArchive .\path\to\node-vXX.YY.ZZ-win-x64.zip `
   -ClaudeCliSource .\path\to\claude-cli `
-  -NodeVersion XX.YY.ZZ `
   -ClaudeCliVersion X.Y.Z
 ```
 
-也可以把 `-ClaudeCliSource` 换成已经解压好的 CLI 目录。脚本会验证 `node.exe` 和 `claude.exe/claude.cmd --version`，生成 `AGENT-RUNTIME-VERSIONS.txt`。NSIS 和 Release workflow 会把运行时作为必需资源；缺少运行时会直接失败，不会生成一个表面可安装但无法使用 Agent 的包。正式分发前还需要确认 Node.js 和 Claude CLI 的再分发许可。
+也可以把 `-ClaudeCliSource` 换成已经解压好的 CLI 目录。脚本会验证 原生 `claude.exe --version`，生成 `AGENT-RUNTIME-VERSIONS.txt`。NSIS 和 Release workflow 会把运行时作为必需资源；缺少运行时会直接失败，不会生成一个表面可安装但无法使用 Agent 的包。正式分发前还需要确认 Claude CLI 的再分发许可。
 
 ## 本地构建完整安装包
 
@@ -169,7 +177,7 @@ ConsolePauser.exe
 MinGW64/
 Lang/ Templates/ Help/ Icons/
 AStyle/ ResEd/ contributes/
-nodejs/ claude-cli/ AGENT-RUNTIME-VERSIONS.txt
+claude-cli/ AGENT-RUNTIME-VERSIONS.txt
 ```
 
 ### 2. 解压 Agent 运行时
@@ -187,7 +195,6 @@ nodejs/ claude-cli/ AGENT-RUNTIME-VERSIONS.txt
 确认启动器存在：
 
 ```powershell
-.\nodejs\node.exe --version
 .\claude-cli\bin\claude.exe --version
 ```
 
@@ -272,14 +279,13 @@ makensis.exe devcpp-x64.nsi
 Dev-Cpp.6.7.5.MinGW-w64 X86_64 GCC 10.3 .Setup.exe
 ```
 
-NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需文件规则。缺少运行时会直接失败，不能通过跳过文件生成不完整安装包。
+NSIS 对 `claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需文件规则。缺少运行时会直接失败，不能通过跳过文件生成不完整安装包。
 
 ### 5. 安装后验收
 
 在干净的 Windows 目录安装后，先检查：
 
 ```bat
-<安装目录>\nodejs\node.exe --version
 <安装目录>\claude-cli\bin\claude.exe --version
 ```
 
@@ -293,7 +299,7 @@ NSIS 对 `nodejs/`、`claude-cli/` 和 `AGENT-RUNTIME-VERSIONS.txt` 使用必需
 - Claude CLI 无法启动：确认使用 Windows x64，并先单独运行 `claude.exe --version`。
 - CLI 可以启动但对话失败：检查 API Key、网络、Provider 和 Anthropic-compatible Base URL；这不是安装问题。
 
-当前 `devcpp-i686.nsi` 不应直接复用 x64 runtime。若要发布 i686 版本，需要单独准备与目标系统兼容的 Node.js 和 Claude CLI 运行时。
+当前 `devcpp-i686.nsi` 不应直接复用 x64 runtime。若要发布 i686 版本，需要单独准备与目标系统兼容的原生 Claude CLI 运行时。
 
 > 说明：本仓库基于小熊猫 Dev-C++（Red Panda Dev-C++）的编辑器内核进行二次开发，在其之上新增了完整的 AI Agent 集成能力。
 

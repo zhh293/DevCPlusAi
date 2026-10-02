@@ -87,11 +87,25 @@ const
 function NormalizeAgentModel(const Provider, Model: String): String;
 function NormalizeAgentBaseUrl(const Provider, BaseUrl: String): String;
 function AgentCliModel(const Provider, Model: String): String;
+function AgentComponentInstalled(const InstallDir: String): Boolean;
 
 implementation
 
 uses
-  devCFG;
+  devCFG, IniFiles;
+
+function AgentComponentInstalled(const InstallDir: String): Boolean;
+var Settings: TIniFile;
+begin
+  // Portable and older installs have no component manifest.
+  Settings := TIniFile.Create(IncludeTrailingPathDelimiter(InstallDir) +
+    'installation.ini');
+  try
+    Result := Settings.ReadBool('Components', 'AI', True);
+  finally
+    Settings.Free;
+  end;
+end;
 
 type
   TAgentDataBlob = record

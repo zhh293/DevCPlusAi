@@ -32,7 +32,7 @@ const
 
   // exe properties
   DEVCPP = 'DevCPlusAi';
-  DEVCPP_VERSION = '1.0.2';
+  DEVCPP_VERSION = '1.0.3';
   DEVCPP_BASE_VERSION = '6.7.5';
 
   // delimiters
